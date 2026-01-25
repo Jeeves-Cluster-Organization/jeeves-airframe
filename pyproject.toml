@@ -49,8 +49,9 @@ Documentation = "https://github.com/Jeeves-Cluster-Organization/jeeves-airframe/
 Repository = "https://github.com/Jeeves-Cluster-Organization/jeeves-airframe.git"
 Issues = "https://github.com/Jeeves-Cluster-Organization/jeeves-airframe/issues"
 
-[tool.setuptools]
-packages = ["airframe"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["airframe*"]
 
 [tool.setuptools.package-data]
 airframe = ["py.typed"]
