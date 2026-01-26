@@ -123,14 +123,20 @@ class LlamaServerAdapter(BackendAdapter):
                 "stream": request.stream,
             }
         # native llama.cpp completion
-        return {
+        payload = {
             "prompt": "\n".join([m.content for m in request.messages]),
             "n_predict": request.max_tokens or 512,
             "temperature": request.temperature or 0.7,
-            "stop": [],
+            "stop": [],  # Default empty
             "stream": request.stream,
             "cache_prompt": True,
         }
+
+        # Merge extra_params (precedence: per-call > AgentConfig > defaults)
+        if request.extra_params:
+            payload.update(request.extra_params)
+
+        return payload
 
     async def _stream_sse(self, response: "httpx.Response") -> AsyncIterator[InferenceStreamEvent]:
         async for line in response.aiter_lines():
