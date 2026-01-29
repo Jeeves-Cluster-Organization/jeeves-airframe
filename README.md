@@ -1,151 +1,106 @@
-# Jeeves-Airframe
+# jeeves-infra
 
-Inference platform abstraction layer for Jeeves. Handles endpoint representation, backend adapters, health signals, and streaming contracts independently from agent logic and capability concerns.
-
-## Quick Start
-
-```bash
-# Install
-pip install jeeves-airframe
-
-# With K8s support
-pip install "jeeves-airframe[k8s]"
-
-# Development
-pip install "jeeves-airframe[dev]"
-```
+Infrastructure layer for Jeeves - adapters above the kernel.
 
 ## Architecture
 
 ```
-airframe/
-├── __init__.py          # Public exports
-├── types.py             # InferenceRequest, Message, StreamEvent, etc.
-├── endpoints.py         # EndpointSpec, HealthState, BackendKind
-├── registry.py          # EndpointRegistry, StaticRegistry
-├── client.py            # AirframeClient (adapter dispatch)
-├── health.py            # HealthProbe, HttpHealthProbe
-├── telemetry.py         # Observability hooks
-├── selftest.py          # Import verification
-├── CONSTITUTION.md      # Architectural principles
-├── adapters/
-│   ├── base.py          # BackendAdapter ABC
-│   ├── llama_server.py  # llama.cpp server adapter
-│   └── openai_chat.py   # OpenAI Chat Completions adapter
-└── k8s/
-    ├── __init__.py      # K8sRegistry export
-    ├── registry.py      # ConfigMap-based registry
-    └── types.py         # K8s-specific types
+Capabilities (User Space)
+       │
+       ↓
+jeeves-infra (Kernel Modules / Drivers)  <- THIS PACKAGE
+       │
+       ↓
+jeeves-core (Microkernel - Go)
 ```
 
-## Core Concepts
+This package provides infrastructure implementations for the jeeves-core microkernel:
 
-### Endpoint Registry
-Discover and manage inference endpoints dynamically.
+- **gateway/** - HTTP/WebSocket/gRPC translation (FastAPI)
+- **llm/** - LLM providers (LiteLLM, OpenAI HTTP, Mock)
+- **postgres/** - PostgreSQL + pgvector implementations
+- **redis/** - Distributed state backend
+- **memory/** - Memory service implementations (repositories, services)
+- **runtime/** - Python agent/pipeline execution
+- **protocols/** - Type definitions and interfaces
+- **observability/** - Metrics and tracing
+- **tools/** - Tool executor
 
-```python
-from airframe import StaticRegistry, EndpointSpec, BackendKind
-
-registry = StaticRegistry([
-    EndpointSpec(
-        name="local-llama",
-        base_url="http://localhost:8080",
-        backend_kind=BackendKind.LLAMA_SERVER,
-    ),
-])
-```
-
-### Inference Streaming
-Stream responses asynchronously with built-in error handling.
-
-```python
-from airframe import AirframeClient, InferenceRequest, Message
-
-client = AirframeClient(registry=registry)
-request = InferenceRequest(
-    messages=[Message(role="user", content="Hello, world!")],
-    model="default",
-)
-
-async for event in client.stream(request):
-    print(event)
-```
-
-### Health Monitoring
-Check endpoint health and capacity.
-
-```python
-from airframe import HttpHealthProbe
-
-probe = HttpHealthProbe(base_url="http://localhost:8080")
-health_state = await probe.check()
-print(f"Status: {health_state.status}")
-print(f"Capacity: {health_state.capacity_used}/{health_state.capacity_total}")
-```
-
-## Error Handling
-
-Airframe normalizes errors across backends into stable categories:
-
-- **timeout**: Request exceeded deadline
-- **connection**: Network/DNS failure
-- **backend**: Server returned error
-- **parse**: Response parsing failed
-- **unknown**: Uncategorized error
-
-```python
-from airframe import AirframeError, ErrorCategory
-
-try:
-    async for event in client.stream(request):
-        process(event)
-except AirframeError as e:
-    if e.category == ErrorCategory.TIMEOUT:
-        retry_with_backoff()
-    elif e.category == ErrorCategory.CONNECTION:
-        fallback_endpoint()
-    else:
-        log_and_escalate(e)
-```
-
-## Verification
+## Installation
 
 ```bash
-# Basic selftest
-python -m airframe.selftest
+# Core only (gRPC, protocols)
+pip install jeeves-infra
 
-# Run tests
-pytest tests/ -v
+# With specific features
+pip install jeeves-infra[gateway]    # FastAPI, WebSocket
+pip install jeeves-infra[postgres]   # PostgreSQL, pgvector
+pip install jeeves-infra[redis]      # Redis client
+pip install jeeves-infra[embeddings] # Sentence transformers
+pip install jeeves-infra[llm]        # LiteLLM, tiktoken
 
-# With K8s deps
-pytest tests/k8s/ -v
+# All features
+pip install jeeves-infra[all]
+
+# Development
+pip install jeeves-infra[dev]
 ```
 
-## Dependencies
+## Quick Start
 
-**Core:**
-- httpx (streaming HTTP)
-- pydantic (type validation)
-- structlog (structured logging)
+```python
+from jeeves_infra.protocols import (
+    RequestContext,
+    LLMProviderProtocol,
+    Envelope,
+    AgentConfig,
+)
+from jeeves_infra.llm import OpenAIHTTPProvider
+from jeeves_infra.runtime import Agent, PipelineRunner
+from jeeves_infra.kernel_client import get_kernel_client
 
-**Optional:**
-- kubernetes (K8s ConfigMap registry)
-- PyYAML (K8s YAML parsing)
+# Use protocols for type safety
+from jeeves_infra.postgres import PostgreSQLClient
+from jeeves_infra.gateway import create_gateway_app
+```
 
-## Constitution
+## Packages
 
-See [CONSTITUTION.md](./CONSTITUTION.md) for architectural principles:
+### jeeves_infra
 
-- **Ownership**: Airframe owns endpoints, adapters, health; capabilities own routing policy
-- **Stream-first**: All inference exposed as async streams
-- **Error taxonomy**: Stable categories across backends
-- **Backend isolation**: Adapters normalize protocol differences
-- **Optional K8s**: Kubernetes integration never required
+Core infrastructure with 230+ type exports:
+- Protocols and interfaces
+- LLM providers
+- Gateway (HTTP/WS/gRPC)
+- Memory services
+- Database clients
+- Observability
+
+### mission_system
+
+Capability-agnostic orchestration infrastructure:
+- Agent profiles and configuration
+- Prompt templates and blocks
+- Event handling
+- Vertical services
+
+## Optional Dependencies
+
+| Extra | Description |
+|-------|-------------|
+| `gateway` | FastAPI, uvicorn, websockets, SSE |
+| `postgres` | asyncpg, SQLAlchemy, pgvector |
+| `redis` | Redis client |
+| `embeddings` | Sentence transformers, numpy |
+| `llm` | LiteLLM, tiktoken |
+| `dev` | pytest, black, ruff, mypy |
+| `all` | All optional dependencies |
+
+## Requirements
+
+- Python 3.11+
+- gRPC and protobuf (core)
 
 ## License
 
-Apache License 2.0
-
-## Contributing
-
-Bug reports and feature requests welcome at https://github.com/Jeeves-Cluster-Organization/jeeves-airframe/issues
+Apache-2.0
