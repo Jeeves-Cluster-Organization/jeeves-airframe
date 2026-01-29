@@ -8,7 +8,7 @@ Architecture:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Protocol, AsyncIterator, Tuple, TYPE_CHECKING
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Protocol, AsyncIterator, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from jeeves_infra.protocols import Envelope, AgentConfig, PipelineConfig
@@ -60,8 +60,8 @@ class EventContext(Protocol):
 # =============================================================================
 
 LLMProviderFactory = Callable[[str], LLMProvider]
-PreProcessHook = Callable[["Envelope", Optional["Agent"]], "Envelope"]
-PostProcessHook = Callable[["Envelope", Dict[str, Any], Optional["Agent"]], "Envelope"]
+PreProcessHook = Callable[["Envelope", Optional["Agent"]], Awaitable["Envelope"]]
+PostProcessHook = Callable[["Envelope", Dict[str, Any], Optional["Agent"]], Awaitable["Envelope"]]
 MockHandler = Callable[["Envelope"], Dict[str, Any]]
 
 
@@ -113,9 +113,9 @@ class Agent:
         if self.event_context:
             await self.event_context.emit_agent_started(self.name)
 
-        # Pre-process hook
+        # Pre-process hook (async)
         if self.pre_process:
-            envelope = self.pre_process(envelope, self)
+            envelope = await self.pre_process(envelope, self)
 
         # Get output
         if self.use_mock and self.mock_handler:
@@ -152,9 +152,9 @@ class Agent:
                     actual_fields=output_keys,
                 )
 
-        # Post-process hook
+        # Post-process hook (async)
         if self.post_process:
-            envelope = self.post_process(envelope, output, self)
+            envelope = await self.post_process(envelope, output, self)
 
         # Store output
         envelope.outputs[self.config.output_key] = output
@@ -350,9 +350,9 @@ class Agent:
 
         self.logger.info(f"{self.name}_stream_started", envelope_id=envelope.envelope_id)
 
-        # Pre-process hook
+        # Pre-process hook (async)
         if self.pre_process:
-            envelope = self.pre_process(envelope, self)
+            envelope = await self.pre_process(envelope, self)
 
         # Determine if tokens should be authoritative
         is_authoritative = self.config.token_stream == TokenStreamMode.AUTHORITATIVE
