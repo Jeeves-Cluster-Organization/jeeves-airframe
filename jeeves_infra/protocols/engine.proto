@@ -1,0 +1,782 @@
+// Engine gRPC Service - Python <-> Go runtime bridge
+//
+// This is the primary IPC mechanism between Python orchestration
+// and Go execution engine. Replaces subprocess-based JSON IPC.
+//
+// Compile Go:
+//   protoc --go_out=. --go-grpc_out=. coreengine/proto/engine.proto
+//
+// Compile Python:
+//   python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. coreengine/proto/engine.proto
+
+syntax = "proto3";
+
+package jeeves.engine.v1;
+
+option go_package = "github.com/jeeves-cluster-organization/codeanalysis/coreengine/proto";
+
+// =============================================================================
+// KernelService - Process lifecycle and resource management
+// =============================================================================
+service KernelService {
+    // Process lifecycle
+    rpc CreateProcess(CreateProcessRequest) returns (ProcessControlBlock);
+    rpc GetProcess(GetProcessRequest) returns (ProcessControlBlock);
+    rpc ScheduleProcess(ScheduleProcessRequest) returns (ProcessControlBlock);
+    rpc GetNextRunnable(GetNextRunnableRequest) returns (ProcessControlBlock);
+    rpc TransitionState(TransitionStateRequest) returns (ProcessControlBlock);
+    rpc TerminateProcess(TerminateProcessRequest) returns (ProcessControlBlock);
+
+    // Resource management
+    rpc CheckQuota(CheckQuotaRequest) returns (QuotaResult);
+    rpc RecordUsage(RecordUsageRequest) returns (ResourceUsage);
+    rpc CheckRateLimit(CheckRateLimitRequest) returns (RateLimitResult);
+
+    // Queries
+    rpc ListProcesses(ListProcessesRequest) returns (ListProcessesResponse);
+    rpc GetProcessCounts(GetProcessCountsRequest) returns (ProcessCountsResponse);
+}
+
+// =============================================================================
+// EngineService - Go runtime operations
+// =============================================================================
+service EngineService {
+    // Envelope lifecycle
+    rpc CreateEnvelope(CreateEnvelopeRequest) returns (Envelope);
+    rpc UpdateEnvelope(UpdateEnvelopeRequest) returns (Envelope);
+    
+    // Bounds checking (Go is authoritative)
+    rpc CheckBounds(Envelope) returns (BoundsResult);
+    
+    // Execution
+    rpc ExecutePipeline(ExecuteRequest) returns (stream ExecutionEvent);
+    rpc ExecuteAgent(ExecuteAgentRequest) returns (AgentResult);
+    
+    // State management
+    rpc CloneEnvelope(CloneRequest) returns (Envelope);
+}
+
+// =============================================================================
+// Envelope Messages
+// =============================================================================
+
+message CreateEnvelopeRequest {
+    string raw_input = 1;
+    string user_id = 2;
+    string session_id = 3;
+    string request_id = 4;              // Optional, generated if empty
+    map<string, string> metadata = 5;
+    repeated string stage_order = 6;
+}
+
+message UpdateEnvelopeRequest {
+    Envelope envelope = 1;
+}
+
+message CloneRequest {
+    Envelope envelope = 1;
+}
+
+message Envelope {
+    // Identification
+    string envelope_id = 1;
+    string request_id = 2;
+    string user_id = 3;
+    string session_id = 4;
+    
+    // Input
+    string raw_input = 5;
+    int64 received_at_ms = 6;
+    
+    // Pipeline state
+    string current_stage = 7;
+    repeated string stage_order = 8;
+    int32 iteration = 9;
+    int32 max_iterations = 10;
+    
+    // Bounds
+    int32 llm_call_count = 11;
+    int32 max_llm_calls = 12;
+    int32 agent_hop_count = 13;
+    int32 max_agent_hops = 14;
+    
+    // Termination
+    bool terminated = 15;
+    string termination_reason = 16;
+    TerminalReason terminal_reason = 17;
+    int64 completed_at_ms = 18;
+    
+    // Interrupt
+    bool interrupt_pending = 19;
+    FlowInterrupt interrupt = 20;
+    
+    // Outputs (JSON-encoded per-agent outputs)
+    map<string, bytes> outputs = 21;
+    
+    // Parallel execution state
+    map<string, bool> active_stages = 22;
+    map<string, bool> completed_stage_set = 23;
+    map<string, string> failed_stages = 24;
+    
+    // Multi-stage
+    int32 current_stage_number = 25;
+    int32 max_stages = 26;
+    
+    // Goals
+    repeated string all_goals = 27;
+    repeated string remaining_goals = 28;
+    map<string, string> goal_completion_status = 29;
+    
+    // Metadata
+    map<string, string> metadata_str = 30;
+    int64 created_at_ms = 31;
+}
+
+enum TerminalReason {
+    TERMINAL_REASON_UNSPECIFIED = 0;
+    MAX_ITERATIONS_EXCEEDED = 1;
+    MAX_LLM_CALLS_EXCEEDED = 2;
+    MAX_AGENT_HOPS_EXCEEDED = 3;
+    USER_CANCELLED = 4;
+    TOOL_FAILED_FATALLY = 5;
+    LLM_FAILED_FATALLY = 6;
+    COMPLETED = 7;
+    POLICY_VIOLATION = 8;
+}
+
+message FlowInterrupt {
+    string id = 1;
+    InterruptKind kind = 2;
+    string request_id = 3;
+    string user_id = 4;
+    string session_id = 5;
+    string envelope_id = 6;
+    string question = 7;
+    string message = 8;
+    bytes data = 9;                     // JSON-encoded additional data
+    InterruptResponse response = 10;
+    InterruptStatus status = 11;
+    int64 created_at_ms = 12;
+    int64 expires_at_ms = 13;
+    int64 resolved_at_ms = 14;
+    string trace_id = 15;
+    string span_id = 16;
+}
+
+enum InterruptKind {
+    INTERRUPT_KIND_UNSPECIFIED = 0;
+    CLARIFICATION = 1;
+    CONFIRMATION = 2;
+    CHECKPOINT = 3;
+    RESOURCE_EXHAUSTED = 4;
+    TIMEOUT = 5;
+    SYSTEM_ERROR = 6;
+    AGENT_REVIEW = 7;
+}
+
+message InterruptResponse {
+    string text = 1;
+    bool approved = 2;
+    string decision = 3;
+    bytes data = 4;                     // JSON-encoded response data
+    int64 resolved_at_ms = 5;
+}
+
+// =============================================================================
+// Bounds Messages
+// =============================================================================
+
+message BoundsResult {
+    bool can_continue = 1;
+    TerminalReason terminal_reason = 2;
+    int32 llm_calls_remaining = 3;
+    int32 agent_hops_remaining = 4;
+    int32 iterations_remaining = 5;
+}
+
+// =============================================================================
+// Execution Messages
+// =============================================================================
+
+message ExecuteRequest {
+    Envelope envelope = 1;
+    string thread_id = 2;
+    bytes pipeline_config = 3;          // JSON-encoded PipelineConfig
+}
+
+message ExecuteAgentRequest {
+    Envelope envelope = 1;
+    string agent_name = 2;
+    bytes agent_config = 3;             // JSON-encoded AgentConfig
+}
+
+message ExecutionEvent {
+    ExecutionEventType type = 1;
+    string stage = 2;
+    int64 timestamp_ms = 3;
+    bytes payload = 4;                  // JSON-encoded event data
+    Envelope envelope = 5;              // Updated envelope after event
+}
+
+enum ExecutionEventType {
+    EXECUTION_EVENT_TYPE_UNSPECIFIED = 0;
+    STAGE_STARTED = 1;
+    STAGE_COMPLETED = 2;
+    STAGE_FAILED = 3;
+    PIPELINE_COMPLETED = 4;
+    INTERRUPT_RAISED = 5;
+    CHECKPOINT_CREATED = 6;
+    BOUNDS_EXCEEDED = 7;
+}
+
+message AgentResult {
+    bool success = 1;
+    bytes output = 2;                   // JSON-encoded output
+    string error = 3;
+    int32 duration_ms = 4;
+    int32 llm_calls = 5;
+    Envelope envelope = 6;              // Updated envelope
+}
+
+// =============================================================================
+// Core Enums (from protocols/enums.py)
+// =============================================================================
+
+enum RiskLevel {
+    RISK_LEVEL_UNSPECIFIED = 0;
+    // Semantic levels
+    RISK_READ_ONLY = 1;
+    RISK_WRITE = 2;
+    RISK_DESTRUCTIVE = 3;
+    // Severity levels
+    RISK_LOW = 4;
+    RISK_MEDIUM = 5;
+    RISK_HIGH = 6;
+    RISK_CRITICAL = 7;
+}
+
+enum ToolCategory {
+    TOOL_CATEGORY_UNSPECIFIED = 0;
+    // Operation types
+    TOOL_READ = 1;
+    TOOL_WRITE = 2;
+    TOOL_EXECUTE = 3;
+    TOOL_NETWORK = 4;
+    TOOL_SYSTEM = 5;
+    // Tool organization
+    TOOL_UNIFIED = 6;
+    TOOL_COMPOSITE = 7;
+    TOOL_RESILIENT = 8;
+    TOOL_STANDALONE = 9;
+    TOOL_INTERNAL = 10;
+}
+
+enum HealthStatus {
+    HEALTH_STATUS_UNSPECIFIED = 0;
+    HEALTH_HEALTHY = 1;
+    HEALTH_DEGRADED = 2;
+    HEALTH_UNHEALTHY = 3;
+    HEALTH_UNKNOWN = 4;
+}
+
+enum LoopVerdict {
+    LOOP_VERDICT_UNSPECIFIED = 0;
+    LOOP_PROCEED = 1;
+    LOOP_BACK = 2;
+    LOOP_ADVANCE = 3;
+    LOOP_ESCALATE = 4;
+}
+
+enum RiskApproval {
+    RISK_APPROVAL_UNSPECIFIED = 0;
+    RISK_APPROVED = 1;
+    RISK_DENIED = 2;
+    RISK_PENDING = 3;
+}
+
+enum ToolAccess {
+    TOOL_ACCESS_UNSPECIFIED = 0;
+    TOOL_ACCESS_NONE = 1;
+    TOOL_ACCESS_READ = 2;
+    TOOL_ACCESS_WRITE = 3;
+    TOOL_ACCESS_ALL = 4;
+}
+
+enum OperationStatus {
+    OPERATION_STATUS_UNSPECIFIED = 0;
+    OPERATION_SUCCESS = 1;
+    OPERATION_ERROR = 2;
+    OPERATION_NOT_FOUND = 3;
+    OPERATION_TIMEOUT = 4;
+    OPERATION_VALIDATION_ERROR = 5;
+    OPERATION_PARTIAL = 6;
+    OPERATION_INVALID_PARAMETERS = 7;
+}
+
+// Unified result type for operations
+message OperationResult {
+    OperationStatus status = 1;
+    bytes data = 2;                     // JSON-encoded result data
+    string error = 3;
+    string error_type = 4;
+    repeated string suggestions = 5;
+}
+
+// =============================================================================
+// Interrupt Status (from jeeves_core/types/interrupts.py)
+// =============================================================================
+
+enum InterruptStatus {
+    INTERRUPT_STATUS_UNSPECIFIED = 0;
+    INTERRUPT_PENDING = 1;
+    INTERRUPT_RESOLVED = 2;
+    INTERRUPT_EXPIRED = 3;
+    INTERRUPT_CANCELLED = 4;
+}
+
+// =============================================================================
+// Rate Limiting (from jeeves_core/types/interrupts.py)
+// =============================================================================
+
+message RateLimitConfig {
+    int32 requests_per_minute = 1;
+    int32 requests_per_hour = 2;
+    int32 requests_per_day = 3;
+    int32 burst_size = 4;
+}
+
+message RateLimitResult {
+    bool allowed = 1;
+    bool exceeded = 2;
+    string reason = 3;
+    string limit_type = 4;
+    int32 current_count = 5;
+    int32 limit = 6;
+    float retry_after_seconds = 7;
+    int32 remaining = 8;
+}
+
+// =============================================================================
+// Pipeline Config Types (from jeeves_core/types/config.py)
+// =============================================================================
+
+enum RunMode {
+    RUN_MODE_UNSPECIFIED = 0;
+    RUN_MODE_SEQUENTIAL = 1;
+    RUN_MODE_PARALLEL = 2;
+}
+
+enum JoinStrategy {
+    JOIN_STRATEGY_UNSPECIFIED = 0;
+    JOIN_ALL = 1;
+    JOIN_ANY = 2;
+}
+
+enum AgentOutputMode {
+    AGENT_OUTPUT_MODE_UNSPECIFIED = 0;
+    AGENT_OUTPUT_STRUCTURED = 1;
+    AGENT_OUTPUT_TEXT = 2;
+}
+
+enum TokenStreamMode {
+    TOKEN_STREAM_MODE_UNSPECIFIED = 0;
+    TOKEN_STREAM_OFF = 1;
+    TOKEN_STREAM_DEBUG = 2;
+    TOKEN_STREAM_AUTHORITATIVE = 3;
+}
+
+enum AgentCapability {
+    AGENT_CAPABILITY_UNSPECIFIED = 0;
+    AGENT_CAPABILITY_LLM = 1;
+    AGENT_CAPABILITY_TOOLS = 2;
+    AGENT_CAPABILITY_POLICIES = 3;
+    AGENT_CAPABILITY_SERVICE = 4;
+}
+
+message RoutingRule {
+    string condition = 1;
+    string value = 2;                   // JSON-encoded value
+    string target = 3;
+}
+
+message EdgeLimit {
+    string from_stage = 1;
+    string to_stage = 2;
+    int32 max_count = 3;
+}
+
+message GenerationParams {
+    repeated string stop = 1;
+    optional float repeat_penalty = 2;
+    optional float top_p = 3;
+    optional int32 top_k = 4;
+    optional int32 seed = 5;
+}
+
+message AgentConfig {
+    string name = 1;
+    int32 stage_order = 2;
+
+    // Dependencies
+    repeated string requires = 3;
+    repeated string after = 4;
+    JoinStrategy join_strategy = 5;
+
+    // Capabilities
+    bool has_llm = 6;
+    bool has_tools = 7;
+    bool has_policies = 8;
+
+    // Tool access
+    ToolAccess tool_access = 9;
+    repeated string allowed_tools = 10;
+
+    // LLM config
+    string model_role = 11;
+    string prompt_key = 12;
+    optional float temperature = 13;
+    optional int32 max_tokens = 14;
+    GenerationParams generation = 15;
+
+    // Output
+    string output_key = 16;
+    repeated string required_output_fields = 17;
+
+    // Streaming
+    AgentOutputMode output_mode = 18;
+    TokenStreamMode token_stream = 19;
+    string streaming_prompt_key = 20;
+
+    // Routing
+    repeated RoutingRule routing_rules = 21;
+    string default_next = 22;
+    string error_next = 23;
+
+    // Bounds
+    optional int32 timeout_seconds = 24;
+    int32 max_retries = 25;
+}
+
+message PipelineConfig {
+    string name = 1;
+    repeated AgentConfig agents = 2;
+
+    // Run mode
+    RunMode default_run_mode = 3;
+
+    // Bounds
+    int32 max_iterations = 4;
+    int32 max_llm_calls = 5;
+    int32 max_agent_hops = 6;
+    int32 default_timeout_seconds = 7;
+
+    // Edge limits
+    repeated EdgeLimit edge_limits = 8;
+
+    // Interrupt resume stages
+    string clarification_resume_stage = 9;
+    string confirmation_resume_stage = 10;
+    string agent_review_resume_stage = 11;
+}
+
+message ContextBounds {
+    int32 max_input_tokens = 1;
+    int32 max_output_tokens = 2;
+    int32 max_context_tokens = 3;
+    int32 reserved_tokens = 4;
+}
+
+message ExecutionConfig {
+    int32 max_iterations = 1;
+    int32 max_llm_calls = 2;
+    int32 max_agent_hops = 3;
+    ContextBounds context_bounds = 4;
+    bool enable_telemetry = 5;
+    bool enable_checkpoints = 6;
+    bool debug_mode = 7;
+}
+
+message OrchestrationFlags {
+    bool enable_parallel_agents = 1;
+    bool enable_checkpoints = 2;
+    bool enable_distributed = 3;
+    bool enable_telemetry = 4;
+    int32 max_concurrent_agents = 5;
+    int32 checkpoint_interval_seconds = 6;
+}
+
+// =============================================================================
+// Request Context (from jeeves_core/protocols.py)
+// =============================================================================
+
+message RequestContext {
+    string request_id = 1;
+    string capability = 2;
+    string session_id = 3;
+    string user_id = 4;
+    string agent_role = 5;
+    string trace_id = 6;
+    string span_id = 7;
+    map<string, string> tags = 8;
+}
+
+// =============================================================================
+// Processing Types (from jeeves_core/types/envelope.py)
+// =============================================================================
+
+message ProcessingRecord {
+    string agent = 1;
+    int32 stage_order = 2;
+    int64 started_at_ms = 3;
+    int64 completed_at_ms = 4;
+    int32 duration_ms = 5;
+    string status = 6;              // running, success, error, skipped
+    string error = 7;
+    int32 llm_calls = 8;
+}
+
+message PipelineEvent {
+    string type = 1;                // token, stage, error, done
+    string stage = 2;               // Agent name or "__end__"
+    bytes data = 3;                 // JSON-encoded event payload
+    bool debug = 4;
+}
+
+// =============================================================================
+// Agent LLM Config (from jeeves_core/protocols.py)
+// =============================================================================
+
+message AgentLLMConfig {
+    string agent_name = 1;
+    string model = 2;
+    optional float temperature = 3;
+    int32 max_tokens = 4;
+    string server_url = 5;
+    string provider = 6;
+    int32 timeout_seconds = 7;
+    int32 context_window = 8;
+}
+
+// =============================================================================
+// Kernel Types - Process lifecycle and scheduling
+// =============================================================================
+
+enum ProcessState {
+    PROCESS_STATE_UNSPECIFIED = 0;
+    PROCESS_STATE_NEW = 1;
+    PROCESS_STATE_READY = 2;
+    PROCESS_STATE_RUNNING = 3;
+    PROCESS_STATE_WAITING = 4;
+    PROCESS_STATE_BLOCKED = 5;
+    PROCESS_STATE_TERMINATED = 6;
+    PROCESS_STATE_ZOMBIE = 7;
+}
+
+enum SchedulingPriority {
+    SCHEDULING_PRIORITY_UNSPECIFIED = 0;
+    SCHEDULING_PRIORITY_REALTIME = 1;
+    SCHEDULING_PRIORITY_HIGH = 2;
+    SCHEDULING_PRIORITY_NORMAL = 3;
+    SCHEDULING_PRIORITY_LOW = 4;
+    SCHEDULING_PRIORITY_IDLE = 5;
+}
+
+message ResourceQuota {
+    int32 max_input_tokens = 1;
+    int32 max_output_tokens = 2;
+    int32 max_context_tokens = 3;
+    int32 max_llm_calls = 4;
+    int32 max_tool_calls = 5;
+    int32 max_agent_hops = 6;
+    int32 max_iterations = 7;
+    int32 timeout_seconds = 8;
+    int32 soft_timeout_seconds = 9;
+    int32 rate_limit_rpm = 10;
+    int32 rate_limit_rph = 11;
+    int32 rate_limit_burst = 12;
+}
+
+message ResourceUsage {
+    int32 llm_calls = 1;
+    int32 tool_calls = 2;
+    int32 agent_hops = 3;
+    int32 iterations = 4;
+    int32 tokens_in = 5;
+    int32 tokens_out = 6;
+    double elapsed_seconds = 7;
+}
+
+message ProcessControlBlock {
+    // Identity
+    string pid = 1;
+    string request_id = 2;
+    string user_id = 3;
+    string session_id = 4;
+
+    // State
+    ProcessState state = 5;
+    SchedulingPriority priority = 6;
+
+    // Resource tracking
+    ResourceQuota quota = 7;
+    ResourceUsage usage = 8;
+
+    // Timestamps
+    int64 created_at_ms = 9;
+    int64 started_at_ms = 10;
+    int64 completed_at_ms = 11;
+    int64 last_scheduled_at_ms = 12;
+
+    // Current execution
+    string current_stage = 13;
+    string current_service = 14;
+
+    // Interrupt handling
+    InterruptKind pending_interrupt = 15;
+    bytes interrupt_data = 16;
+
+    // Parent/child relationships
+    string parent_pid = 17;
+    repeated string child_pids = 18;
+}
+
+// =============================================================================
+// Kernel Service Request/Response Messages
+// =============================================================================
+
+message CreateProcessRequest {
+    string pid = 1;
+    string request_id = 2;
+    string user_id = 3;
+    string session_id = 4;
+    SchedulingPriority priority = 5;
+    ResourceQuota quota = 6;
+}
+
+message GetProcessRequest {
+    string pid = 1;
+}
+
+message ScheduleProcessRequest {
+    string pid = 1;
+}
+
+message GetNextRunnableRequest {
+    // Empty - returns the highest priority ready process
+}
+
+message TransitionStateRequest {
+    string pid = 1;
+    ProcessState new_state = 2;
+    string reason = 3;
+}
+
+message TerminateProcessRequest {
+    string pid = 1;
+    string reason = 2;
+    bool force = 3;
+}
+
+message CheckQuotaRequest {
+    string pid = 1;
+}
+
+message QuotaResult {
+    bool within_bounds = 1;
+    string exceeded_reason = 2;
+    ResourceUsage usage = 3;
+    ResourceQuota quota = 4;
+}
+
+message RecordUsageRequest {
+    string pid = 1;
+    int32 llm_calls = 2;
+    int32 tool_calls = 3;
+    int32 agent_hops = 4;
+    int32 tokens_in = 5;
+    int32 tokens_out = 6;
+}
+
+message CheckRateLimitRequest {
+    string user_id = 1;
+    string endpoint = 2;
+    bool record = 3;
+}
+
+message ListProcessesRequest {
+    ProcessState state = 1;
+    string user_id = 2;
+}
+
+message ListProcessesResponse {
+    repeated ProcessControlBlock processes = 1;
+}
+
+message GetProcessCountsRequest {
+    // Empty
+}
+
+message ProcessCountsResponse {
+    map<string, int32> counts_by_state = 1;
+    int32 total = 2;
+    int32 queue_depth = 3;
+}
+
+// =============================================================================
+// CommBusService - Message bus operations (Agentic OS IPC)
+// =============================================================================
+service CommBusService {
+    // Publish event to all subscribers (fire-and-forget, fan-out)
+    rpc Publish(CommBusPublishRequest) returns (CommBusPublishResponse);
+
+    // Send command to single handler (fire-and-forget)
+    rpc Send(CommBusSendRequest) returns (CommBusSendResponse);
+
+    // Query with response (request-response, synchronous)
+    rpc Query(CommBusQueryRequest) returns (CommBusQueryResponse);
+
+    // Subscribe to events (server streaming)
+    rpc Subscribe(CommBusSubscribeRequest) returns (stream CommBusEvent);
+}
+
+message CommBusPublishRequest {
+    string event_type = 1;
+    bytes payload = 2;  // JSON-encoded event data
+}
+
+message CommBusPublishResponse {
+    bool success = 1;
+    string error = 2;
+}
+
+message CommBusSendRequest {
+    string command_type = 1;
+    bytes payload = 2;  // JSON-encoded command data
+}
+
+message CommBusSendResponse {
+    bool success = 1;
+    string error = 2;
+}
+
+message CommBusQueryRequest {
+    string query_type = 1;
+    bytes payload = 2;      // JSON-encoded query data
+    int32 timeout_ms = 3;   // Query timeout in milliseconds
+}
+
+message CommBusQueryResponse {
+    bool success = 1;
+    bytes result = 2;       // JSON-encoded result
+    string error = 3;
+}
+
+message CommBusSubscribeRequest {
+    repeated string event_types = 1;
+}
+
+message CommBusEvent {
+    string event_type = 1;
+    bytes payload = 2;      // JSON-encoded event data
+    int64 timestamp_ms = 3;
+}

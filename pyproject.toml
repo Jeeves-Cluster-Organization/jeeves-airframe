@@ -1,0 +1,95 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "jeeves-infra"
+version = "1.0.0"
+description = "Jeeves Infrastructure Layer - adapters above the kernel"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.11"
+authors = [
+    {name = "Jeeves Cluster Organization"}
+]
+keywords = ["llm", "inference", "infrastructure", "grpc", "orchestration", "agents"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+dependencies = [
+    # gRPC for kernel communication (Go kernel via gRPC)
+    "grpcio>=1.60.0",
+    "grpcio-tools>=1.60.0",
+    "protobuf>=4.25.0",
+    # HTTP client (used by LLM providers and health probes)
+    "httpx>=0.25.0",
+    # Data validation
+    "pydantic>=2.0.0",
+    # Structured logging
+    "structlog>=23.0.0",
+]
+
+[project.optional-dependencies]
+gateway = [
+    "fastapi>=0.109.0",
+    "uvicorn>=0.27.0",
+    "websockets>=12.0",
+    "sse-starlette>=1.6.0",
+]
+postgres = [
+    "asyncpg>=0.29.0",
+    "sqlalchemy[asyncio]>=2.0.0",
+    "pgvector>=0.2.0",
+]
+redis = [
+    "redis>=5.0.0",
+]
+embeddings = [
+    "sentence-transformers>=2.2.0",
+    "numpy>=1.24.0",
+]
+llm = [
+    "litellm>=1.0.0",
+    "tiktoken>=0.5.0",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+]
+all = [
+    "jeeves-infra[gateway,postgres,redis,embeddings,llm]",
+]
+
+[project.urls]
+Repository = "https://github.com/Jeeves-Cluster-Organization/jeeves-airframe"
+
+[tool.hatch.build.targets.wheel]
+packages = ["jeeves_infra", "mission_system"]
+
+[tool.black]
+line-length = 100
+target-version = ["py311", "py312"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+select = ["E", "F", "I", "UP"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_ignores = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

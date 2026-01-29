@@ -1,0 +1,217 @@
+// Code Analysis Agent gRPC Service Definitions
+// Internal RPC layer for gateway <-> orchestrator communication
+//
+// Constitution v3.0 Compliance:
+//   REMOVED: KanbanService, JournalService, OpenLoopService
+//   These features were permanently deleted in the v3.0 pivot.
+//
+// Compile with:
+//   python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. proto/jeeves.proto
+
+syntax = "proto3";
+
+package jeeves.v1;
+
+// ============================================================================
+// CodeAnalysisFlowService - Core orchestration (analysis flow)
+// ============================================================================
+service JeevesFlowService {
+  // Start a conversational flow, stream events back (tokens, tool calls, completion)
+  rpc StartFlow(FlowRequest) returns (stream FlowEvent);
+
+  // Handle confirmation response (yes/no/modify)
+  rpc HandleConfirmation(ConfirmationRequest) returns (stream FlowEvent);
+
+  // Create a new session
+  rpc CreateSession(CreateSessionRequest) returns (Session);
+
+  // Get session state
+  rpc GetSession(GetSessionRequest) returns (Session);
+
+  // List sessions for a user
+  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
+
+  // Delete a session
+  rpc DeleteSession(DeleteSessionRequest) returns (DeleteSessionResponse);
+
+  // Get messages for a session
+  rpc GetSessionMessages(GetSessionMessagesRequest) returns (GetSessionMessagesResponse);
+}
+
+// Request to start a new flow
+message FlowRequest {
+  string user_id = 1;
+  string session_id = 2;      // Optional - creates new if empty
+  string message = 3;
+  map<string, string> context = 4;  // Optional additional context
+}
+
+// Request to handle confirmation
+message ConfirmationRequest {
+  string user_id = 1;
+  string confirmation_id = 2;
+  string response = 3;        // User's response text
+}
+
+// Streaming event from flow execution
+message FlowEvent {
+  enum EventType {
+    EVENT_TYPE_UNSPECIFIED = 0;
+    TOKEN = 1;                // Streaming token from LLM
+    PLAN_CREATED = 2;         // ExecutionPlan generated
+    TOOL_STARTED = 3;         // Tool execution started
+    TOOL_COMPLETED = 4;       // Tool execution completed
+    RESPONSE_READY = 5;       // Final response ready
+    CLARIFICATION = 6;        // Needs user clarification
+    CONFIRMATION = 7;         // Needs user confirmation
+    ERROR = 8;                // Error occurred
+    FLOW_STARTED = 9;         // Flow started (includes request_id)
+    CRITIC_DECISION = 10;     // Critic made a decision
+    AGENT_STARTED = 11;       // Agent started processing
+    AGENT_COMPLETED = 12;     // Agent completed processing
+    SYNTHESIZER_COMPLETE = 13; // Synthesizer built understanding
+    STAGE_TRANSITION = 14;    // Multi-stage transition occurred
+  }
+
+  EventType type = 1;
+  string request_id = 2;
+  string session_id = 3;
+  bytes payload = 4;          // JSON-encoded payload specific to event type
+  int64 timestamp_ms = 5;
+}
+
+message GetSessionRequest {
+  string session_id = 1;
+  string user_id = 2;
+}
+
+message ListSessionsRequest {
+  string user_id = 1;
+  int32 limit = 2;
+  int32 offset = 3;
+  bool include_deleted = 4;
+}
+
+message Session {
+  string session_id = 1;
+  string user_id = 2;
+  string title = 3;
+  int32 message_count = 4;
+  string status = 5;
+  int64 created_at_ms = 6;
+  int64 last_activity_ms = 7;
+}
+
+message ListSessionsResponse {
+  repeated Session sessions = 1;
+  int32 total = 2;
+}
+
+message CreateSessionRequest {
+  string user_id = 1;
+  string title = 2;
+}
+
+message DeleteSessionRequest {
+  string session_id = 1;
+  string user_id = 2;
+}
+
+message DeleteSessionResponse {
+  bool success = 1;
+}
+
+message GetSessionMessagesRequest {
+  string session_id = 1;
+  string user_id = 2;
+  int32 limit = 3;
+  int32 offset = 4;
+}
+
+message ChatMessage {
+  string message_id = 1;
+  string session_id = 2;
+  string role = 3;           // user, assistant
+  string content = 4;
+  int64 created_at_ms = 5;
+}
+
+message GetSessionMessagesResponse {
+  repeated ChatMessage messages = 1;
+  int32 total = 2;
+}
+
+// ============================================================================
+// GovernanceService - System introspection (L7)
+// ============================================================================
+service GovernanceService {
+  rpc GetHealthSummary(GetHealthSummaryRequest) returns (HealthSummary);
+  rpc GetToolHealth(GetToolHealthRequest) returns (ToolHealth);
+  rpc GetAgents(GetAgentsRequest) returns (GetAgentsResponse);
+  rpc GetMemoryLayers(GetMemoryLayersRequest) returns (GetMemoryLayersResponse);
+}
+
+message GetHealthSummaryRequest {}
+
+message HealthSummary {
+  string overall_status = 1;  // healthy, degraded, unhealthy
+  int32 total_tools = 2;
+  int32 healthy_tools = 3;
+  int32 degraded_tools = 4;
+  int32 unhealthy_tools = 5;
+  repeated ToolHealthBrief tools = 6;
+}
+
+message ToolHealthBrief {
+  string tool_name = 1;
+  string status = 2;
+  double success_rate = 3;
+  int64 last_used_ms = 4;
+}
+
+message GetToolHealthRequest {
+  string tool_name = 1;
+}
+
+message ToolHealth {
+  string tool_name = 1;
+  string status = 2;
+  int32 total_calls = 3;
+  int32 successful_calls = 4;
+  int32 failed_calls = 5;
+  double success_rate = 6;
+  double avg_latency_ms = 7;
+  int64 last_success_ms = 8;
+  int64 last_failure_ms = 9;
+  string last_error = 10;
+}
+
+// Agent introspection messages
+message GetAgentsRequest {}
+
+message AgentInfo {
+  string name = 1;
+  string description = 2;
+  string status = 3;          // active, disabled, error
+  string layer = 4;           // perception, intent, planning, traversal, critic, integration
+  repeated string tools = 5;  // Tools this agent can access
+}
+
+message GetAgentsResponse {
+  repeated AgentInfo agents = 1;
+}
+
+// Memory layer introspection messages
+message GetMemoryLayersRequest {}
+
+message MemoryLayerInfo {
+  string name = 1;
+  string description = 2;
+  string status = 3;          // active, degraded, inactive
+  string backend = 4;         // postgres, pgvector
+  string layer_id = 5;        // L1, L2, L3, L4, L5, L7
+}
+
+message GetMemoryLayersResponse {
+  repeated MemoryLayerInfo layers = 1;
+}
