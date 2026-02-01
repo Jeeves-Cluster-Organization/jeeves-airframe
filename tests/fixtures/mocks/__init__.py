@@ -11,7 +11,7 @@ Usage:
     from mission_system.tests.fixtures.mocks import MockLLMAdapter, MockDatabaseClient
 """
 
-from .avionics_mocks import (
+from .infra_mocks import (
     MockLLMAdapter,
     MockDatabaseClient,
     MockMemoryService,
