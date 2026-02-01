@@ -83,6 +83,41 @@ class ProcessInfo:
     current_stage: str = ""
 
 
+@dataclass
+class AgentExecutionMetrics:
+    """Metrics from agent execution."""
+    llm_calls: int = 0
+    tool_calls: int = 0
+    tokens_in: int = 0
+    tokens_out: int = 0
+    duration_ms: int = 0
+
+
+@dataclass
+class OrchestratorInstruction:
+    """Instruction from the kernel orchestrator."""
+    kind: str  # RUN_AGENT, TERMINATE, WAIT_INTERRUPT
+    agent_name: str = ""
+    agent_config: Optional[Dict[str, Any]] = None
+    envelope: Optional[Dict[str, Any]] = None
+    terminal_reason: str = ""
+    termination_message: str = ""
+    interrupt_pending: bool = False
+    interrupt: Optional[Dict[str, Any]] = None
+
+
+@dataclass
+class OrchestrationSessionState:
+    """Current state of an orchestration session."""
+    process_id: str
+    current_stage: str
+    stage_order: List[str]
+    envelope: Optional[Dict[str, Any]] = None
+    edge_traversals: Dict[str, int] = field(default_factory=dict)
+    terminated: bool = False
+    terminal_reason: str = ""
+
+
 class KernelClient:
     """Async gRPC client for the Go kernel.
 
@@ -101,6 +136,7 @@ class KernelClient:
         channel: grpc_aio.Channel,
         kernel_stub: Optional[pb2_grpc.KernelServiceStub] = None,
         engine_stub: Optional[pb2_grpc.EngineServiceStub] = None,
+        orchestration_stub: Optional[pb2_grpc.OrchestrationServiceStub] = None,
     ):
         """Initialize the client with a gRPC channel.
 
@@ -108,11 +144,13 @@ class KernelClient:
             channel: Async gRPC channel to the kernel
             kernel_stub: Optional pre-created KernelService stub
             engine_stub: Optional pre-created EngineService stub
+            orchestration_stub: Optional pre-created OrchestrationService stub
         """
         self._channel = channel
         # KernelServiceStub now generated - use it directly
         self._kernel_stub = kernel_stub or pb2_grpc.KernelServiceStub(channel)
         self._engine_stub = engine_stub or pb2_grpc.EngineServiceStub(channel)
+        self._orchestration_stub = orchestration_stub or pb2_grpc.OrchestrationServiceStub(channel)
         self._closed = False
 
     @classmethod
@@ -572,6 +610,236 @@ class KernelClient:
             raise KernelClientError(f"CheckBounds failed: {e}") from e
 
     # =========================================================================
+    # Orchestration (OrchestrationService) - Kernel-Driven Pipeline Execution
+    # =========================================================================
+
+    async def initialize_orchestration_session(
+        self,
+        process_id: str,
+        pipeline_config: Dict[str, Any],
+        envelope: Dict[str, Any],
+        force: bool = False,
+    ) -> OrchestrationSessionState:
+        """Initialize a new orchestration session.
+
+        The kernel takes control of pipeline orchestration. Python workers
+        will execute agents as instructed by the kernel.
+
+        Args:
+            process_id: Unique process identifier (usually envelope_id)
+            pipeline_config: Pipeline configuration dict
+            envelope: Initial envelope state dict
+            force: If True, replace existing session with same process_id.
+                   Default False means ALREADY_EXISTS error if session exists.
+
+        Returns:
+            OrchestrationSessionState with initial state
+
+        Raises:
+            KernelClientError: If session already exists (and force=False),
+                              or if deadline exceeded, or other RPC error.
+        """
+        import json
+        request = pb2.InitializeSessionRequest(
+            process_id=process_id,
+            pipeline_config=json.dumps(pipeline_config).encode('utf-8'),
+            envelope=json.dumps(envelope).encode('utf-8'),
+            force=force,
+        )
+        try:
+            response = await self._orchestration_stub.InitializeSession(request)
+            return self._session_state_to_dataclass(response)
+        except grpc.RpcError as e:
+            if e.code() == grpc.StatusCode.ALREADY_EXISTS:
+                logger.warning(f"Session already exists for {process_id}")
+                raise KernelClientError(f"Session already exists for process {process_id}") from e
+            if e.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
+                logger.error(f"Deadline exceeded initializing session {process_id}")
+                raise KernelClientError(f"Request deadline exceeded") from e
+            logger.error(f"Failed to initialize orchestration session {process_id}: {e}")
+            raise KernelClientError(f"InitializeSession failed: {e}") from e
+
+    async def get_next_instruction(
+        self,
+        process_id: str,
+    ) -> OrchestratorInstruction:
+        """Get the next instruction from the kernel.
+
+        The kernel determines what agent to run next, or if the pipeline
+        should terminate or wait for an interrupt.
+
+        Args:
+            process_id: Process identifier
+
+        Returns:
+            OrchestratorInstruction with next action
+        """
+        request = pb2.GetNextInstructionRequest(process_id=process_id)
+        try:
+            response = await self._orchestration_stub.GetNextInstruction(request)
+            return self._instruction_to_dataclass(response)
+        except grpc.RpcError as e:
+            if e.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
+                logger.error(f"Deadline exceeded getting next instruction for {process_id}")
+                raise KernelClientError(f"Request deadline exceeded") from e
+            logger.error(f"Failed to get next instruction for {process_id}: {e}")
+            raise KernelClientError(f"GetNextInstruction failed: {e}") from e
+
+    async def report_agent_result(
+        self,
+        process_id: str,
+        agent_name: str,
+        output: Optional[Dict[str, Any]] = None,
+        metrics: Optional[AgentExecutionMetrics] = None,
+        success: bool = True,
+        error: str = "",
+    ) -> OrchestratorInstruction:
+        """Report agent execution result and get next instruction.
+
+        After executing an agent, report the result to the kernel.
+        The kernel evaluates routing rules and returns the next instruction.
+
+        Args:
+            process_id: Process identifier
+            agent_name: Name of the agent that just executed
+            output: Agent output dict (optional)
+            metrics: Execution metrics (optional)
+            success: Whether the agent succeeded
+            error: Error message if success=False
+
+        Returns:
+            OrchestratorInstruction with next action
+        """
+        import json
+
+        metrics_pb = None
+        if metrics:
+            metrics_pb = pb2.AgentExecutionMetrics(
+                llm_calls=metrics.llm_calls,
+                tool_calls=metrics.tool_calls,
+                tokens_in=metrics.tokens_in,
+                tokens_out=metrics.tokens_out,
+                duration_ms=metrics.duration_ms,
+            )
+
+        request = pb2.ReportAgentResultRequest(
+            process_id=process_id,
+            agent_name=agent_name,
+            output=json.dumps(output).encode('utf-8') if output else b'',
+            metrics=metrics_pb,
+            success=success,
+            error=error,
+        )
+        try:
+            response = await self._orchestration_stub.ReportAgentResult(request)
+            return self._instruction_to_dataclass(response)
+        except grpc.RpcError as e:
+            if e.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
+                logger.error(f"Deadline exceeded reporting agent result for {process_id}/{agent_name}")
+                raise KernelClientError(f"Request deadline exceeded") from e
+            logger.error(f"Failed to report agent result for {process_id}/{agent_name}: {e}")
+            raise KernelClientError(f"ReportAgentResult failed: {e}") from e
+
+    async def get_orchestration_session_state(
+        self,
+        process_id: str,
+    ) -> OrchestrationSessionState:
+        """Get current orchestration session state.
+
+        Useful for debugging or recovery.
+
+        Args:
+            process_id: Process identifier
+
+        Returns:
+            OrchestrationSessionState with current state
+        """
+        request = pb2.GetSessionStateRequest(process_id=process_id)
+        try:
+            response = await self._orchestration_stub.GetSessionState(request)
+            return self._session_state_to_dataclass(response)
+        except grpc.RpcError as e:
+            if e.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
+                logger.error(f"Deadline exceeded getting session state for {process_id}")
+                raise KernelClientError(f"Request deadline exceeded") from e
+            logger.error(f"Failed to get session state for {process_id}: {e}")
+            raise KernelClientError(f"GetSessionState failed: {e}") from e
+
+    def _instruction_to_dataclass(self, pb_instruction: pb2.Instruction) -> OrchestratorInstruction:
+        """Convert protobuf Instruction to dataclass."""
+        import json
+
+        kind_map = {
+            pb2.INSTRUCTION_KIND_UNSPECIFIED: "UNSPECIFIED",
+            pb2.RUN_AGENT: "RUN_AGENT",
+            pb2.TERMINATE: "TERMINATE",
+            pb2.WAIT_INTERRUPT: "WAIT_INTERRUPT",
+        }
+
+        agent_config = None
+        if pb_instruction.agent_config:
+            try:
+                agent_config = json.loads(pb_instruction.agent_config.decode('utf-8'))
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                pass
+
+        envelope = None
+        if pb_instruction.envelope:
+            try:
+                envelope = json.loads(pb_instruction.envelope.decode('utf-8'))
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                pass
+
+        interrupt = None
+        if pb_instruction.interrupt:
+            interrupt = {
+                "interrupt_id": pb_instruction.interrupt.interrupt_id,
+                "kind": pb2.InterruptKind.Name(pb_instruction.interrupt.kind),
+                "question": pb_instruction.interrupt.question,
+                "message": pb_instruction.interrupt.message,
+            }
+
+        terminal_reason = ""
+        if pb_instruction.terminal_reason:
+            terminal_reason = pb2.TerminalReason.Name(pb_instruction.terminal_reason)
+
+        return OrchestratorInstruction(
+            kind=kind_map.get(pb_instruction.kind, "UNSPECIFIED"),
+            agent_name=pb_instruction.agent_name,
+            agent_config=agent_config,
+            envelope=envelope,
+            terminal_reason=terminal_reason,
+            termination_message=pb_instruction.termination_message,
+            interrupt_pending=pb_instruction.interrupt_pending,
+            interrupt=interrupt,
+        )
+
+    def _session_state_to_dataclass(self, pb_state: pb2.SessionState) -> OrchestrationSessionState:
+        """Convert protobuf SessionState to dataclass."""
+        import json
+
+        envelope = None
+        if pb_state.envelope:
+            try:
+                envelope = json.loads(pb_state.envelope.decode('utf-8'))
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                pass
+
+        terminal_reason = ""
+        if pb_state.terminal_reason:
+            terminal_reason = pb2.TerminalReason.Name(pb_state.terminal_reason)
+
+        return OrchestrationSessionState(
+            process_id=pb_state.process_id,
+            current_stage=pb_state.current_stage,
+            stage_order=list(pb_state.stage_order),
+            envelope=envelope,
+            edge_traversals=dict(pb_state.edge_traversals),
+            terminated=pb_state.terminated,
+            terminal_reason=terminal_reason,
+        )
+
+    # =========================================================================
     # High-Level Convenience Methods
     # =========================================================================
 
@@ -724,6 +992,9 @@ __all__ = [
     "KernelClientError",
     "QuotaCheckResult",
     "ProcessInfo",
+    "AgentExecutionMetrics",
+    "OrchestratorInstruction",
+    "OrchestrationSessionState",
     "get_kernel_client",
     "close_kernel_client",
     "reset_kernel_client",

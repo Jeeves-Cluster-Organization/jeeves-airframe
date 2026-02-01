@@ -158,13 +158,9 @@ class Agent:
 
         # Store output
         envelope.outputs[self.config.output_key] = output
-        envelope.agent_hop_count += 1
+        # Note: agent_hop_count and current_stage are now managed by the kernel orchestrator
 
-        # Route to next stage
-        next_stage = self._determine_next_stage(output)
-        envelope.current_stage = next_stage
-
-        self.logger.info(f"{self.name}_completed", envelope_id=envelope.envelope_id, next_stage=next_stage)
+        self.logger.info(f"{self.name}_completed", envelope_id=envelope.envelope_id)
 
         if self.event_context:
             await self.event_context.emit_agent_completed(self.name, status="success")
@@ -323,17 +319,6 @@ class Agent:
             return tool_name in self.config.allowed_tools
         return True
 
-    def _determine_next_stage(self, output: Dict[str, Any]) -> str:
-        """Determine next stage based on routing rules."""
-        for rule in self.config.routing_rules:
-            if output.get(rule.condition) == rule.value:
-                return rule.target
-
-        if output.get("error") and self.config.error_next:
-            return self.config.error_next
-
-        return self.config.default_next or "end"
-
     async def stream(self, envelope: Envelope) -> AsyncIterator[Tuple[str, Any]]:
         """Streaming execution (token/event emission).
 
@@ -382,10 +367,7 @@ class Agent:
             # No streaming - use regular process
             await self.process(envelope)
 
-        envelope.agent_hop_count += 1
-        next_stage = self._determine_next_stage(envelope.outputs.get(self.config.output_key, {}))
-        envelope.current_stage = next_stage
-
+        # Note: agent_hop_count and current_stage are now managed by the kernel orchestrator
         self.logger.info(f"{self.name}_stream_completed", envelope_id=envelope.envelope_id)
 
     async def _call_llm_stream(self, envelope: Envelope) -> AsyncIterator[str]:
@@ -583,147 +565,10 @@ class PipelineRunner:
         for agent in self.agents.values():
             agent.set_event_context(ctx)
 
-    async def run(self, envelope: Envelope, thread_id: str = "") -> Envelope:
-        """Execute pipeline on envelope."""
-        envelope.max_iterations = self.config.max_iterations
-        envelope.max_llm_calls = self.config.max_llm_calls
-        envelope.max_agent_hops = self.config.max_agent_hops
-
-        stage_order = [a.name for a in self.config.agents]
-        envelope.stage_order = stage_order
-        envelope.current_stage = stage_order[0] if stage_order else "end"
-
-        if self.logger:
-            self.logger.info("pipeline_started", envelope_id=envelope.envelope_id, stages=stage_order)
-
-        while envelope.current_stage != "end" and not envelope.terminated:
-            if not self._can_continue(envelope):
-                if self.logger:
-                    self.logger.warning("pipeline_bounds_exceeded", reason=envelope.terminal_reason)
-                break
-
-            if envelope.current_stage in ("clarification", "confirmation"):
-                break
-
-            agent = self.agents.get(envelope.current_stage)
-            if not agent:
-                envelope.terminated = True
-                envelope.terminal_reason = f"Unknown stage: {envelope.current_stage}"
-                break
-
-            try:
-                envelope = await agent.process(envelope)
-            except Exception as e:
-                if self.logger:
-                    self.logger.error("agent_error", agent=agent.name, error=str(e))
-                if agent.config.error_next:
-                    envelope.current_stage = agent.config.error_next
-                else:
-                    envelope.terminated = True
-                    envelope.terminal_reason = str(e)
-                    break
-
-            if self.persistence and thread_id:
-                try:
-                    await self.persistence.save_state(thread_id, envelope.to_dict())
-                except Exception:
-                    pass
-
-        if self.logger:
-            self.logger.info("pipeline_completed", envelope_id=envelope.envelope_id, terminated=envelope.terminated)
-
-        return envelope
-
-    async def run_streaming(self, envelope: Envelope, thread_id: str = "") -> AsyncIterator[Tuple[str, Dict[str, Any]]]:
-        """Execute pipeline with streaming outputs."""
-        envelope.max_iterations = self.config.max_iterations
-        envelope.max_llm_calls = self.config.max_llm_calls
-        envelope.max_agent_hops = self.config.max_agent_hops
-
-        stage_order = [a.name for a in self.config.agents]
-        envelope.stage_order = stage_order
-        envelope.current_stage = stage_order[0] if stage_order else "end"
-
-        while envelope.current_stage != "end" and not envelope.terminated:
-            if not self._can_continue(envelope):
-                break
-
-            if envelope.current_stage in ("clarification", "confirmation"):
-                break
-
-            agent = self.agents.get(envelope.current_stage)
-            if not agent:
-                envelope.terminated = True
-                break
-
-            stage_name = envelope.current_stage
-
-            try:
-                envelope = await agent.process(envelope)
-            except Exception as e:
-                envelope.terminated = True
-                envelope.terminal_reason = str(e)
-                break
-
-            # Yield the output using the agent's output_key, not stage_name
-            # Some agents have different output_key than their name (e.g., planner has output_key="plan")
-            output_key = agent.config.output_key
-            yield (stage_name, envelope.outputs.get(output_key, {}))
-
-            if self.persistence and thread_id:
-                try:
-                    await self.persistence.save_state(thread_id, envelope.to_dict())
-                except Exception:
-                    pass
-
-        yield ("__end__", {"terminated": envelope.terminated})
-
-    async def resume(self, envelope: Envelope, thread_id: str = "") -> Envelope:
-        """Resume after interrupt.
-
-        Resume stages are determined by PipelineConfig, not hardcoded.
-        This allows different capabilities to define their own resume behavior.
-        """
-        from jeeves_infra.protocols import InterruptKind
-
-        # Handle unified interrupt mechanism
-        if envelope.interrupt and envelope.interrupt.kind == InterruptKind.CLARIFICATION:
-            envelope.interrupt_pending = False
-            envelope.interrupt = None
-            # Use config-defined resume stage (capability determines this)
-            envelope.current_stage = self.config.get_clarification_resume_stage()
-
-        if envelope.interrupt and envelope.interrupt.kind == InterruptKind.CONFIRMATION:
-            envelope.interrupt_pending = False
-            confirmation_response = envelope.interrupt.response
-            envelope.interrupt = None
-            if confirmation_response and confirmation_response.approved:
-                # Use config-defined resume stage (capability determines this)
-                envelope.current_stage = self.config.get_confirmation_resume_stage()
-            else:
-                envelope.terminated = True
-                envelope.terminal_reason = "User denied"
-                return envelope
-
-        return await self.run(envelope, thread_id)
-
     async def get_state(self, thread_id: str) -> Optional[Dict[str, Any]]:
         if not self.persistence:
             return None
         return await self.persistence.load_state(thread_id)
-
-    def _can_continue(self, envelope: Envelope) -> bool:
-        """Check bounds."""
-        if envelope.iteration >= envelope.max_iterations:
-            envelope.terminal_reason = "max_iterations_exceeded"
-            return False
-        if envelope.llm_call_count >= envelope.max_llm_calls:
-            envelope.terminal_reason = "max_llm_calls_exceeded"
-            return False
-        if envelope.agent_hop_count >= envelope.max_agent_hops:
-            envelope.terminal_reason = "max_agent_hops_exceeded"
-            return False
-        return True
 
     def get_agent(self, name: str) -> Optional[Agent]:
         return self.agents.get(name)

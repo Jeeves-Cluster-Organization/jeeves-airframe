@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-from jeeves_infra.protocols import engine_pb2 as coreengine_dot_proto_dot_engine__pb2
+from . import engine_pb2 as engine__pb2
 
 GRPC_GENERATED_VERSION = '1.76.0'
 GRPC_VERSION = grpc.__version__
@@ -18,7 +18,7 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + ' but the generated code in coreengine/proto/engine_pb2_grpc.py depends on'
+        + ' but the generated code in engine_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
@@ -39,58 +39,58 @@ class KernelServiceStub(object):
         """
         self.CreateProcess = channel.unary_unary(
                 '/jeeves.engine.v1.KernelService/CreateProcess',
-                request_serializer=coreengine_dot_proto_dot_engine__pb2.CreateProcessRequest.SerializeToString,
-                response_deserializer=coreengine_dot_proto_dot_engine__pb2.ProcessControlBlock.FromString,
+                request_serializer=engine__pb2.CreateProcessRequest.SerializeToString,
+                response_deserializer=engine__pb2.ProcessControlBlock.FromString,
                 _registered_method=True)
         self.GetProcess = channel.unary_unary(
                 '/jeeves.engine.v1.KernelService/GetProcess',
-                request_serializer=coreengine_dot_proto_dot_engine__pb2.GetProcessRequest.SerializeToString,
-                response_deserializer=coreengine_dot_proto_dot_engine__pb2.ProcessControlBlock.FromString,
+                request_serializer=engine__pb2.GetProcessRequest.SerializeToString,
+                response_deserializer=engine__pb2.ProcessControlBlock.FromString,
                 _registered_method=True)
         self.ScheduleProcess = channel.unary_unary(
                 '/jeeves.engine.v1.KernelService/ScheduleProcess',
-                request_serializer=coreengine_dot_proto_dot_engine__pb2.ScheduleProcessRequest.SerializeToString,
-                response_deserializer=coreengine_dot_proto_dot_engine__pb2.ProcessControlBlock.FromString,
+                request_serializer=engine__pb2.ScheduleProcessRequest.SerializeToString,
+                response_deserializer=engine__pb2.ProcessControlBlock.FromString,
                 _registered_method=True)
         self.GetNextRunnable = channel.unary_unary(
                 '/jeeves.engine.v1.KernelService/GetNextRunnable',
-                request_serializer=coreengine_dot_proto_dot_engine__pb2.GetNextRunnableRequest.SerializeToString,
-                response_deserializer=coreengine_dot_proto_dot_engine__pb2.ProcessControlBlock.FromString,
+                request_serializer=engine__pb2.GetNextRunnableRequest.SerializeToString,
+                response_deserializer=engine__pb2.ProcessControlBlock.FromString,
                 _registered_method=True)
         self.TransitionState = channel.unary_unary(
                 '/jeeves.engine.v1.KernelService/TransitionState',
-                request_serializer=coreengine_dot_proto_dot_engine__pb2.TransitionStateRequest.SerializeToString,
-                response_deserializer=coreengine_dot_proto_dot_engine__pb2.ProcessControlBlock.FromString,
+                request_serializer=engine__pb2.TransitionStateRequest.SerializeToString,
+                response_deserializer=engine__pb2.ProcessControlBlock.FromString,
                 _registered_method=True)
         self.TerminateProcess = channel.unary_unary(
                 '/jeeves.engine.v1.KernelService/TerminateProcess',
-                request_serializer=coreengine_dot_proto_dot_engine__pb2.TerminateProcessRequest.SerializeToString,
-                response_deserializer=coreengine_dot_proto_dot_engine__pb2.ProcessControlBlock.FromString,
+                request_serializer=engine__pb2.TerminateProcessRequest.SerializeToString,
+                response_deserializer=engine__pb2.ProcessControlBlock.FromString,
                 _registered_method=True)
         self.CheckQuota = channel.unary_unary(
                 '/jeeves.engine.v1.KernelService/CheckQuota',
-                request_serializer=coreengine_dot_proto_dot_engine__pb2.CheckQuotaRequest.SerializeToString,
-                response_deserializer=coreengine_dot_proto_dot_engine__pb2.QuotaResult.FromString,
+                request_serializer=engine__pb2.CheckQuotaRequest.SerializeToString,
+                response_deserializer=engine__pb2.QuotaResult.FromString,
                 _registered_method=True)
         self.RecordUsage = channel.unary_unary(
                 '/jeeves.engine.v1.KernelService/RecordUsage',
-                request_serializer=coreengine_dot_proto_dot_engine__pb2.RecordUsageRequest.SerializeToString,
-                response_deserializer=coreengine_dot_proto_dot_engine__pb2.ResourceUsage.FromString,
+                request_serializer=engine__pb2.RecordUsageRequest.SerializeToString,
+                response_deserializer=engine__pb2.ResourceUsage.FromString,
                 _registered_method=True)
         self.CheckRateLimit = channel.unary_unary(
                 '/jeeves.engine.v1.KernelService/CheckRateLimit',
-                request_serializer=coreengine_dot_proto_dot_engine__pb2.CheckRateLimitRequest.SerializeToString,
-                response_deserializer=coreengine_dot_proto_dot_engine__pb2.RateLimitResult.FromString,
+                request_serializer=engine__pb2.CheckRateLimitRequest.SerializeToString,
+                response_deserializer=engine__pb2.RateLimitResult.FromString,
                 _registered_method=True)
         self.ListProcesses = channel.unary_unary(
                 '/jeeves.engine.v1.KernelService/ListProcesses',
-                request_serializer=coreengine_dot_proto_dot_engine__pb2.ListProcessesRequest.SerializeToString,
-                response_deserializer=coreengine_dot_proto_dot_engine__pb2.ListProcessesResponse.FromString,
+                request_serializer=engine__pb2.ListProcessesRequest.SerializeToString,
+                response_deserializer=engine__pb2.ListProcessesResponse.FromString,
                 _registered_method=True)
         self.GetProcessCounts = channel.unary_unary(
                 '/jeeves.engine.v1.KernelService/GetProcessCounts',
-                request_serializer=coreengine_dot_proto_dot_engine__pb2.GetProcessCountsRequest.SerializeToString,
-                response_deserializer=coreengine_dot_proto_dot_engine__pb2.ProcessCountsResponse.FromString,
+                request_serializer=engine__pb2.GetProcessCountsRequest.SerializeToString,
+                response_deserializer=engine__pb2.ProcessCountsResponse.FromString,
                 _registered_method=True)
 
 
@@ -174,58 +174,58 @@ def add_KernelServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'CreateProcess': grpc.unary_unary_rpc_method_handler(
                     servicer.CreateProcess,
-                    request_deserializer=coreengine_dot_proto_dot_engine__pb2.CreateProcessRequest.FromString,
-                    response_serializer=coreengine_dot_proto_dot_engine__pb2.ProcessControlBlock.SerializeToString,
+                    request_deserializer=engine__pb2.CreateProcessRequest.FromString,
+                    response_serializer=engine__pb2.ProcessControlBlock.SerializeToString,
             ),
             'GetProcess': grpc.unary_unary_rpc_method_handler(
                     servicer.GetProcess,
-                    request_deserializer=coreengine_dot_proto_dot_engine__pb2.GetProcessRequest.FromString,
-                    response_serializer=coreengine_dot_proto_dot_engine__pb2.ProcessControlBlock.SerializeToString,
+                    request_deserializer=engine__pb2.GetProcessRequest.FromString,
+                    response_serializer=engine__pb2.ProcessControlBlock.SerializeToString,
             ),
             'ScheduleProcess': grpc.unary_unary_rpc_method_handler(
                     servicer.ScheduleProcess,
-                    request_deserializer=coreengine_dot_proto_dot_engine__pb2.ScheduleProcessRequest.FromString,
-                    response_serializer=coreengine_dot_proto_dot_engine__pb2.ProcessControlBlock.SerializeToString,
+                    request_deserializer=engine__pb2.ScheduleProcessRequest.FromString,
+                    response_serializer=engine__pb2.ProcessControlBlock.SerializeToString,
             ),
             'GetNextRunnable': grpc.unary_unary_rpc_method_handler(
                     servicer.GetNextRunnable,
-                    request_deserializer=coreengine_dot_proto_dot_engine__pb2.GetNextRunnableRequest.FromString,
-                    response_serializer=coreengine_dot_proto_dot_engine__pb2.ProcessControlBlock.SerializeToString,
+                    request_deserializer=engine__pb2.GetNextRunnableRequest.FromString,
+                    response_serializer=engine__pb2.ProcessControlBlock.SerializeToString,
             ),
             'TransitionState': grpc.unary_unary_rpc_method_handler(
                     servicer.TransitionState,
-                    request_deserializer=coreengine_dot_proto_dot_engine__pb2.TransitionStateRequest.FromString,
-                    response_serializer=coreengine_dot_proto_dot_engine__pb2.ProcessControlBlock.SerializeToString,
+                    request_deserializer=engine__pb2.TransitionStateRequest.FromString,
+                    response_serializer=engine__pb2.ProcessControlBlock.SerializeToString,
             ),
             'TerminateProcess': grpc.unary_unary_rpc_method_handler(
                     servicer.TerminateProcess,
-                    request_deserializer=coreengine_dot_proto_dot_engine__pb2.TerminateProcessRequest.FromString,
-                    response_serializer=coreengine_dot_proto_dot_engine__pb2.ProcessControlBlock.SerializeToString,
+                    request_deserializer=engine__pb2.TerminateProcessRequest.FromString,
+                    response_serializer=engine__pb2.ProcessControlBlock.SerializeToString,
             ),
             'CheckQuota': grpc.unary_unary_rpc_method_handler(
                     servicer.CheckQuota,
-                    request_deserializer=coreengine_dot_proto_dot_engine__pb2.CheckQuotaRequest.FromString,
-                    response_serializer=coreengine_dot_proto_dot_engine__pb2.QuotaResult.SerializeToString,
+                    request_deserializer=engine__pb2.CheckQuotaRequest.FromString,
+                    response_serializer=engine__pb2.QuotaResult.SerializeToString,
             ),
             'RecordUsage': grpc.unary_unary_rpc_method_handler(
                     servicer.RecordUsage,
-                    request_deserializer=coreengine_dot_proto_dot_engine__pb2.RecordUsageRequest.FromString,
-                    response_serializer=coreengine_dot_proto_dot_engine__pb2.ResourceUsage.SerializeToString,
+                    request_deserializer=engine__pb2.RecordUsageRequest.FromString,
+                    response_serializer=engine__pb2.ResourceUsage.SerializeToString,
             ),
             'CheckRateLimit': grpc.unary_unary_rpc_method_handler(
                     servicer.CheckRateLimit,
-                    request_deserializer=coreengine_dot_proto_dot_engine__pb2.CheckRateLimitRequest.FromString,
-                    response_serializer=coreengine_dot_proto_dot_engine__pb2.RateLimitResult.SerializeToString,
+                    request_deserializer=engine__pb2.CheckRateLimitRequest.FromString,
+                    response_serializer=engine__pb2.RateLimitResult.SerializeToString,
             ),
             'ListProcesses': grpc.unary_unary_rpc_method_handler(
                     servicer.ListProcesses,
-                    request_deserializer=coreengine_dot_proto_dot_engine__pb2.ListProcessesRequest.FromString,
-                    response_serializer=coreengine_dot_proto_dot_engine__pb2.ListProcessesResponse.SerializeToString,
+                    request_deserializer=engine__pb2.ListProcessesRequest.FromString,
+                    response_serializer=engine__pb2.ListProcessesResponse.SerializeToString,
             ),
             'GetProcessCounts': grpc.unary_unary_rpc_method_handler(
                     servicer.GetProcessCounts,
-                    request_deserializer=coreengine_dot_proto_dot_engine__pb2.GetProcessCountsRequest.FromString,
-                    response_serializer=coreengine_dot_proto_dot_engine__pb2.ProcessCountsResponse.SerializeToString,
+                    request_deserializer=engine__pb2.GetProcessCountsRequest.FromString,
+                    response_serializer=engine__pb2.ProcessCountsResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -256,8 +256,8 @@ class KernelService(object):
             request,
             target,
             '/jeeves.engine.v1.KernelService/CreateProcess',
-            coreengine_dot_proto_dot_engine__pb2.CreateProcessRequest.SerializeToString,
-            coreengine_dot_proto_dot_engine__pb2.ProcessControlBlock.FromString,
+            engine__pb2.CreateProcessRequest.SerializeToString,
+            engine__pb2.ProcessControlBlock.FromString,
             options,
             channel_credentials,
             insecure,
@@ -283,8 +283,8 @@ class KernelService(object):
             request,
             target,
             '/jeeves.engine.v1.KernelService/GetProcess',
-            coreengine_dot_proto_dot_engine__pb2.GetProcessRequest.SerializeToString,
-            coreengine_dot_proto_dot_engine__pb2.ProcessControlBlock.FromString,
+            engine__pb2.GetProcessRequest.SerializeToString,
+            engine__pb2.ProcessControlBlock.FromString,
             options,
             channel_credentials,
             insecure,
@@ -310,8 +310,8 @@ class KernelService(object):
             request,
             target,
             '/jeeves.engine.v1.KernelService/ScheduleProcess',
-            coreengine_dot_proto_dot_engine__pb2.ScheduleProcessRequest.SerializeToString,
-            coreengine_dot_proto_dot_engine__pb2.ProcessControlBlock.FromString,
+            engine__pb2.ScheduleProcessRequest.SerializeToString,
+            engine__pb2.ProcessControlBlock.FromString,
             options,
             channel_credentials,
             insecure,
@@ -337,8 +337,8 @@ class KernelService(object):
             request,
             target,
             '/jeeves.engine.v1.KernelService/GetNextRunnable',
-            coreengine_dot_proto_dot_engine__pb2.GetNextRunnableRequest.SerializeToString,
-            coreengine_dot_proto_dot_engine__pb2.ProcessControlBlock.FromString,
+            engine__pb2.GetNextRunnableRequest.SerializeToString,
+            engine__pb2.ProcessControlBlock.FromString,
             options,
             channel_credentials,
             insecure,
@@ -364,8 +364,8 @@ class KernelService(object):
             request,
             target,
             '/jeeves.engine.v1.KernelService/TransitionState',
-            coreengine_dot_proto_dot_engine__pb2.TransitionStateRequest.SerializeToString,
-            coreengine_dot_proto_dot_engine__pb2.ProcessControlBlock.FromString,
+            engine__pb2.TransitionStateRequest.SerializeToString,
+            engine__pb2.ProcessControlBlock.FromString,
             options,
             channel_credentials,
             insecure,
@@ -391,8 +391,8 @@ class KernelService(object):
             request,
             target,
             '/jeeves.engine.v1.KernelService/TerminateProcess',
-            coreengine_dot_proto_dot_engine__pb2.TerminateProcessRequest.SerializeToString,
-            coreengine_dot_proto_dot_engine__pb2.ProcessControlBlock.FromString,
+            engine__pb2.TerminateProcessRequest.SerializeToString,
+            engine__pb2.ProcessControlBlock.FromString,
             options,
             channel_credentials,
             insecure,
@@ -418,8 +418,8 @@ class KernelService(object):
             request,
             target,
             '/jeeves.engine.v1.KernelService/CheckQuota',
-            coreengine_dot_proto_dot_engine__pb2.CheckQuotaRequest.SerializeToString,
-            coreengine_dot_proto_dot_engine__pb2.QuotaResult.FromString,
+            engine__pb2.CheckQuotaRequest.SerializeToString,
+            engine__pb2.QuotaResult.FromString,
             options,
             channel_credentials,
             insecure,
@@ -445,8 +445,8 @@ class KernelService(object):
             request,
             target,
             '/jeeves.engine.v1.KernelService/RecordUsage',
-            coreengine_dot_proto_dot_engine__pb2.RecordUsageRequest.SerializeToString,
-            coreengine_dot_proto_dot_engine__pb2.ResourceUsage.FromString,
+            engine__pb2.RecordUsageRequest.SerializeToString,
+            engine__pb2.ResourceUsage.FromString,
             options,
             channel_credentials,
             insecure,
@@ -472,8 +472,8 @@ class KernelService(object):
             request,
             target,
             '/jeeves.engine.v1.KernelService/CheckRateLimit',
-            coreengine_dot_proto_dot_engine__pb2.CheckRateLimitRequest.SerializeToString,
-            coreengine_dot_proto_dot_engine__pb2.RateLimitResult.FromString,
+            engine__pb2.CheckRateLimitRequest.SerializeToString,
+            engine__pb2.RateLimitResult.FromString,
             options,
             channel_credentials,
             insecure,
@@ -499,8 +499,8 @@ class KernelService(object):
             request,
             target,
             '/jeeves.engine.v1.KernelService/ListProcesses',
-            coreengine_dot_proto_dot_engine__pb2.ListProcessesRequest.SerializeToString,
-            coreengine_dot_proto_dot_engine__pb2.ListProcessesResponse.FromString,
+            engine__pb2.ListProcessesRequest.SerializeToString,
+            engine__pb2.ListProcessesResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -526,8 +526,8 @@ class KernelService(object):
             request,
             target,
             '/jeeves.engine.v1.KernelService/GetProcessCounts',
-            coreengine_dot_proto_dot_engine__pb2.GetProcessCountsRequest.SerializeToString,
-            coreengine_dot_proto_dot_engine__pb2.ProcessCountsResponse.FromString,
+            engine__pb2.GetProcessCountsRequest.SerializeToString,
+            engine__pb2.ProcessCountsResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -553,33 +553,33 @@ class EngineServiceStub(object):
         """
         self.CreateEnvelope = channel.unary_unary(
                 '/jeeves.engine.v1.EngineService/CreateEnvelope',
-                request_serializer=coreengine_dot_proto_dot_engine__pb2.CreateEnvelopeRequest.SerializeToString,
-                response_deserializer=coreengine_dot_proto_dot_engine__pb2.Envelope.FromString,
+                request_serializer=engine__pb2.CreateEnvelopeRequest.SerializeToString,
+                response_deserializer=engine__pb2.Envelope.FromString,
                 _registered_method=True)
         self.UpdateEnvelope = channel.unary_unary(
                 '/jeeves.engine.v1.EngineService/UpdateEnvelope',
-                request_serializer=coreengine_dot_proto_dot_engine__pb2.UpdateEnvelopeRequest.SerializeToString,
-                response_deserializer=coreengine_dot_proto_dot_engine__pb2.Envelope.FromString,
+                request_serializer=engine__pb2.UpdateEnvelopeRequest.SerializeToString,
+                response_deserializer=engine__pb2.Envelope.FromString,
                 _registered_method=True)
         self.CheckBounds = channel.unary_unary(
                 '/jeeves.engine.v1.EngineService/CheckBounds',
-                request_serializer=coreengine_dot_proto_dot_engine__pb2.Envelope.SerializeToString,
-                response_deserializer=coreengine_dot_proto_dot_engine__pb2.BoundsResult.FromString,
+                request_serializer=engine__pb2.Envelope.SerializeToString,
+                response_deserializer=engine__pb2.BoundsResult.FromString,
                 _registered_method=True)
         self.ExecutePipeline = channel.unary_stream(
                 '/jeeves.engine.v1.EngineService/ExecutePipeline',
-                request_serializer=coreengine_dot_proto_dot_engine__pb2.ExecuteRequest.SerializeToString,
-                response_deserializer=coreengine_dot_proto_dot_engine__pb2.ExecutionEvent.FromString,
+                request_serializer=engine__pb2.ExecuteRequest.SerializeToString,
+                response_deserializer=engine__pb2.ExecutionEvent.FromString,
                 _registered_method=True)
         self.ExecuteAgent = channel.unary_unary(
                 '/jeeves.engine.v1.EngineService/ExecuteAgent',
-                request_serializer=coreengine_dot_proto_dot_engine__pb2.ExecuteAgentRequest.SerializeToString,
-                response_deserializer=coreengine_dot_proto_dot_engine__pb2.AgentResult.FromString,
+                request_serializer=engine__pb2.ExecuteAgentRequest.SerializeToString,
+                response_deserializer=engine__pb2.AgentResult.FromString,
                 _registered_method=True)
         self.CloneEnvelope = channel.unary_unary(
                 '/jeeves.engine.v1.EngineService/CloneEnvelope',
-                request_serializer=coreengine_dot_proto_dot_engine__pb2.CloneRequest.SerializeToString,
-                response_deserializer=coreengine_dot_proto_dot_engine__pb2.Envelope.FromString,
+                request_serializer=engine__pb2.CloneRequest.SerializeToString,
+                response_deserializer=engine__pb2.Envelope.FromString,
                 _registered_method=True)
 
 
@@ -634,33 +634,33 @@ def add_EngineServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'CreateEnvelope': grpc.unary_unary_rpc_method_handler(
                     servicer.CreateEnvelope,
-                    request_deserializer=coreengine_dot_proto_dot_engine__pb2.CreateEnvelopeRequest.FromString,
-                    response_serializer=coreengine_dot_proto_dot_engine__pb2.Envelope.SerializeToString,
+                    request_deserializer=engine__pb2.CreateEnvelopeRequest.FromString,
+                    response_serializer=engine__pb2.Envelope.SerializeToString,
             ),
             'UpdateEnvelope': grpc.unary_unary_rpc_method_handler(
                     servicer.UpdateEnvelope,
-                    request_deserializer=coreengine_dot_proto_dot_engine__pb2.UpdateEnvelopeRequest.FromString,
-                    response_serializer=coreengine_dot_proto_dot_engine__pb2.Envelope.SerializeToString,
+                    request_deserializer=engine__pb2.UpdateEnvelopeRequest.FromString,
+                    response_serializer=engine__pb2.Envelope.SerializeToString,
             ),
             'CheckBounds': grpc.unary_unary_rpc_method_handler(
                     servicer.CheckBounds,
-                    request_deserializer=coreengine_dot_proto_dot_engine__pb2.Envelope.FromString,
-                    response_serializer=coreengine_dot_proto_dot_engine__pb2.BoundsResult.SerializeToString,
+                    request_deserializer=engine__pb2.Envelope.FromString,
+                    response_serializer=engine__pb2.BoundsResult.SerializeToString,
             ),
             'ExecutePipeline': grpc.unary_stream_rpc_method_handler(
                     servicer.ExecutePipeline,
-                    request_deserializer=coreengine_dot_proto_dot_engine__pb2.ExecuteRequest.FromString,
-                    response_serializer=coreengine_dot_proto_dot_engine__pb2.ExecutionEvent.SerializeToString,
+                    request_deserializer=engine__pb2.ExecuteRequest.FromString,
+                    response_serializer=engine__pb2.ExecutionEvent.SerializeToString,
             ),
             'ExecuteAgent': grpc.unary_unary_rpc_method_handler(
                     servicer.ExecuteAgent,
-                    request_deserializer=coreengine_dot_proto_dot_engine__pb2.ExecuteAgentRequest.FromString,
-                    response_serializer=coreengine_dot_proto_dot_engine__pb2.AgentResult.SerializeToString,
+                    request_deserializer=engine__pb2.ExecuteAgentRequest.FromString,
+                    response_serializer=engine__pb2.AgentResult.SerializeToString,
             ),
             'CloneEnvelope': grpc.unary_unary_rpc_method_handler(
                     servicer.CloneEnvelope,
-                    request_deserializer=coreengine_dot_proto_dot_engine__pb2.CloneRequest.FromString,
-                    response_serializer=coreengine_dot_proto_dot_engine__pb2.Envelope.SerializeToString,
+                    request_deserializer=engine__pb2.CloneRequest.FromString,
+                    response_serializer=engine__pb2.Envelope.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -691,8 +691,8 @@ class EngineService(object):
             request,
             target,
             '/jeeves.engine.v1.EngineService/CreateEnvelope',
-            coreengine_dot_proto_dot_engine__pb2.CreateEnvelopeRequest.SerializeToString,
-            coreengine_dot_proto_dot_engine__pb2.Envelope.FromString,
+            engine__pb2.CreateEnvelopeRequest.SerializeToString,
+            engine__pb2.Envelope.FromString,
             options,
             channel_credentials,
             insecure,
@@ -718,8 +718,8 @@ class EngineService(object):
             request,
             target,
             '/jeeves.engine.v1.EngineService/UpdateEnvelope',
-            coreengine_dot_proto_dot_engine__pb2.UpdateEnvelopeRequest.SerializeToString,
-            coreengine_dot_proto_dot_engine__pb2.Envelope.FromString,
+            engine__pb2.UpdateEnvelopeRequest.SerializeToString,
+            engine__pb2.Envelope.FromString,
             options,
             channel_credentials,
             insecure,
@@ -745,8 +745,8 @@ class EngineService(object):
             request,
             target,
             '/jeeves.engine.v1.EngineService/CheckBounds',
-            coreengine_dot_proto_dot_engine__pb2.Envelope.SerializeToString,
-            coreengine_dot_proto_dot_engine__pb2.BoundsResult.FromString,
+            engine__pb2.Envelope.SerializeToString,
+            engine__pb2.BoundsResult.FromString,
             options,
             channel_credentials,
             insecure,
@@ -772,8 +772,8 @@ class EngineService(object):
             request,
             target,
             '/jeeves.engine.v1.EngineService/ExecutePipeline',
-            coreengine_dot_proto_dot_engine__pb2.ExecuteRequest.SerializeToString,
-            coreengine_dot_proto_dot_engine__pb2.ExecutionEvent.FromString,
+            engine__pb2.ExecuteRequest.SerializeToString,
+            engine__pb2.ExecutionEvent.FromString,
             options,
             channel_credentials,
             insecure,
@@ -799,8 +799,8 @@ class EngineService(object):
             request,
             target,
             '/jeeves.engine.v1.EngineService/ExecuteAgent',
-            coreengine_dot_proto_dot_engine__pb2.ExecuteAgentRequest.SerializeToString,
-            coreengine_dot_proto_dot_engine__pb2.AgentResult.FromString,
+            engine__pb2.ExecuteAgentRequest.SerializeToString,
+            engine__pb2.AgentResult.FromString,
             options,
             channel_credentials,
             insecure,
@@ -826,8 +826,448 @@ class EngineService(object):
             request,
             target,
             '/jeeves.engine.v1.EngineService/CloneEnvelope',
-            coreengine_dot_proto_dot_engine__pb2.CloneRequest.SerializeToString,
-            coreengine_dot_proto_dot_engine__pb2.Envelope.FromString,
+            engine__pb2.CloneRequest.SerializeToString,
+            engine__pb2.Envelope.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+
+class CommBusServiceStub(object):
+    """=============================================================================
+    CommBusService - Message bus operations (Agentic OS IPC)
+    =============================================================================
+    """
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.Publish = channel.unary_unary(
+                '/jeeves.engine.v1.CommBusService/Publish',
+                request_serializer=engine__pb2.CommBusPublishRequest.SerializeToString,
+                response_deserializer=engine__pb2.CommBusPublishResponse.FromString,
+                _registered_method=True)
+        self.Send = channel.unary_unary(
+                '/jeeves.engine.v1.CommBusService/Send',
+                request_serializer=engine__pb2.CommBusSendRequest.SerializeToString,
+                response_deserializer=engine__pb2.CommBusSendResponse.FromString,
+                _registered_method=True)
+        self.Query = channel.unary_unary(
+                '/jeeves.engine.v1.CommBusService/Query',
+                request_serializer=engine__pb2.CommBusQueryRequest.SerializeToString,
+                response_deserializer=engine__pb2.CommBusQueryResponse.FromString,
+                _registered_method=True)
+        self.Subscribe = channel.unary_stream(
+                '/jeeves.engine.v1.CommBusService/Subscribe',
+                request_serializer=engine__pb2.CommBusSubscribeRequest.SerializeToString,
+                response_deserializer=engine__pb2.CommBusEvent.FromString,
+                _registered_method=True)
+
+
+class CommBusServiceServicer(object):
+    """=============================================================================
+    CommBusService - Message bus operations (Agentic OS IPC)
+    =============================================================================
+    """
+
+    def Publish(self, request, context):
+        """Publish event to all subscribers (fire-and-forget, fan-out)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def Send(self, request, context):
+        """Send command to single handler (fire-and-forget)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def Query(self, request, context):
+        """Query with response (request-response, synchronous)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def Subscribe(self, request, context):
+        """Subscribe to events (server streaming)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+
+def add_CommBusServiceServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            'Publish': grpc.unary_unary_rpc_method_handler(
+                    servicer.Publish,
+                    request_deserializer=engine__pb2.CommBusPublishRequest.FromString,
+                    response_serializer=engine__pb2.CommBusPublishResponse.SerializeToString,
+            ),
+            'Send': grpc.unary_unary_rpc_method_handler(
+                    servicer.Send,
+                    request_deserializer=engine__pb2.CommBusSendRequest.FromString,
+                    response_serializer=engine__pb2.CommBusSendResponse.SerializeToString,
+            ),
+            'Query': grpc.unary_unary_rpc_method_handler(
+                    servicer.Query,
+                    request_deserializer=engine__pb2.CommBusQueryRequest.FromString,
+                    response_serializer=engine__pb2.CommBusQueryResponse.SerializeToString,
+            ),
+            'Subscribe': grpc.unary_stream_rpc_method_handler(
+                    servicer.Subscribe,
+                    request_deserializer=engine__pb2.CommBusSubscribeRequest.FromString,
+                    response_serializer=engine__pb2.CommBusEvent.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'jeeves.engine.v1.CommBusService', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers('jeeves.engine.v1.CommBusService', rpc_method_handlers)
+
+
+ # This class is part of an EXPERIMENTAL API.
+class CommBusService(object):
+    """=============================================================================
+    CommBusService - Message bus operations (Agentic OS IPC)
+    =============================================================================
+    """
+
+    @staticmethod
+    def Publish(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/jeeves.engine.v1.CommBusService/Publish',
+            engine__pb2.CommBusPublishRequest.SerializeToString,
+            engine__pb2.CommBusPublishResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def Send(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/jeeves.engine.v1.CommBusService/Send',
+            engine__pb2.CommBusSendRequest.SerializeToString,
+            engine__pb2.CommBusSendResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def Query(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/jeeves.engine.v1.CommBusService/Query',
+            engine__pb2.CommBusQueryRequest.SerializeToString,
+            engine__pb2.CommBusQueryResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def Subscribe(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            '/jeeves.engine.v1.CommBusService/Subscribe',
+            engine__pb2.CommBusSubscribeRequest.SerializeToString,
+            engine__pb2.CommBusEvent.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+
+class OrchestrationServiceStub(object):
+    """=============================================================================
+    OrchestrationService - Kernel-driven pipeline execution
+    =============================================================================
+
+    OrchestrationService moves pipeline orchestration from Python to Go kernel.
+    Python workers ask the kernel for instructions, execute agents, and report results.
+    The kernel owns: loop control, routing, bounds checking, state transitions.
+    """
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.InitializeSession = channel.unary_unary(
+                '/jeeves.engine.v1.OrchestrationService/InitializeSession',
+                request_serializer=engine__pb2.InitializeSessionRequest.SerializeToString,
+                response_deserializer=engine__pb2.SessionState.FromString,
+                _registered_method=True)
+        self.GetNextInstruction = channel.unary_unary(
+                '/jeeves.engine.v1.OrchestrationService/GetNextInstruction',
+                request_serializer=engine__pb2.GetNextInstructionRequest.SerializeToString,
+                response_deserializer=engine__pb2.Instruction.FromString,
+                _registered_method=True)
+        self.ReportAgentResult = channel.unary_unary(
+                '/jeeves.engine.v1.OrchestrationService/ReportAgentResult',
+                request_serializer=engine__pb2.ReportAgentResultRequest.SerializeToString,
+                response_deserializer=engine__pb2.Instruction.FromString,
+                _registered_method=True)
+        self.GetSessionState = channel.unary_unary(
+                '/jeeves.engine.v1.OrchestrationService/GetSessionState',
+                request_serializer=engine__pb2.GetSessionStateRequest.SerializeToString,
+                response_deserializer=engine__pb2.SessionState.FromString,
+                _registered_method=True)
+
+
+class OrchestrationServiceServicer(object):
+    """=============================================================================
+    OrchestrationService - Kernel-driven pipeline execution
+    =============================================================================
+
+    OrchestrationService moves pipeline orchestration from Python to Go kernel.
+    Python workers ask the kernel for instructions, execute agents, and report results.
+    The kernel owns: loop control, routing, bounds checking, state transitions.
+    """
+
+    def InitializeSession(self, request, context):
+        """Initialize a new orchestration session with pipeline config
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetNextInstruction(self, request, context):
+        """Get the next instruction (what agent to run, or terminal state)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ReportAgentResult(self, request, context):
+        """Report agent execution result and get next instruction
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetSessionState(self, request, context):
+        """Get current session state (for debugging/recovery)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+
+def add_OrchestrationServiceServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            'InitializeSession': grpc.unary_unary_rpc_method_handler(
+                    servicer.InitializeSession,
+                    request_deserializer=engine__pb2.InitializeSessionRequest.FromString,
+                    response_serializer=engine__pb2.SessionState.SerializeToString,
+            ),
+            'GetNextInstruction': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetNextInstruction,
+                    request_deserializer=engine__pb2.GetNextInstructionRequest.FromString,
+                    response_serializer=engine__pb2.Instruction.SerializeToString,
+            ),
+            'ReportAgentResult': grpc.unary_unary_rpc_method_handler(
+                    servicer.ReportAgentResult,
+                    request_deserializer=engine__pb2.ReportAgentResultRequest.FromString,
+                    response_serializer=engine__pb2.Instruction.SerializeToString,
+            ),
+            'GetSessionState': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetSessionState,
+                    request_deserializer=engine__pb2.GetSessionStateRequest.FromString,
+                    response_serializer=engine__pb2.SessionState.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'jeeves.engine.v1.OrchestrationService', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers('jeeves.engine.v1.OrchestrationService', rpc_method_handlers)
+
+
+ # This class is part of an EXPERIMENTAL API.
+class OrchestrationService(object):
+    """=============================================================================
+    OrchestrationService - Kernel-driven pipeline execution
+    =============================================================================
+
+    OrchestrationService moves pipeline orchestration from Python to Go kernel.
+    Python workers ask the kernel for instructions, execute agents, and report results.
+    The kernel owns: loop control, routing, bounds checking, state transitions.
+    """
+
+    @staticmethod
+    def InitializeSession(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/jeeves.engine.v1.OrchestrationService/InitializeSession',
+            engine__pb2.InitializeSessionRequest.SerializeToString,
+            engine__pb2.SessionState.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetNextInstruction(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/jeeves.engine.v1.OrchestrationService/GetNextInstruction',
+            engine__pb2.GetNextInstructionRequest.SerializeToString,
+            engine__pb2.Instruction.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ReportAgentResult(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/jeeves.engine.v1.OrchestrationService/ReportAgentResult',
+            engine__pb2.ReportAgentResultRequest.SerializeToString,
+            engine__pb2.Instruction.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetSessionState(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/jeeves.engine.v1.OrchestrationService/GetSessionState',
+            engine__pb2.GetSessionStateRequest.SerializeToString,
+            engine__pb2.SessionState.FromString,
             options,
             channel_credentials,
             insecure,
