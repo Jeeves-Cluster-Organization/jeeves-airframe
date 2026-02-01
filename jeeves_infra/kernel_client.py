@@ -40,7 +40,7 @@ import logging
 import os
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from typing import Any, AsyncIterator, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, AsyncIterator, Callable, Dict, List, Optional, TYPE_CHECKING
 
 import grpc
 from grpc import aio as grpc_aio
@@ -64,6 +64,8 @@ class QuotaCheckResult:
     agent_hops: int = 0
     tokens_in: int = 0
     tokens_out: int = 0
+    inference_requests: int = 0
+    inference_input_chars: int = 0
 
 
 @dataclass
@@ -392,6 +394,8 @@ class KernelClient:
         agent_hops: int = 0,
         tokens_in: int = 0,
         tokens_out: int = 0,
+        inference_requests: int = 0,
+        inference_input_chars: int = 0,
     ) -> QuotaCheckResult:
         """Record resource usage for a process.
 
@@ -402,6 +406,8 @@ class KernelClient:
             agent_hops: Number of agent hops to record
             tokens_in: Input tokens used
             tokens_out: Output tokens used
+            inference_requests: Number of inference calls (embeddings, NLI, etc)
+            inference_input_chars: Total input characters for inference
 
         Returns:
             QuotaCheckResult with current usage state
@@ -413,6 +419,8 @@ class KernelClient:
             agent_hops=agent_hops,
             tokens_in=tokens_in,
             tokens_out=tokens_out,
+            inference_requests=inference_requests,
+            inference_input_chars=inference_input_chars,
         )
         try:
             response = await self._call_kernel("RecordUsage", request)
@@ -423,6 +431,8 @@ class KernelClient:
                 agent_hops=response.agent_hops,
                 tokens_in=response.tokens_in,
                 tokens_out=response.tokens_out,
+                inference_requests=response.inference_requests,
+                inference_input_chars=response.inference_input_chars,
             )
         except grpc.RpcError as e:
             logger.error(f"Failed to record usage for {pid}: {e}")
@@ -885,6 +895,143 @@ class KernelClient:
             return None
         except KernelClientError:
             return None
+
+    async def record_inference_call(
+        self, pid: str, input_chars: int = 0
+    ) -> Optional[str]:
+        """Record an inference call (embedding, NLI, classification).
+
+        Args:
+            pid: Process ID
+            input_chars: Number of input characters processed
+
+        Returns:
+            Exceeded reason if quota exceeded, None otherwise
+        """
+        try:
+            await self.record_usage(
+                pid=pid,
+                inference_requests=1,
+                inference_input_chars=input_chars,
+            )
+            result = await self.check_quota(pid)
+            if not result.within_bounds:
+                return result.exceeded_reason
+            return None
+        except KernelClientError:
+            return None
+
+    # =========================================================================
+    # Inference Methods (Kernel-Tracked)
+    # =========================================================================
+
+    async def embed_batch(
+        self,
+        pid: str,
+        texts: list[str],
+        embedding_fn: "Callable[[list[str]], list[list[float]]] | None" = None,
+    ) -> list[list[float]]:
+        """Compute embeddings for multiple texts with kernel tracking.
+
+        Enforces quota before embedding and tracks usage. The actual embedding
+        computation is delegated to the provided embedding_fn.
+
+        Args:
+            pid: Process ID for quota tracking
+            texts: List of texts to embed
+            embedding_fn: Function that computes embeddings. Should accept a list
+                of strings and return a list of embedding vectors. If not provided,
+                raises KernelClientError.
+
+        Returns:
+            List of embedding vectors (one per input text)
+
+        Raises:
+            KernelClientError: If quota exceeded, embedding_fn not provided, or
+                embedding computation fails
+
+        Example:
+            # With EmbeddingService from jeeves_infra.memory.services
+            embedding_service = EmbeddingService()
+            embeddings = await kernel_client.embed_batch(
+                pid="process-123",
+                texts=["hello", "world"],
+                embedding_fn=embedding_service.embed_batch,
+            )
+        """
+        if not texts:
+            return []
+
+        if embedding_fn is None:
+            raise KernelClientError(
+                "embedding_fn is required. Pass a function like "
+                "EmbeddingService().embed_batch to compute embeddings."
+            )
+
+        # Calculate total input chars for quota check
+        total_chars = sum(len(t) for t in texts)
+
+        # Check quota before proceeding
+        exceeded = await self.record_inference_call(pid, total_chars)
+        if exceeded:
+            raise KernelClientError(f"Inference quota exceeded: {exceeded}")
+
+        # Delegate to provided embedding function
+        try:
+            return embedding_fn(texts)
+        except Exception as e:
+            raise KernelClientError(f"Embedding computation failed: {e}") from e
+
+    async def embed(
+        self,
+        pid: str,
+        text: str,
+        embedding_fn: "Callable[[str], list[float]] | None" = None,
+    ) -> list[float]:
+        """Compute embedding for a single text with kernel tracking.
+
+        Enforces quota before embedding and tracks usage.
+
+        Args:
+            pid: Process ID for quota tracking
+            text: Text to embed
+            embedding_fn: Function that computes embedding for a single string.
+                If not provided, raises KernelClientError.
+
+        Returns:
+            Embedding vector
+
+        Raises:
+            KernelClientError: If quota exceeded, embedding_fn not provided, or
+                embedding computation fails
+
+        Example:
+            embedding_service = EmbeddingService()
+            embedding = await kernel_client.embed(
+                pid="process-123",
+                text="hello world",
+                embedding_fn=embedding_service.embed,
+            )
+        """
+        if embedding_fn is None:
+            raise KernelClientError(
+                "embedding_fn is required. Pass a function like "
+                "EmbeddingService().embed to compute embeddings."
+            )
+
+        # Calculate input chars for quota check
+        total_chars = len(text)
+
+        # Check quota before proceeding
+        exceeded = await self.record_inference_call(pid, total_chars)
+        if exceeded:
+            raise KernelClientError(f"Inference quota exceeded: {exceeded}")
+
+        # Delegate to provided embedding function
+        try:
+            return embedding_fn(text)
+        except Exception as e:
+            raise KernelClientError(f"Embedding computation failed: {e}") from e
 
     # =========================================================================
     # Internal Helpers
