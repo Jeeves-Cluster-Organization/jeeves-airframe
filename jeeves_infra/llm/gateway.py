@@ -5,7 +5,7 @@ The gateway provides a single entry point for all LLM calls with:
 - Provider fallback on failures
 - Request/response metadata collection
 - Performance monitoring (latency, tokens/sec)
-- Resource tracking via KernelClient (Go kernel integration)
+- Resource tracking via KernelClient (Rust kernel integration)
 - Streaming support with token-by-token event emission
 
 All agent LLM calls should route through this gateway when
@@ -146,7 +146,7 @@ class LLMGateway:
     cost tracking, and performance monitoring.
 
     Resource Tracking:
-    - Integrates with Go kernel via KernelClient for quota enforcement
+    - Integrates with Rust kernel via KernelClient for quota enforcement
     - Reports token usage after each LLM call
     - Raises QuotaExceededError when limits are hit
 
@@ -190,7 +190,7 @@ class LLMGateway:
                               If None, uses only primary provider.
                               Example: ["llamaserver", "openai"] tries OpenAI if llama-server fails
             logger: Logger for DI (uses context logger if not provided)
-            kernel_client: Optional KernelClient for resource tracking (Go kernel integration).
+            kernel_client: Optional KernelClient for resource tracking (Rust kernel integration).
                           When set, token usage is reported to kernel after each LLM call.
             streaming_callback: Optional callback for streaming events.
                               Called for each token chunk during streaming generation.

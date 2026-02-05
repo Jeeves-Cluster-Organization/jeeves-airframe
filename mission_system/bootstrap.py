@@ -34,7 +34,7 @@ from jeeves_infra.feature_flags import FeatureFlags, get_feature_flags
 from jeeves_infra.protocols import ExecutionConfig, ContextBounds, OrchestrationFlags
 from jeeves_infra.protocols import get_capability_resource_registry
 
-# KernelClient for Go kernel integration
+# KernelClient for Rust kernel integration
 from jeeves_infra.kernel_client import KernelClient, QuotaCheckResult
 
 # Type alias for LLMGateway (imported conditionally)

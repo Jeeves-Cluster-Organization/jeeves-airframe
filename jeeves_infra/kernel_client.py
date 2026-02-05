@@ -1,7 +1,7 @@
-"""Python gRPC Client for Go Kernel.
+"""Python gRPC Client for Rust Kernel.
 
 This module provides an async Python client that wraps the gRPC stubs
-for communicating with the Go kernel (KernelService) and engine (EngineService).
+for communicating with the Rust kernel (KernelService) and engine (EngineService).
 
 Usage:
     from jeeves_infra.kernel_client import KernelClient, get_kernel_client
@@ -29,8 +29,8 @@ Usage:
             print(f"Quota exceeded: {result.exceeded_reason}")
 
 Constitutional Reference:
-- Session 15: Wire Python capabilities to Go kernel via gRPC
-- jeeves-core = pure Go, Python calls via gRPC
+- Session 15: Wire Python capabilities to Rust kernel via gRPC
+- jeeves-core = pure Rust, Python calls via gRPC
 """
 
 from __future__ import annotations
@@ -121,7 +121,7 @@ class OrchestrationSessionState:
 
 
 class KernelClient:
-    """Async gRPC client for the Go kernel.
+    """Async gRPC client for the Rust kernel.
 
     Provides methods to interact with:
     - KernelService: Process lifecycle and resource management
@@ -570,7 +570,7 @@ class KernelClient:
         metadata: Optional[Dict[str, str]] = None,
         stage_order: Optional[List[str]] = None,
     ) -> pb2.Envelope:
-        """Create a new envelope via the Go engine.
+        """Create a new envelope via the Rust engine.
 
         Args:
             raw_input: User input text

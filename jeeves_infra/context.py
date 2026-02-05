@@ -105,7 +105,7 @@ class AppContext:
     orchestration_flags: OrchestrationFlags = field(default_factory=OrchestrationFlags)
     vertical_registry: Dict[str, bool] = field(default_factory=dict)
 
-    # Kernel Client - gRPC client to Go kernel for orchestration
+    # Kernel Client - gRPC client to Rust kernel for orchestration
     # Uses string annotation for TYPE_CHECKING-only import (layer extraction support)
     kernel_client: Optional["KernelClient"] = None
 

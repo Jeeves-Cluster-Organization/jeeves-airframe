@@ -11,7 +11,7 @@ Capabilities (User Space)
 jeeves-infra (Kernel Modules / Drivers)  <- THIS PACKAGE
        │
        ↓
-jeeves-core (Microkernel - Go)
+jeeves-core (Microkernel - Rust)
 ```
 
 This package provides infrastructure implementations for the jeeves-core microkernel:

@@ -107,7 +107,7 @@ from mission_system.config.agent_profiles import (
 # NOTE: Tool catalog types (ToolId, ToolCatalog, etc.) are OWNED BY CAPABILITIES
 # NOT re-exported here. Capability layers should import from their own tools/catalog.py.
 # See: jeeves-capability-code-analyser/tools/catalog.py for code_analysis capability.
-# ToolCategory and RiskLevel come from jeeves_core.types (Go kernel).
+# ToolCategory and RiskLevel come from jeeves_core.types (Rust kernel).
 from jeeves_infra.protocols import ToolCategory
 
 # NOTE: AgentContext removed in v4.0 - context flows through Envelope

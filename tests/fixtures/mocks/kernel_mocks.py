@@ -1,6 +1,6 @@
 """Mock implementations for KernelClient gRPC testing.
 
-These mocks allow Python tests to run without a real Go kernel server.
+These mocks allow Python tests to run without a real Rust kernel server.
 
 Usage:
     from tests.fixtures.mocks.kernel_mocks import (
@@ -226,7 +226,7 @@ def mock_kernel_client(mock_grpc_channel, mock_kernel_stub, mock_engine_stub):
     """Configured KernelClient with mocked gRPC.
 
     This fixture provides a fully mocked KernelClient that can be used
-    in unit tests without requiring a real Go kernel server.
+    in unit tests without requiring a real Rust kernel server.
 
     Usage:
         async def test_something(mock_kernel_client):

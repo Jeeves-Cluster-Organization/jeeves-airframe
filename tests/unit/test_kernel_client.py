@@ -1,6 +1,6 @@
 """Unit tests for KernelClient.
 
-Tests the Python gRPC client for the Go kernel with mocked gRPC.
+Tests the Python gRPC client for the Rust kernel with mocked gRPC.
 """
 
 import sys

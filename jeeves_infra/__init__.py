@@ -18,7 +18,7 @@ Architecture:
     jeeves-infra (Kernel Modules / Drivers)  <- THIS PACKAGE
            │
            ↓
-    jeeves-core (Microkernel - Go)
+    jeeves-core (Microkernel - Rust)
 
 Usage:
     from jeeves_infra.postgres import PostgreSQLClient
@@ -33,6 +33,6 @@ __version__ = "1.0.0"
 
 # Lazy imports for kernel client
 def get_kernel_client():
-    """Get the global kernel client for communicating with Go kernel."""
+    """Get the global kernel client for communicating with Rust kernel."""
     from jeeves_infra.kernel_client import get_kernel_client as _get
     return _get()
