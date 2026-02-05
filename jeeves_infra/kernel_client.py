@@ -803,7 +803,7 @@ class KernelClient:
         interrupt = None
         if pb_instruction.interrupt:
             interrupt = {
-                "interrupt_id": pb_instruction.interrupt.interrupt_id,
+                "id": pb_instruction.interrupt.id,
                 "kind": pb2.InterruptKind.Name(pb_instruction.interrupt.kind),
                 "question": pb_instruction.interrupt.question,
                 "message": pb_instruction.interrupt.message,
