@@ -236,25 +236,49 @@ Fix: `s/avionics/jeeves_infra/` in test files + docstring updates.
 | `MetaValidationIssue` | `utils/models.py:11`, `mission_system/common/models.py:11` | `jeeves_infra/protocols/validation.py` |
 | `VerificationReport` | `utils/models.py:11`, `observability/metrics.py:39` | `jeeves_infra/protocols/validation.py` |
 
-#### (e) `control_tower` -- GENUINELY MISSING (deleted in "Session 14")
+#### (e) `control_tower` -- REPLACED BY `kernel_client.py` + Rust kernel
 
 Confirmed deleted by `mission_system/events/bridge.py:22`: *"control_tower deleted -
-Session 14"*. Runtime code already degrades gracefully (try/except guards).
+Session 14"*. The Rust kernel now provides the same functionality via gRPC, accessed
+through `jeeves_infra/kernel_client.py`. Runtime code already degrades gracefully
+(try/except guards).
 
-**Missing types that need stubs or deletion of consumers:**
+**Type mapping (control_tower → kernel_client/protobuf):**
 
-| Missing type | Referenced in |
-|-------------|--------------|
-| `SchedulingPriority` | `jeeves_infra/services/worker_coordinator.py:154` |
-| `ProcessState` | `jeeves_infra/gateway/server.py:995`, `services/worker_coordinator.py:154` |
-| `ResourceQuota` | `services/worker_coordinator.py:154` (partial duplicate at `bootstrap.py:53`) |
-| `ResourceUsage` | `tests/integration/test_control_tower_resource_tracking.py` |
-| `ResourceTracker` | `tests/integration/test_control_tower_resource_tracking.py` |
-| `ControlTower` | `tests/e2e/test_distributed_mode.py` |
-| `get_commbus` | `memory/services/event_emitter.py:229` (try/except, non-fatal) |
+| control_tower type | kernel_client equivalent | Notes |
+|-------------------|------------------------|-------|
+| `SchedulingPriority` enum | String `"HIGH"/"NORMAL"/"LOW"` | `kernel_client.create_process()` uses `priority_map` dict (line 232) |
+| `ProcessState` enum | String `"RUNNING"/"TERMINATED"/etc.` | `ProcessInfo.state` is a plain `str` (line 78) |
+| `ResourceQuota` dataclass | kwargs to `kernel_client.create_process()` | Quota set at process creation (line 240) |
+| `ResourceUsage` dataclass | `ProcessInfo` fields (llm_calls, tool_calls, etc.) | Inlined into ProcessInfo, not a separate object |
+| `ResourceTracker` class | `kernel_client` methods directly | `record_usage()`, `check_quota()`, `get_process()` |
+| `ControlTower` class | `KernelClient` itself | `.lifecycle.*` + `.resources.*` → flat async methods |
+| `get_commbus()` | `CommBusServiceStub` (exists in pb2_grpc, not yet wired) | Need to add stub to KernelClient |
 
-**Decision**: Either write stub types in `jeeves_infra/process/types.py` or delete
-orphaned test files + clean up guarded imports.
+**Consumer rewiring plan:**
+
+| Consumer | What it needs | Fix |
+|----------|--------------|-----|
+| `services/worker_coordinator.py` (both copies) | Enum values + lifecycle/resource calls | Replace enums with strings, calls with `await kernel_client.*()` |
+| `gateway/server.py` | Process CRUD + orchestration + service registry | Direct rewire for CRUD; orchestration loop needed for `submit_request()`/`resume_request()` |
+| `memory/services/event_emitter.py:229` | `get_commbus()` (try/except) | Wire `CommBusServiceStub` into `KernelClient` |
+| Test files (3) | Full `control_tower` surface | Rewrite against `KernelClient` mock |
+
+**What can be directly rewired (no new code):**
+- `lifecycle.get_process()` → `kernel_client.get_process()`
+- `lifecycle.transition_state()` → `kernel_client.transition_state()`
+- `lifecycle.terminate()` → `kernel_client.terminate_process()`
+- `lifecycle.list_processes()` → `kernel_client.list_processes()`
+- `resources.record_usage()` → `kernel_client.record_usage()`
+- `resources.check_quota()` → `kernel_client.check_quota()`
+- `resources.get_system_usage()` → `kernel_client.get_process_counts()`
+- `lifecycle.submit() + resources.allocate()` → single `kernel_client.create_process()`
+
+**What needs new code:**
+- `submit_request()` / `resume_request()` → orchestration loop using `initialize_orchestration_session()` + `get_next_instruction()` + `report_agent_result()`
+- `register_service()` → Python-side service registry (not a kernel concern)
+- `events` (EventAggregator) → Wire `CommBusServiceStub` or Python-side event bus
+- `get_commbus()` → Add `CommBusServiceStub` to KernelClient (stub already in pb2_grpc)
 
 ### CRITICAL: Missing source file referenced by tests
 
@@ -299,7 +323,7 @@ the proto source lives in a separate `codeanalysis` repository.
 | 3 | Fix `avionics` → `jeeves_infra` in test files | Path fix (a) | Small | 2 test files + docstrings |
 | 4 | Write `jeeves_infra/protocols/events.py` (Event, EventCategory, EventSeverity, EventEmitterProtocol) | New code (b) | Medium | 4 types, 3 consumers |
 | 5 | Write `jeeves_infra/protocols/validation.py` (MetaValidationIssue, VerificationReport) | New code (b) | Small | 2 types, 3 consumers |
-| 6 | Decide control_tower strategy: write stubs OR delete orphaned tests | Design decision | Medium | 7 types, ~6 consumers |
+| 6 | Rewire `control_tower` consumers → `kernel_client` (direct rewire for 8 methods, new code for orchestration loop + CommBus) | Rewire | Large | ~6 source files, 3 test files |
 | 7 | Resolve or remove `flow_service.py` reference + its test file | Bug | Small | 1 test file |
 | 8 | Add `OptionalCheckpoint` to `protocols/__init__.py` exports | Bug | Trivial | 1 line |
 | 9 | Fix protobuf schema drift (`inference_requests`, `inference_input_chars`) | Bug | Small | kernel_client.py |
@@ -360,17 +384,20 @@ Step 2: Write missing types (P0 #4-5)
   jeeves_infra/protocols/events.py      (4 types)
   jeeves_infra/protocols/validation.py  (2 types)
   ↓
-Step 3: Decide control_tower fate (P0 #6)
-  Option A: Write stubs in jeeves_infra/process/types.py
-  Option B: Delete orphaned tests + clean guarded imports
+Step 3: Rewire control_tower → kernel_client (P0 #6)
+  Direct: 8 methods map 1:1 (enum→string, sync→async)
+  New:    Orchestration loop, CommBusServiceStub, service registry
   ↓
 Step 4: Trivial fixes (P0 #7-11)
   OptionalCheckpoint re-export, proto drift, dep cleanup
 ```
 
 Steps 1 & 4 are mechanical -- no design decisions needed. Step 2 requires reading
-the consumers to understand the type contracts. Step 3 requires an architectural
-decision about whether resource tracking belongs in this repo or the Rust kernel.
+the consumers to understand the type contracts. Step 3 is the largest piece: the
+8 direct-rewire methods are straightforward (enum→string, sync→async), but the
+orchestration loop (`submit_request`/`resume_request`) and CommBus wiring require
+new code. The Rust kernel already provides all the gRPC services -- this is purely
+a Python client-side wiring task.
 
 ### Post-wiring impact
 
