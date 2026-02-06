@@ -23,7 +23,7 @@ import pytest
 from fastapi.testclient import TestClient
 from httpx import AsyncClient, ASGITransport
 
-from jeeves_infra.gateway.server import app, app_state, lifespan
+from mission_system.app_server import app, app_state, lifespan
 from mission_system.config.constants import PLATFORM_NAME, PLATFORM_VERSION
 
 
