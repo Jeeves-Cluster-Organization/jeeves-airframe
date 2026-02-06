@@ -35,7 +35,14 @@ from jeeves_infra.database.client import DatabaseClientProtocol
 from jeeves_infra.database.factory import create_database_client, reset_factory
 from jeeves_infra.logging import get_current_logger
 from mission_system.services.chat_service import ChatService
-from jeeves_infra.observability.tracing import init_tracing, instrument_fastapi, shutdown_tracing
+try:
+    from jeeves_infra.observability.tracing import init_tracing, instrument_fastapi, shutdown_tracing
+    _TRACING_AVAILABLE = True
+except ImportError:
+    _TRACING_AVAILABLE = False
+    def init_tracing(*args, **kwargs): pass
+    def instrument_fastapi(*args, **kwargs): pass
+    def shutdown_tracing(*args, **kwargs): pass
 
 from jeeves_infra.protocols import (
     Envelope,

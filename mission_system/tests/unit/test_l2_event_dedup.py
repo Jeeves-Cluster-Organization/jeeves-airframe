@@ -20,8 +20,9 @@ from mission_system.memory.services.event_emitter import (
     clear_global_dedup_cache
 )
 
-# Requires PostgreSQL database
-pytestmark = pytest.mark.requires_postgres
+# All tests in this file are pure in-memory (no database fixtures).
+# Removed incorrect requires_postgres marker (RCA: all 15 tests use
+# SessionDedupCache/EventEmitter with mocks, no pg_test_db).
 
 
 class TestSessionDedupCache:
