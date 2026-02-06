@@ -106,7 +106,7 @@ def _classify_event_category(event_type: str) -> "EventCategory":
         >>> _classify_event_category("perception.complete")  # legacy
         EventCategory.AGENT_LIFECYCLE  # via prefix match
     """
-    from protocols.events import EventCategory
+    from jeeves_infra.protocols.events import EventCategory
 
     # Exact match lookup (O(1))
     if event_type in EVENT_CATEGORY_MAP:
@@ -132,12 +132,12 @@ async def _publish_unified_event(event: dict):
         event: Dict containing event data from gRPC FlowEvent payload
     """
     from jeeves_infra.gateway.event_bus import gateway_events
-    from protocols.events import (
+    from jeeves_infra.protocols.events import (
         Event,
         EventCategory,
         EventSeverity,
     )
-    from protocols.protocols import RequestContext
+    from jeeves_infra.protocols.interfaces import RequestContext
     from datetime import datetime, timezone
     import uuid
 

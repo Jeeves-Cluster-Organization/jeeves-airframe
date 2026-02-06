@@ -36,7 +36,7 @@ except ImportError:  # pragma: no cover - fallback when Prometheus is unavailabl
         warnings.warn("prometheus-client not installed; metrics server not started", RuntimeWarning)
         return None
 
-from protocols.validation import VerificationReport
+from jeeves_infra.protocols.validation import VerificationReport
 
 
 ORCHESTRATOR_INFLIGHT = Gauge(

@@ -137,6 +137,7 @@ from jeeves_infra.runtime.agents import (
     PipelineRunner,
     create_pipeline_runner,
     create_envelope,
+    OptionalCheckpoint,
 )
 
 # =============================================================================
@@ -319,6 +320,7 @@ __all__ = [
     "PipelineRunner",
     "create_pipeline_runner",
     "create_envelope",
+    "OptionalCheckpoint",
     # Utilities
     "JSONRepairKit",
     "normalize_string_list",

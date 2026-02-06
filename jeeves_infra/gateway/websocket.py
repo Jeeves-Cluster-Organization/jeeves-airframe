@@ -20,7 +20,7 @@ from typing import Set
 from fastapi import WebSocket
 
 from jeeves_infra.logging import get_current_logger
-from protocols.events import Event
+from jeeves_infra.protocols.events import Event
 
 
 # Connected WebSocket clients (module-level state)

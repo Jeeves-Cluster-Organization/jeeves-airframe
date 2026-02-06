@@ -64,8 +64,6 @@ class QuotaCheckResult:
     agent_hops: int = 0
     tokens_in: int = 0
     tokens_out: int = 0
-    inference_requests: int = 0
-    inference_input_chars: int = 0
 
 
 @dataclass
@@ -394,8 +392,6 @@ class KernelClient:
         agent_hops: int = 0,
         tokens_in: int = 0,
         tokens_out: int = 0,
-        inference_requests: int = 0,
-        inference_input_chars: int = 0,
     ) -> QuotaCheckResult:
         """Record resource usage for a process.
 
@@ -406,8 +402,6 @@ class KernelClient:
             agent_hops: Number of agent hops to record
             tokens_in: Input tokens used
             tokens_out: Output tokens used
-            inference_requests: Number of inference calls (embeddings, NLI, etc)
-            inference_input_chars: Total input characters for inference
 
         Returns:
             QuotaCheckResult with current usage state
@@ -419,8 +413,6 @@ class KernelClient:
             agent_hops=agent_hops,
             tokens_in=tokens_in,
             tokens_out=tokens_out,
-            inference_requests=inference_requests,
-            inference_input_chars=inference_input_chars,
         )
         try:
             response = await self._call_kernel("RecordUsage", request)
@@ -431,8 +423,6 @@ class KernelClient:
                 agent_hops=response.agent_hops,
                 tokens_in=response.tokens_in,
                 tokens_out=response.tokens_out,
-                inference_requests=response.inference_requests,
-                inference_input_chars=response.inference_input_chars,
             )
         except grpc.RpcError as e:
             logger.error(f"Failed to record usage for {pid}: {e}")
@@ -896,31 +886,6 @@ class KernelClient:
         except KernelClientError:
             return None
 
-    async def record_inference_call(
-        self, pid: str, input_chars: int = 0
-    ) -> Optional[str]:
-        """Record an inference call (embedding, NLI, classification).
-
-        Args:
-            pid: Process ID
-            input_chars: Number of input characters processed
-
-        Returns:
-            Exceeded reason if quota exceeded, None otherwise
-        """
-        try:
-            await self.record_usage(
-                pid=pid,
-                inference_requests=1,
-                inference_input_chars=input_chars,
-            )
-            result = await self.check_quota(pid)
-            if not result.within_bounds:
-                return result.exceeded_reason
-            return None
-        except KernelClientError:
-            return None
-
     # =========================================================================
     # Inference Methods (Kernel-Tracked)
     # =========================================================================
@@ -968,14 +933,6 @@ class KernelClient:
                 "EmbeddingService().embed_batch to compute embeddings."
             )
 
-        # Calculate total input chars for quota check
-        total_chars = sum(len(t) for t in texts)
-
-        # Check quota before proceeding
-        exceeded = await self.record_inference_call(pid, total_chars)
-        if exceeded:
-            raise KernelClientError(f"Inference quota exceeded: {exceeded}")
-
         # Delegate to provided embedding function
         try:
             return embedding_fn(texts)
@@ -1018,14 +975,6 @@ class KernelClient:
                 "embedding_fn is required. Pass a function like "
                 "EmbeddingService().embed to compute embeddings."
             )
-
-        # Calculate input chars for quota check
-        total_chars = len(text)
-
-        # Check quota before proceeding
-        exceeded = await self.record_inference_call(pid, total_chars)
-        if exceeded:
-            raise KernelClientError(f"Inference quota exceeded: {exceeded}")
 
         # Delegate to provided embedding function
         try:

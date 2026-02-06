@@ -27,7 +27,7 @@ from jeeves_infra.utils.serialization import datetime_to_ms
 from jeeves_infra.protocols import LoggerProtocol, get_capability_resource_registry
 
 try:
-    from proto import jeeves_pb2, jeeves_pb2_grpc
+    from jeeves_infra.gateway.proto import jeeves_pb2, jeeves_pb2_grpc
 except ImportError:
     jeeves_pb2 = None
     jeeves_pb2_grpc = None
