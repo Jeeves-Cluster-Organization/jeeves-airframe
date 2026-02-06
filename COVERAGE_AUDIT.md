@@ -171,21 +171,90 @@ require a live PostgreSQL database.
 
 ## 3. Structural / Dependency Issues
 
-### CRITICAL: Phantom packages (5 declared, 0 exist)
+### jeeves-core submodule: NOT a solution for phantom packages
 
-`mission_system/pyproject.toml` declares these as hard dependencies, but none
-exist as installable packages or directories in the repository:
+jeeves-core is a **pure Rust gRPC server** (confirmed by `protocols/interfaces.py:6`:
+*"Moved from jeeves_core/protocols.py as part of Session 10 (Complete Python Removal
+from jeeves-core)"*). No `.gitmodules` exists. Cloning it would only provide `.proto`
+source files for sync -- it contains **zero Python packages**. The phantom packages
+originate from an earlier multi-package Python architecture that was partially
+consolidated into `jeeves_infra` but never fully wired up.
 
-| Package | Files importing it | Impact |
-|---------|-------------------|--------|
-| `memory_module>=1.0.0` | 15+ files | Blocks all memory-related imports |
-| `shared>=1.0.0` | 25 files | Blocks `get_component_logger` everywhere |
-| `protocols>=1.0.0` | 0 runtime imports | Misleading dependency |
-| `avionics>=1.0.0` | 0 runtime imports | Stale dependency |
-| `control_tower>=1.0.0` | 0 runtime imports | Stale dependency |
+### CRITICAL: Phantom packages -- diagnosis and fix-forward strategy
 
-**Root cause**: These appear to be sibling packages from a monorepo that were
-partially migrated into `jeeves_infra/` but import paths were never updated.
+`mission_system/pyproject.toml` declares 5 phantom dependencies. Each has a
+distinct root cause and fix path:
+
+#### (a) `memory_module` -- ALREADY MIGRATED, needs path fix
+
+All code lives at `jeeves_infra/memory/`. Mechanical find-and-replace only.
+
+| File (line) | Phantom import | Correct import |
+|-------------|---------------|----------------|
+| `jeeves_infra/memory/__init__.py` (14) | `from memory_module.handlers import register_memory_handlers, reset_cached_services` | `from jeeves_infra.memory.handlers import register_memory_handlers, reset_cached_services` |
+| `jeeves_infra/memory/handlers.py` (56) | `from memory_module.messages import GetSessionState, SearchMemory, ...` | `from jeeves_infra.memory.messages import GetSessionState, SearchMemory, ...` |
+| `jeeves_infra/memory/messages/__init__.py` (12,23,30) | `from memory_module.messages.events/queries/commands import ...` | `from jeeves_infra.memory.messages.events/queries/commands import ...` |
+| `jeeves_infra/memory/services/event_emitter.py` (382) | `from memory_module.messages import MemoryStored` | `from jeeves_infra.memory.messages import MemoryStored` |
+| `mission_system/bootstrap.py` (576) | `from memory_module.manager import MemoryManager` | `from jeeves_infra.memory.manager import MemoryManager` |
+| `mission_system/adapters.py` (111) | `from memory_module.manager import MemoryManager` | `from jeeves_infra.memory.manager import MemoryManager` |
+| `mission_system/tests/acceptance/test_pytest_imports.py` (49,62) | `from memory_module.manager/intent_classifier import ...` | `from jeeves_infra.memory.manager/intent_classifier import ...` |
+
+#### (b) `shared` -- ALREADY MIGRATED, needs path fix
+
+Was a flat utility package split into three locations. `get_component_logger` is
+defined at `jeeves_infra/utils/logging/__init__.py:288`.
+
+| Phantom symbol | Correct import path |
+|---------------|-------------------|
+| `get_component_logger` | `jeeves_infra.utils.logging` |
+| `convert_uuids_to_strings`, `uuid_str`, `uuid_read` | `jeeves_infra.utils.uuid_utils` |
+| `parse_datetime` | `jeeves_infra.utils.serialization` |
+
+**25 files** need this fix, all under `jeeves_infra/memory/` and `jeeves_infra/postgres/`.
+
+#### (c) `avionics` -- ALREADY MIGRATED (old name for jeeves_infra)
+
+`avionics` was the former package name. Evidence: `jeeves_infra/memory/manager.py:15`
+says *"Moved from avionics/memory/manager.py"*. All code-level imports are in 2 test
+files (`test_distributed_mode.py`, `test_unwired_audit_phase2.py`). ~20 docstrings
+in `jeeves_infra/` also reference the old name.
+
+Fix: `s/avionics/jeeves_infra/` in test files + docstring updates.
+
+#### (d) `protocols` (bare package) -- PARTIALLY MIGRATED + GENUINELY MISSING TYPES
+
+**Path fix needed** for `RequestContext`: exists at `jeeves_infra.protocols.interfaces.RequestContext`.
+
+**Genuinely missing types** (must be written):
+
+| Missing type | Referenced in | Proposed location |
+|-------------|--------------|-------------------|
+| `Event` | `gateway/event_bus.py:44`, `gateway/websocket.py:23`, `gateway/routers/chat.py:109` | `jeeves_infra/protocols/events.py` |
+| `EventCategory` | `gateway/routers/chat.py:135` | `jeeves_infra/protocols/events.py` |
+| `EventSeverity` | `gateway/routers/chat.py:140` | `jeeves_infra/protocols/events.py` |
+| `EventEmitterProtocol` | `gateway/event_bus.py:44` | `jeeves_infra/protocols/events.py` |
+| `MetaValidationIssue` | `utils/models.py:11`, `mission_system/common/models.py:11` | `jeeves_infra/protocols/validation.py` |
+| `VerificationReport` | `utils/models.py:11`, `observability/metrics.py:39` | `jeeves_infra/protocols/validation.py` |
+
+#### (e) `control_tower` -- GENUINELY MISSING (deleted in "Session 14")
+
+Confirmed deleted by `mission_system/events/bridge.py:22`: *"control_tower deleted -
+Session 14"*. Runtime code already degrades gracefully (try/except guards).
+
+**Missing types that need stubs or deletion of consumers:**
+
+| Missing type | Referenced in |
+|-------------|--------------|
+| `SchedulingPriority` | `jeeves_infra/services/worker_coordinator.py:154` |
+| `ProcessState` | `jeeves_infra/gateway/server.py:995`, `services/worker_coordinator.py:154` |
+| `ResourceQuota` | `services/worker_coordinator.py:154` (partial duplicate at `bootstrap.py:53`) |
+| `ResourceUsage` | `tests/integration/test_control_tower_resource_tracking.py` |
+| `ResourceTracker` | `tests/integration/test_control_tower_resource_tracking.py` |
+| `ControlTower` | `tests/e2e/test_distributed_mode.py` |
+| `get_commbus` | `memory/services/event_emitter.py:229` (try/except, non-fatal) |
+
+**Decision**: Either write stub types in `jeeves_infra/process/types.py` or delete
+orphaned test files + clean up guarded imports.
 
 ### CRITICAL: Missing source file referenced by tests
 
@@ -211,79 +280,123 @@ automatically run on commits or PRs.
 
 ### LOW: No git submodule for jeeves-core
 
-Despite documentation referencing "jeeves-core Rust microkernel", there is no
-`.gitmodules` file. The gRPC client communicates with it over the network, but
-the proto files may drift without a submodule keeping them in sync.
+jeeves-core is pure Rust, communicates via gRPC only. A submodule would be useful
+**only** for keeping `engine.proto` in sync (preventing the proto drift issue above).
+No `.gitmodules` exists. The generated `_pb2.py` files embed a Go package path
+(`github.com/jeeves-cluster-organization/codeanalysis/coreengine/proto`) suggesting
+the proto source lives in a separate `codeanalysis` repository.
 
 ---
 
 ## 4. Trackable Issues (scoped to this repository)
 
-### P0 -- Blocking test execution
+### P0 -- Blocking test execution (fix-forward wiring)
 
-| # | Title | Type | Effort |
-|---|-------|------|--------|
-| 1 | Fix `memory_module` imports → `jeeves_infra.memory` | Bug | Medium |
-| 2 | Fix `shared` imports → `jeeves_infra.utils.logging` (or create shim) | Bug | Medium |
-| 3 | Resolve or remove `flow_service.py` reference + its test file | Bug | Small |
-| 4 | Add `OptionalCheckpoint` to `protocols/__init__.py` exports | Bug | Trivial |
-| 5 | Fix protobuf schema drift (`inference_requests`, `inference_input_chars`) | Bug | Small |
-| 6 | Clean phantom deps from `mission_system/pyproject.toml` | Bug | Trivial |
+| # | Title | Category | Effort | Files |
+|---|-------|----------|--------|-------|
+| 1 | Fix `memory_module` → `jeeves_infra.memory` imports | Path fix (a) | Small | ~8 files, mechanical |
+| 2 | Fix `shared` → `jeeves_infra.utils.{logging,uuid_utils,serialization}` | Path fix (a) | Medium | 25 files, 3-way split |
+| 3 | Fix `avionics` → `jeeves_infra` in test files | Path fix (a) | Small | 2 test files + docstrings |
+| 4 | Write `jeeves_infra/protocols/events.py` (Event, EventCategory, EventSeverity, EventEmitterProtocol) | New code (b) | Medium | 4 types, 3 consumers |
+| 5 | Write `jeeves_infra/protocols/validation.py` (MetaValidationIssue, VerificationReport) | New code (b) | Small | 2 types, 3 consumers |
+| 6 | Decide control_tower strategy: write stubs OR delete orphaned tests | Design decision | Medium | 7 types, ~6 consumers |
+| 7 | Resolve or remove `flow_service.py` reference + its test file | Bug | Small | 1 test file |
+| 8 | Add `OptionalCheckpoint` to `protocols/__init__.py` exports | Bug | Trivial | 1 line |
+| 9 | Fix protobuf schema drift (`inference_requests`, `inference_input_chars`) | Bug | Small | kernel_client.py |
+| 10 | Clean phantom deps from `mission_system/pyproject.toml` | Bug | Trivial | 5 lines |
+| 11 | Add `pydantic-settings` to root `pyproject.toml` dependencies | Bug | Trivial | 1 line |
 
 ### P1 -- Coverage gaps on critical paths
 
 | # | Title | Type | Effort |
 |---|-------|------|--------|
-| 7 | Add unit tests for `kernel_client.py` resource management methods | Test | Medium |
-| 8 | Add unit tests for `pipeline_worker.py` | Test | Medium |
-| 9 | Add unit tests for `wiring.py` remaining DI paths | Test | Medium |
-| 10 | Add unit tests for `feature_flags.py` | Test | Medium |
-| 11 | Add unit tests for `gateway/` HTTP layer (FastAPI TestClient) | Test | Large |
-| 12 | Add unit tests for `services/chat_service.py` | Test | Large |
-| 13 | Add unit tests for `services/worker_coordinator.py` | Test | Large |
-| 14 | Add unit tests for `postgres/client.py` (mock asyncpg) | Test | Medium |
-| 15 | Add unit tests for `redis/client.py` + `connection_manager.py` | Test | Medium |
-| 16 | Add unit tests for `mission_system/adapters.py` | Test | Medium |
-| 17 | Add unit tests for `mission_system/orchestrator/` services | Test | Large |
+| 12 | Add unit tests for `kernel_client.py` resource management methods | Test | Medium |
+| 13 | Add unit tests for `pipeline_worker.py` | Test | Medium |
+| 14 | Add unit tests for `wiring.py` remaining DI paths | Test | Medium |
+| 15 | Add unit tests for `feature_flags.py` | Test | Medium |
+| 16 | Add unit tests for `gateway/` HTTP layer (FastAPI TestClient) | Test | Large |
+| 17 | Add unit tests for `services/chat_service.py` | Test | Large |
+| 18 | Add unit tests for `services/worker_coordinator.py` | Test | Large |
+| 19 | Add unit tests for `postgres/client.py` (mock asyncpg) | Test | Medium |
+| 20 | Add unit tests for `redis/client.py` + `connection_manager.py` | Test | Medium |
+| 21 | Add unit tests for `mission_system/adapters.py` | Test | Medium |
+| 22 | Add unit tests for `mission_system/orchestrator/` services | Test | Large |
 
 ### P2 -- Test infrastructure & quality
 
 | # | Title | Type | Effort |
 |---|-------|------|--------|
-| 18 | Add CI pipeline (GitHub Actions) for pytest + coverage | Infra | Medium |
-| 19 | Add coverage threshold enforcement (fail build below X%) | Infra | Small |
-| 20 | Add `pydantic-settings` to root pyproject.toml dependencies | Bug | Trivial |
-| 21 | Enable contract tests with testcontainers for PostgreSQL | Test | Medium |
-| 22 | Add proto sync mechanism (submodule or CI step) for jeeves-core | Infra | Medium |
+| 23 | Add CI pipeline (GitHub Actions) for pytest + coverage | Infra | Medium |
+| 24 | Add coverage threshold enforcement (fail build below X%) | Infra | Small |
+| 25 | Enable contract tests with testcontainers for PostgreSQL | Test | Medium |
+| 26 | Add proto sync mechanism (submodule or CI step) for jeeves-core | Infra | Medium |
 
 ### P3 -- Coverage for utility/secondary modules
 
 | # | Title | Type | Effort |
 |---|-------|------|--------|
-| 23 | Add tests for `utils/` modules (fuzzy_matcher, id_generator, uuid_utils, etc.) | Test | Medium |
-| 24 | Add tests for `memory/` repositories and services | Test | Large |
-| 25 | Add tests for `observability/` (metrics, tracing) | Test | Medium |
-| 26 | Add tests for `webhooks/service.py` | Test | Medium |
-| 27 | Add tests for `middleware/rate_limiter.py` | Test | Small |
-| 28 | Add tests for `logging/` (setup, context) | Test | Small |
+| 27 | Add tests for `utils/` modules (fuzzy_matcher, id_generator, uuid_utils, etc.) | Test | Medium |
+| 28 | Add tests for `memory/` repositories and services | Test | Large |
+| 29 | Add tests for `observability/` (metrics, tracing) | Test | Medium |
+| 30 | Add tests for `webhooks/service.py` | Test | Medium |
+| 31 | Add tests for `middleware/rate_limiter.py` | Test | Small |
+| 32 | Add tests for `logging/` (setup, context) | Test | Small |
 
 ---
 
 ## 5. Recommendations
 
-1. **Fix P0 items first.** The phantom package imports (`memory_module`, `shared`)
-   prevent ~70+ tests from collecting and block coverage measurement on ~45 source
-   modules. Fixing imports will likely raise measurable coverage by 5-10% with zero
-   new test code.
+### Fall-forward wiring order
 
-2. **Set a coverage floor.** Current combined coverage is approximately 25%. After
-   fixing P0 imports, target 40% as a near-term floor, 60% as a medium-term goal.
+The fix-forward approach for the phantom packages follows a clear dependency chain:
 
-3. **Prioritize gateway and services testing.** The HTTP/WS/gRPC gateway and the
-   chat/worker services are the system's API surface and have 0% coverage.
+```
+Step 1: Mechanical path fixes (P0 #1-3)
+  memory_module → jeeves_infra.memory   (~8 files)
+  shared → jeeves_infra.utils.*         (~25 files)
+  avionics → jeeves_infra              (~2 test files)
+  ↓
+Step 2: Write missing types (P0 #4-5)
+  jeeves_infra/protocols/events.py      (4 types)
+  jeeves_infra/protocols/validation.py  (2 types)
+  ↓
+Step 3: Decide control_tower fate (P0 #6)
+  Option A: Write stubs in jeeves_infra/process/types.py
+  Option B: Delete orphaned tests + clean guarded imports
+  ↓
+Step 4: Trivial fixes (P0 #7-11)
+  OptionalCheckpoint re-export, proto drift, dep cleanup
+```
 
-4. **Add CI immediately.** Without automated test runs, regressions like the proto
-   drift and missing module issues accumulate silently.
+Steps 1 & 4 are mechanical -- no design decisions needed. Step 2 requires reading
+the consumers to understand the type contracts. Step 3 requires an architectural
+decision about whether resource tracking belongs in this repo or the Rust kernel.
 
-5. **Consider testcontainers for integration tests.** The 36 skipped contract tests
-   need PostgreSQL. `testcontainers-python` can provide ephemeral DB instances in CI.
+### Post-wiring impact
+
+After completing P0:
+- ~7 currently-uncollectable test files will become runnable (~70+ additional tests)
+- ~45 source modules that fail at import will become testable/measurable
+- Estimated coverage increase: **+5-10% with zero new test code**
+
+### Coverage targets
+
+| Milestone | Target | When |
+|-----------|--------|------|
+| After P0 wiring | ~30% combined | Immediate |
+| After P1 critical path tests | ~50% combined | Near-term |
+| After P2 infrastructure + P3 utilities | ~65% combined | Medium-term |
+
+### Other recommendations
+
+1. **Add CI immediately** (P2 #23). Without automated test runs, regressions like
+   the proto drift and missing module issues accumulate silently.
+
+2. **Prioritize gateway and services testing** (P1 #16-18). The HTTP/WS/gRPC
+   gateway and the chat/worker services are the system's API surface and have 0%
+   coverage.
+
+3. **Add proto sync for jeeves-core** (P2 #26). The generated `_pb2.py` files embed
+   a Go package path (`github.com/jeeves-cluster-organization/codeanalysis/coreengine/proto`)
+   suggesting the proto source lives in a separate `codeanalysis` repo. A submodule
+   or CI step to regenerate Python stubs would prevent future drift.
