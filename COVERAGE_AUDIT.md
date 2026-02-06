@@ -427,3 +427,419 @@ After completing P0:
    a Go package path (`github.com/jeeves-cluster-organization/codeanalysis/coreengine/proto`)
    suggesting the proto source lives in a separate `codeanalysis` repo. A submodule
    or CI step to regenerate Python stubs would prevent future drift.
+
+---
+
+## Appendix A: P0 Implementation Plan (line-level)
+
+### Guiding principles
+
+- **No backward-compatibility shims.** Delete old paths, don't alias them.
+- **No duplicate files.** Where infra and mission_system have identical copies,
+  one is canonical and the other imports from it.
+- **Forward only.** If code references a deleted subsystem, rewire it to the
+  replacement or delete the consumer.
+
+### Additional issues discovered during investigation
+
+| Issue | Details |
+|-------|---------|
+| `governance_service.py` proto import path wrong | Uses `from proto import jeeves_pb2_grpc` (bare); should be `from jeeves_infra.gateway.proto import jeeves_pb2_grpc`. The bare import only works inside `gateway/` due to relative paths. |
+| Duplicate `worker_coordinator.py` | `jeeves_infra/services/worker_coordinator.py` and `mission_system/services/worker_coordinator.py` are byte-identical (604 lines). |
+| Duplicate `debug_api.py` | `jeeves_infra/services/debug_api.py` and `mission_system/services/debug_api.py` are byte-identical (388 lines). |
+| `control_tower` calls in `worker_coordinator.py` are sync | All `self._control_tower.lifecycle.*` calls are NOT awaited, but `KernelClient` methods are all `async`. The calling methods are already `async def`, so adding `await` is safe. |
+| `bootstrap.py` resource callback is sync | `track_resources()` callback (line 338) calls `control_tower.record_llm_call()` synchronously. `KernelClient.record_llm_call()` is async. Callback must become async. |
+| Newer proto exists but is not used | `protocols/coreengine/proto/engine_pb2.py` has inference fields; `protocols/engine_pb2.py` (active) does not. |
+
+---
+
+### Step 1: Mechanical path fixes
+
+#### 1a. `memory_module` → `jeeves_infra.memory` (P0 #1)
+
+| File | Line | Old | New |
+|------|------|-----|-----|
+| `jeeves_infra/memory/__init__.py` | 14 | `from memory_module.handlers import register_memory_handlers, reset_cached_services` | `from jeeves_infra.memory.handlers import register_memory_handlers, reset_cached_services` |
+| `jeeves_infra/memory/handlers.py` | 56 | `from memory_module.messages import (...)` | `from jeeves_infra.memory.messages import (...)` |
+| `jeeves_infra/memory/messages/__init__.py` | 12 | `from memory_module.messages.events import (...)` | `from jeeves_infra.memory.messages.events import (...)` |
+| `jeeves_infra/memory/messages/__init__.py` | 23 | `from memory_module.messages.queries import (...)` | `from jeeves_infra.memory.messages.queries import (...)` |
+| `jeeves_infra/memory/messages/__init__.py` | 30 | `from memory_module.messages.commands import (...)` | `from jeeves_infra.memory.messages.commands import (...)` |
+| `jeeves_infra/memory/services/event_emitter.py` | 382 | `from memory_module.messages import MemoryStored` | `from jeeves_infra.memory.messages import MemoryStored` |
+| `mission_system/bootstrap.py` | 576 | `from memory_module.manager import MemoryManager` | `from jeeves_infra.memory.manager import MemoryManager` |
+| `mission_system/adapters.py` | 111 | `from memory_module.manager import MemoryManager` | `from jeeves_infra.memory.manager import MemoryManager` |
+| `mission_system/tests/acceptance/test_pytest_imports.py` | 49 | `from memory_module.manager import MemoryManager` | `from jeeves_infra.memory.manager import MemoryManager` |
+| `mission_system/tests/acceptance/test_pytest_imports.py` | 62 | `from memory_module.intent_classifier import IntentClassifier` | `from jeeves_infra.memory.intent_classifier import IntentClassifier` |
+
+#### 1b. `shared` → `jeeves_infra.utils.*` (P0 #2)
+
+**Import mapping:**
+
+| Old import | New import |
+|-----------|-----------|
+| `from shared import get_component_logger` | `from jeeves_infra.utils.logging import get_component_logger` |
+| `from shared import get_component_logger, parse_datetime` | Split into 2 imports: `from jeeves_infra.utils.logging import get_component_logger` + `from jeeves_infra.utils.serialization import parse_datetime` |
+| `from shared import get_component_logger, convert_uuids_to_strings` | Split: `...logging import get_component_logger` + `...uuid_utils import convert_uuids_to_strings` |
+| `from shared import uuid_str, uuid_read, get_component_logger, parse_datetime` | Split: `...logging import get_component_logger` + `...uuid_utils import uuid_str, uuid_read` + `...serialization import parse_datetime` |
+
+**Files (25):** All under `jeeves_infra/memory/` (managers, services, repositories),
+`jeeves_infra/capability_registry.py`, and `jeeves_infra/postgres/graph.py`.
+
+#### 1c. `avionics` → `jeeves_infra` (P0 #3)
+
+**Code-level imports (2 test files):**
+- `mission_system/tests/e2e/test_distributed_mode.py`: Replace all `from avionics.X import Y` with `from jeeves_infra.X import Y`
+- `mission_system/tests/integration/test_unwired_audit_phase2.py`: Same replacement
+
+**Docstrings (~20 files in jeeves_infra/):** Update `from avionics.X import Y` to
+`from jeeves_infra.X import Y` in Usage/Example docstring blocks. Not blocking but
+prevents confusion.
+
+---
+
+### Step 2: Write missing protocol types
+
+#### 2a. Create `jeeves_infra/protocols/events.py` (P0 #4)
+
+```python
+"""Unified event types for the gateway event bus."""
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from enum import Enum
+from typing import Any, Awaitable, Callable, Dict, Optional
+import uuid
+
+from jeeves_infra.protocols.interfaces import RequestContext
+
+
+class EventCategory(str, Enum):
+    AGENT_LIFECYCLE = "agent_lifecycle"
+    CRITIC_DECISION = "critic_decision"
+    TOOL_EXECUTION = "tool_execution"
+    PIPELINE_FLOW = "pipeline_flow"
+    STAGE_TRANSITION = "stage_transition"
+    DOMAIN_EVENT = "domain_event"
+
+
+class EventSeverity(str, Enum):
+    DEBUG = "debug"
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
+    CRITICAL = "critical"
+
+
+@dataclass
+class Event:
+    event_id: str
+    event_type: str
+    category: EventCategory
+    timestamp_iso: str
+    timestamp_ms: int
+    request_context: RequestContext
+    request_id: str
+    session_id: str
+    user_id: Optional[str]
+    payload: Dict[str, Any]
+    severity: EventSeverity
+    source: str
+    version: str = "1.0"
+
+    @classmethod
+    def create_now(cls, event_type, category, request_context,
+                   payload=None, severity=EventSeverity.INFO,
+                   source="", version="1.0"):
+        now = datetime.now(timezone.utc)
+        return cls(
+            event_id=str(uuid.uuid4()), event_type=event_type,
+            category=category, timestamp_iso=now.isoformat(),
+            timestamp_ms=int(now.timestamp() * 1000),
+            request_context=request_context,
+            request_id=request_context.request_id,
+            session_id=request_context.session_id or "",
+            user_id=request_context.user_id,
+            payload=payload or {}, severity=severity,
+            source=source, version=version,
+        )
+
+
+class EventEmitterProtocol:
+    async def emit(self, event: Event) -> None:
+        raise NotImplementedError
+    async def subscribe(self, pattern: str,
+                        handler: Callable[[Event], Awaitable[None]]) -> str:
+        raise NotImplementedError
+    async def unsubscribe(self, subscription_id: str) -> None:
+        raise NotImplementedError
+```
+
+**Then fix consumer imports (3 files):**
+
+| File | Old | New |
+|------|-----|-----|
+| `gateway/event_bus.py:44` | `from protocols.events import Event, EventCategory, EventSeverity, EventEmitterProtocol` | `from jeeves_infra.protocols.events import Event, EventCategory, EventSeverity, EventEmitterProtocol` |
+| `gateway/websocket.py:23` | `from protocols.events import Event` | `from jeeves_infra.protocols.events import Event` |
+| `gateway/routers/chat.py:109` | `from protocols.events import EventCategory` | `from jeeves_infra.protocols.events import EventCategory` |
+| `gateway/routers/chat.py:135-139` | `from protocols.events import Event, EventCategory, EventSeverity` | `from jeeves_infra.protocols.events import Event, EventCategory, EventSeverity` |
+
+#### 2b. Create `jeeves_infra/protocols/validation.py` (P0 #5)
+
+```python
+"""Meta-validation types for the verification layer."""
+from __future__ import annotations
+from dataclasses import dataclass, field
+from typing import List
+
+@dataclass
+class MetaValidationIssue:
+    type: str = ""
+    message: str = ""
+    severity: str = "warning"
+
+@dataclass
+class VerificationReport:
+    approved: bool = False
+    issues_found: List[MetaValidationIssue] = field(default_factory=list)
+```
+
+**Then fix consumer imports (3 files):**
+
+| File | Old | New |
+|------|-----|-----|
+| `jeeves_infra/utils/models.py:11` | `from protocols.validation import MetaValidationIssue, VerificationReport` | `from jeeves_infra.protocols.validation import MetaValidationIssue, VerificationReport` |
+| `mission_system/common/models.py:11` | same | same fix |
+| `jeeves_infra/observability/metrics.py:39` | `from protocols.validation import VerificationReport` | `from jeeves_infra.protocols.validation import VerificationReport` |
+
+---
+
+### Step 3: Rewire control_tower → kernel_client (P0 #6)
+
+This is the largest step. Broken into sub-tasks by file.
+
+#### 3a. `jeeves_infra/services/worker_coordinator.py`
+
+All methods are already `async def`. Changes:
+
+1. **Line 104**: Constructor param `control_tower: Optional["ControlTowerProtocol"]` → `kernel_client: Optional["KernelClient"] = None`
+2. **Line 119**: `self._control_tower = control_tower` → `self._kernel_client = kernel_client`
+3. **Lines 152-181** (submit_envelope block): Replace:
+   ```python
+   if self._kernel_client:
+       priority_str = "HIGH" if priority >= 10 else ("LOW" if priority <= -10 else "NORMAL")
+       await self._kernel_client.create_process(
+           pid=pid, request_id=envelope.request_id or pid,
+           priority=priority_str,
+           max_llm_calls=100, max_tool_calls=50, max_agent_hops=20,
+       )
+   ```
+4. **Lines 363-395** (process execution): Replace:
+   ```python
+   if self._kernel_client:
+       await self._kernel_client.transition_state(pid, "RUNNING", "task_started")
+       await self._kernel_client.record_usage(pid=pid, agent_hops=1)
+       quota = await self._kernel_client.check_quota(pid)
+       if not quota.within_bounds:
+           await self._kernel_client.terminate_process(pid, quota.exceeded_reason)
+   ```
+5. **Lines 409-435** (post-execution usage): Replace with `await self._kernel_client.record_usage(...)` + `await self._kernel_client.check_quota(pid)`
+6. **Lines 477-482** (failure): Replace with `await self._kernel_client.terminate_process(pid, str(e))`
+7. **Delete `mission_system/services/worker_coordinator.py`** (byte-identical duplicate). Update `mission_system/bootstrap.py:449` to import from `jeeves_infra.services.worker_coordinator`.
+
+#### 3b. `jeeves_infra/gateway/server.py`
+
+All endpoint handlers are already `async def`. Changes:
+
+1. **Line 121**: `self.control_tower: Optional[ControlTower]` → `self.kernel_client: Optional[KernelClient]`
+2. **Line 250**: `control_tower = app_context.control_tower` → `kernel_client = app_context.kernel_client`
+3. **Lines 302-320**: `control_tower.register_service(...)` → Delete. Service registration was a control_tower concept. The orchestrator factory should handle service dispatch internally, or a lightweight `ServiceRegistry` dict replaces it (in-process only).
+4. **Line 327**: `event_aggregator=control_tower.events` → Create a local `EventAggregator` class (simple pub/sub dict of handlers). ~30 lines. Pass it as `event_aggregator=event_aggregator`.
+5. **Line 352**: `app_state.control_tower = control_tower` → `app_state.kernel_client = kernel_client`
+6. **Lines 544, 775, 934, 988**: All guard `if not app_state.control_tower:` → change to `if not app_state.kernel_client:`
+7. **Lines 687-689** (`submit_request`): Replace with:
+   ```python
+   pid = str(uuid.uuid4())
+   await app_state.kernel_client.create_process(pid, request_id=..., priority="NORMAL")
+   await app_state.kernel_client.initialize_orchestration_session(pid, ...)
+   # Kick off orchestration loop (get_next_instruction / report_agent_result)
+   ```
+   This requires a new `_run_orchestration_loop(kernel_client, pid)` async helper.
+8. **Lines 781-783** (`resume_request`): Replace with `await kernel_client.transition_state(pid, "RUNNING")` + resume orchestration loop.
+9. **Lines 938-944** (get process/usage/quota): Replace sync calls with `await`:
+   ```python
+   process = await app_state.kernel_client.get_process(pid)
+   quota = await app_state.kernel_client.check_quota(pid)
+   ```
+10. **Lines 992-999** (system metrics): Replace with `await kernel_client.get_process_counts()` + `await kernel_client.list_processes(state=state)`.
+11. **Line 995**: Delete `from control_tower.types import ProcessState`. Use `PROCESS_STATES = ["NEW", "READY", "RUNNING", "WAITING", "BLOCKED", "TERMINATED", "ZOMBIE"]`.
+
+#### 3c. `jeeves_infra/memory/services/event_emitter.py`
+
+1. **Lines 229-233**: Delete the `from control_tower.ipc.commbus import get_commbus` lazy import. Simplify the `commbus` property to just return `self._commbus` (which is `None` unless injected via constructor at line 206).
+
+#### 3d. `jeeves_infra/context.py`
+
+1. **Line 114**: Delete `control_tower: Optional[Any] = None` field.
+2. **Line 151**: Delete `control_tower=self.control_tower,` from `with_request()`.
+3. The `kernel_client: Optional["KernelClient"] = None` field at line 110 already exists.
+
+#### 3e. `mission_system/bootstrap.py`
+
+1. **Lines 325-353**: Resource callback. Replace `app_context.control_tower` with `app_context.kernel_client`. The callback `track_resources()` must become async:
+   ```python
+   async def track_resources(tokens_in, tokens_out):
+       await kernel_client.record_llm_call(pid, tokens_in, tokens_out)
+   ```
+   Verify that `LLMGateway.set_resource_callback()` accepts async callables (if not, wrap with `asyncio.create_task()`).
+2. **Line 518**: `control_tower=app_context.control_tower` → `kernel_client=app_context.kernel_client`
+
+#### 3f. New code: `EventAggregator` (~30 lines)
+
+A minimal local pub/sub for `server.py` line 327. Replaces `control_tower.events`:
+
+```python
+class EventAggregator:
+    def __init__(self):
+        self._handlers: Dict[str, List[Callable]] = {}
+    def subscribe(self, pattern: str, callback):
+        self._handlers.setdefault(pattern, []).append(callback)
+    def unsubscribe(self, pattern: str, callback):
+        self._handlers.get(pattern, []).remove(callback)
+    async def emit(self, event_type: str, data: Any):
+        for pattern, handlers in self._handlers.items():
+            if fnmatch.fnmatch(event_type, pattern):
+                for handler in handlers:
+                    await handler(data)
+```
+
+Can live in `jeeves_infra/gateway/event_aggregator.py` or inline in `server.py`.
+
+#### 3g. New code: orchestration loop
+
+A helper that composes kernel_client primitives into `submit_request`/`resume_request` equivalents:
+
+```python
+async def run_orchestration(kernel_client, pid, agent_registry, event_aggregator):
+    session = await kernel_client.initialize_orchestration_session(pid, ...)
+    while not session.terminated:
+        instruction = await kernel_client.get_next_instruction(pid)
+        if instruction.kind == "EXECUTE_AGENT":
+            agent = agent_registry.get(instruction.agent_name)
+            result = await agent.execute(instruction.envelope)
+            metrics = AgentExecutionMetrics(...)
+            await kernel_client.report_agent_result(pid, metrics, result)
+        elif instruction.kind == "TERMINATE":
+            break
+        session = await kernel_client.get_orchestration_session_state(pid)
+```
+
+Can live in `jeeves_infra/services/orchestrator.py` or `jeeves_infra/gateway/orchestration.py`.
+
+---
+
+### Step 4: Remaining fixes
+
+#### 4a. `OptionalCheckpoint` re-export (P0 #8)
+
+In `jeeves_infra/protocols/__init__.py`:
+- **Line 135-140**: Add `OptionalCheckpoint` to the `from jeeves_infra.runtime.agents import (...)` block.
+- **Line 317-321**: Add `"OptionalCheckpoint"` to the `__all__` list in the Runtime components section.
+
+#### 4b. Proto drift fix (P0 #9)
+
+**Option B (minimal, recommended):** Remove drifted fields from `kernel_client.py`:
+- **Lines 67-68**: Delete `inference_requests: int = 0` and `inference_input_chars: int = 0` from `QuotaCheckResult`.
+- **Lines 397-398**: Delete params from `record_usage()` signature.
+- **Lines 409-410**: Delete from docstring.
+- **Lines 422-423**: Delete from `pb2.RecordUsageRequest()` constructor.
+- **Lines 434-435**: Delete from `QuotaCheckResult()` constructor.
+- **Lines 900-922**: Delete `record_inference_usage()` method entirely (dead code, nothing calls it).
+
+Note: A newer proto at `protocols/coreengine/proto/engine_pb2.py` HAS these fields.
+If inference tracking is wanted later, promote that proto to be the active one.
+
+#### 4c. `flow_service.py` (P0 #7)
+
+The test file (630 lines) contains enough detail to reconstruct the module: 6 gRPC
+methods + 2 helpers, SQL patterns, constructor signatures. The proto stubs already
+exist in `jeeves_pb2_grpc.JeevesFlowServiceServicer`. **Recommended:** Reconstruct
+`mission_system/orchestrator/flow_service.py` from the test contracts. This unblocks
+~20 tests immediately.
+
+#### 4d. `governance_service.py` proto import fix
+
+- **Line 29-33**: Change `from proto import jeeves_pb2, jeeves_pb2_grpc` to
+  `from jeeves_infra.gateway.proto import jeeves_pb2, jeeves_pb2_grpc` (the bare
+  `proto` package only works inside `gateway/` where it's a sibling).
+
+#### 4e. Clean phantom deps (P0 #10)
+
+In `mission_system/pyproject.toml`, delete lines 25-29:
+```
+    "protocols>=1.0.0",
+    "shared>=1.0.0",
+    "avionics>=1.0.0",
+    "control_tower>=1.0.0",
+    "memory_module>=1.0.0",
+```
+Replace with:
+```
+    "jeeves-infra>=1.0.0",
+```
+
+#### 4f. Add `pydantic-settings` (P0 #11)
+
+In root `pyproject.toml`, add to `dependencies` (line 35):
+```
+    "pydantic-settings>=2.0.0",
+```
+
+---
+
+### Execution order (dependency-aware)
+
+```
+Phase 1 -- Unblock imports (no new code, all mechanical)
+  1a. memory_module path fixes          (~10 edits)
+  1b. shared path fixes                 (~25 files, ~40 edits)
+  1c. avionics path fixes               (~2 test files)
+  4e. Clean phantom deps                (1 file, 5 deletions + 1 addition)
+  4f. Add pydantic-settings             (1 line)
+  → Run tests. Expect: memory/ modules now importable, ~2 more test files collectable.
+
+Phase 2 -- Write missing types (small new files)
+  2a. Create protocols/events.py        (1 new file, ~80 lines)
+      Fix 3 consumer imports            (4 edits)
+  2b. Create protocols/validation.py    (1 new file, ~15 lines)
+      Fix 3 consumer imports            (3 edits)
+  4a. OptionalCheckpoint re-export      (2 edits)
+  4d. governance_service proto fix      (1 edit)
+  → Run tests. Expect: gateway modules importable, debug_api importable, ~3 more test files collectable.
+
+Phase 3 -- Proto drift fix (small, isolated)
+  4b. Remove inference fields           (6 edits in kernel_client.py)
+  → Run tests. Expect: 5 kernel_client tests now pass.
+
+Phase 4 -- control_tower rewire (largest, most edits)
+  3c. event_emitter.py commbus cleanup  (1 edit)
+  3a. worker_coordinator.py rewire      (~15 edits + delete duplicate)
+  3e. bootstrap.py rewire               (~5 edits)
+  3d. context.py cleanup                (2 edits)
+  3f. EventAggregator (~30 lines)       (1 new file or inline)
+  3b. server.py rewire                  (~20 edits)
+  3g. Orchestration loop (~40 lines)    (1 new file or inline)
+  → Run tests. Expect: all control_tower guard paths now active.
+
+Phase 5 -- flow_service reconstruction (optional, unblocks 20 tests)
+  4c. Write flow_service.py from test contracts (~250 lines)
+  → Run tests. Expect: test_flow_service.py collectable, ~20 more tests.
+```
+
+### Expected outcome
+
+| Metric | Before P0 | After P0 |
+|--------|----------|---------|
+| Tests collectable | 340 | ~430 |
+| Tests passing | 295 | ~380+ |
+| Tests failing | 9 | ~4 (contract test infra) |
+| jeeves_infra coverage | 17% | ~25% (more modules importable) |
+| mission_system coverage | 50% | ~55% |
+| Import errors at collection | 7 files | 0 |
