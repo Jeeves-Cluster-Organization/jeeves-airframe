@@ -24,6 +24,7 @@ Usage:
 """
 
 import os
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
@@ -61,6 +62,43 @@ class ResourceQuota:
     max_iterations: int = 3
     timeout_seconds: int = 300
     soft_timeout_seconds: int = 240
+
+
+# =============================================================================
+# Request PID Context (per-request process tracking)
+# =============================================================================
+
+_request_pid: ContextVar[Optional[str]] = ContextVar("request_pid", default=None)
+
+
+def set_request_pid(pid: str) -> None:
+    """Set the current request's process ID."""
+    _request_pid.set(pid)
+
+
+def get_request_pid() -> Optional[str]:
+    """Get the current request's process ID."""
+    return _request_pid.get()
+
+
+def clear_request_pid() -> None:
+    """Clear the current request's process ID."""
+    _request_pid.set(None)
+
+
+def request_pid_context(pid: str):
+    """Context manager for request PID."""
+    import contextlib
+
+    @contextlib.contextmanager
+    def _ctx():
+        token = _request_pid.set(pid)
+        try:
+            yield pid
+        finally:
+            _request_pid.reset(token)
+
+    return _ctx()
 
 
 def _parse_bool(value: str, default: bool = True) -> bool:

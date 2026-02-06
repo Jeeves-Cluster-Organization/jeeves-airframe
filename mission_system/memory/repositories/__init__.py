@@ -22,13 +22,18 @@ Constitutional Reference:
 
 from mission_system.memory.repositories.event_repository import EventRepository, DomainEvent
 from mission_system.memory.repositories.trace_repository import TraceRepository, AgentTrace
-from mission_system.memory.repositories.pgvector_repository import PgVectorRepository
 from mission_system.memory.repositories.chunk_repository import ChunkRepository, Chunk
 from mission_system.memory.repositories.session_state_repository import SessionStateRepository, SessionState
 from mission_system.memory.repositories.tool_metrics_repository import ToolMetricsRepository, ToolMetric
 # L5-L6 extensible stubs (in-memory implementations for development/testing)
 from mission_system.memory.repositories.graph_stub import InMemoryGraphStorage, GraphNode, GraphEdge
 from mission_system.memory.repositories.skill_stub import InMemorySkillStorage, Skill, SkillUsage
+
+# PgVectorRepository requires numpy/sqlalchemy (optional deps) - lazy import
+try:
+    from mission_system.memory.repositories.pgvector_repository import PgVectorRepository
+except ImportError:
+    PgVectorRepository = None  # type: ignore[misc,assignment]
 
 __all__ = [
     # L2 Events
