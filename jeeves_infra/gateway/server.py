@@ -341,7 +341,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # Initialize ToolHealthService for L7 governance
     _logger.info("initializing_tool_health_service")
-    from jeeves_infra.memory.services.tool_health_service import ToolHealthService
+    from mission_system.memory.services.tool_health_service import ToolHealthService
     tool_health_service = ToolHealthService(db)
     await tool_health_service.ensure_initialized()
     _logger.info("tool_health_service_initialized")

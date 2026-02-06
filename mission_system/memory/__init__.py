@@ -11,7 +11,7 @@ Constitutional Reference:
 - Memory Module CONSTITUTION: Memory types and protocols in protocols
 """
 
-from jeeves_infra.memory.handlers import register_memory_handlers, reset_cached_services
+from mission_system.memory.handlers import register_memory_handlers, reset_cached_services
 
 __all__ = [
     "register_memory_handlers",

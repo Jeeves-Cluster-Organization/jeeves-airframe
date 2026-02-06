@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     # Using Protocol for type hints during migration
     from typing import Protocol as CommBusProtocol
     from jeeves_infra.protocols import DatabaseClientProtocol, LoggerProtocol
-    from jeeves_infra.memory.services.session_state_service import SessionStateService
+    from mission_system.memory.services.session_state_service import SessionStateService
 
 # Stub type for CommBus during migration (actual implementation is Go)
 class InMemoryCommBus:
@@ -53,7 +53,7 @@ def register_memory_handlers(
     Note:
         Either session_state_service or db must be provided for full functionality.
     """
-    from jeeves_infra.memory.messages import (
+    from mission_system.memory.messages import (
         GetSessionState,
         SearchMemory,
         GetClarificationContext,
@@ -205,7 +205,7 @@ def _get_session_service(
         return _cached_session_service
 
     if db is not None:
-        from jeeves_infra.memory.services.session_state_service import SessionStateService
+        from mission_system.memory.services.session_state_service import SessionStateService
         _cached_session_service = SessionStateService(db=db, logger=logger)
         return _cached_session_service
 

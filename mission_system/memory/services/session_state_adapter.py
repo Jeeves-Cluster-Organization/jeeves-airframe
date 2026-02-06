@@ -25,8 +25,8 @@ from jeeves_infra.protocols import (
 from jeeves_infra.protocols import SessionStateProtocol
 from jeeves_infra.protocols import LoggerProtocol
 
-from jeeves_infra.memory.services.session_state_service import SessionStateService
-from jeeves_infra.memory.repositories.session_state_repository import SessionState
+from mission_system.memory.services.session_state_service import SessionStateService
+from mission_system.memory.repositories.session_state_repository import SessionState
 from jeeves_infra.utils.logging import get_component_logger
 from jeeves_infra.utils.serialization import parse_datetime
 from jeeves_infra.protocols import DatabaseClientProtocol

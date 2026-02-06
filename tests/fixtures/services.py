@@ -29,7 +29,7 @@ async def session_service(pg_test_db):
 
     Provides L4 working memory functionality for tests.
     """
-    from jeeves_infra.memory.services.session_state_service import SessionStateService
+    from mission_system.memory.services.session_state_service import SessionStateService
 
     service = SessionStateService(pg_test_db)
     await service.ensure_initialized()
@@ -42,7 +42,7 @@ async def tool_health_service(pg_test_db):
 
     Provides L7 tool health metrics functionality for tests.
     """
-    from jeeves_infra.memory.services.tool_health_service import ToolHealthService
+    from mission_system.memory.services.tool_health_service import ToolHealthService
 
     service = ToolHealthService(pg_test_db)
     await service.ensure_initialized()

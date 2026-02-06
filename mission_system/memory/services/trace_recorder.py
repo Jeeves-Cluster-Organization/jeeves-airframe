@@ -14,7 +14,7 @@ from uuid import uuid4
 from contextlib import asynccontextmanager
 import asyncio
 
-from jeeves_infra.memory.repositories.trace_repository import TraceRepository, AgentTrace
+from mission_system.memory.repositories.trace_repository import TraceRepository, AgentTrace
 from jeeves_infra.utils.logging import get_component_logger
 from jeeves_infra.protocols import LoggerProtocol, FeatureFlagsProtocol
 

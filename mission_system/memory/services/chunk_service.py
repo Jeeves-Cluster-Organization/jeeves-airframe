@@ -16,7 +16,7 @@ Constitutional Alignment:
 from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime, timezone
 
-from jeeves_infra.memory.repositories.chunk_repository import ChunkRepository, Chunk
+from mission_system.memory.repositories.chunk_repository import ChunkRepository, Chunk
 from jeeves_infra.utils.logging import get_component_logger
 from jeeves_infra.protocols import LoggerProtocol, DatabaseClientProtocol
 

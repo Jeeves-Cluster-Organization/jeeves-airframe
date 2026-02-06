@@ -18,7 +18,7 @@ from datetime import datetime, timezone, timedelta
 from dataclasses import dataclass
 
 from jeeves_infra.protocols import HealthStatus, DatabaseClientProtocol
-from jeeves_infra.memory.repositories.tool_metrics_repository import (
+from mission_system.memory.repositories.tool_metrics_repository import (
     ToolMetricsRepository,
     ToolMetric
 )

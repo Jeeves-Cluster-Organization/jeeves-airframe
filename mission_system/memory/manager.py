@@ -20,8 +20,8 @@ from typing import Dict, Any, List, Optional, Set, TYPE_CHECKING
 
 if TYPE_CHECKING:
     # Type hints only - implementations injected at runtime
-    from jeeves_infra.memory.sql_adapter import SQLAdapter
-    from jeeves_infra.memory.services.xref_manager import CrossRefManager
+    from mission_system.memory.sql_adapter import SQLAdapter
+    from mission_system.memory.services.xref_manager import CrossRefManager
 import asyncio
 from jeeves_infra.utils.logging import get_component_logger
 from jeeves_infra.protocols import LoggerProtocol, VectorStorageProtocol

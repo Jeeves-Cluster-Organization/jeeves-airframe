@@ -38,7 +38,7 @@ from mission_system.adapters import get_logger
 
 if TYPE_CHECKING:
     from mission_system.orchestrator.agent_events import AgentEventEmitter
-    from jeeves_infra.memory.services.event_emitter import EventEmitter as DomainEventEmitter
+    from mission_system.memory.services.event_emitter import EventEmitter as DomainEventEmitter
 
 
 @dataclass

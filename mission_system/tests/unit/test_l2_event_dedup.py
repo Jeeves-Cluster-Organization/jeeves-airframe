@@ -13,7 +13,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 
 # Mission system tests avionics functionality - direct import acceptable
-from jeeves_infra.memory.services.event_emitter import (
+from mission_system.memory.services.event_emitter import (
     EventEmitter,
     SessionDedupCache,
     get_global_dedup_cache,

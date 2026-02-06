@@ -10,64 +10,64 @@ Run with:
 def test_memory_imports():
     """Test that all memory module imports work."""
 
-    # Test 1: Import jeeves_infra.memory package
+    # Test 1: Import mission_system.memory package
     try:
-        import jeeves_infra.memory
-        print("✓ import jeeves_infra.memory")
+        import mission_system.memory
+        print("✓ import mission_system.memory")
     except ModuleNotFoundError as e:
-        print(f"✗ import jeeves_infra.memory - {e}")
+        print(f"✗ import mission_system.memory - {e}")
         raise
 
-    # Test 2: Import from jeeves_infra.memory.services (moved from memory_module)
+    # Test 2: Import from mission_system.memory.services (moved from memory_module)
     try:
-        from jeeves_infra.memory.services.embedding_service import EmbeddingService
-        print("✓ from jeeves_infra.memory.services.embedding_service import EmbeddingService")
+        from mission_system.memory.services.embedding_service import EmbeddingService
+        print("✓ from mission_system.memory.services.embedding_service import EmbeddingService")
     except ModuleNotFoundError as e:
-        print(f"✗ from jeeves_infra.memory.services.embedding_service import EmbeddingService")
+        print(f"✗ from mission_system.memory.services.embedding_service import EmbeddingService")
         print(f"  Error: {e}")
         raise
     except ImportError as e:
         # This is OK - dependency missing
-        print(f"[WARN] from jeeves_infra.memory.services.embedding_service import EmbeddingService")
+        print(f"[WARN] from mission_system.memory.services.embedding_service import EmbeddingService")
         print(f"  Dependency missing (OK): {e}")
 
-    # Test 3: Import from jeeves_infra.memory (moved from memory_module.adapters)
+    # Test 3: Import from mission_system.memory (moved from memory_module.adapters)
     try:
-        from jeeves_infra.memory.sql_adapter import SQLAdapter
-        print("✓ from jeeves_infra.memory.sql_adapter import SQLAdapter")
+        from mission_system.memory.sql_adapter import SQLAdapter
+        print("✓ from mission_system.memory.sql_adapter import SQLAdapter")
     except ModuleNotFoundError as e:
-        print(f"✗ from jeeves_infra.memory.sql_adapter import SQLAdapter")
+        print(f"✗ from mission_system.memory.sql_adapter import SQLAdapter")
         print(f"  Error: {e}")
         raise
     except ImportError as e:
         # This is OK - dependency missing
-        print(f"[WARN] from jeeves_infra.memory.sql_adapter import SQLAdapter")
+        print(f"[WARN] from mission_system.memory.sql_adapter import SQLAdapter")
         print(f"  Dependency missing (OK): {e}")
 
     # Test 4: Import memory.manager
     try:
-        from jeeves_infra.memory.manager import MemoryManager
-        print("✓ from jeeves_infra.memory.manager import MemoryManager")
+        from mission_system.memory.manager import MemoryManager
+        print("✓ from mission_system.memory.manager import MemoryManager")
     except ModuleNotFoundError as e:
-        print(f"✗ from jeeves_infra.memory.manager import MemoryManager")
+        print(f"✗ from mission_system.memory.manager import MemoryManager")
         print(f"  Error: {e}")
         raise
     except ImportError as e:
         # This is OK - dependency missing
-        print(f"[WARN] from jeeves_infra.memory.manager import MemoryManager")
+        print(f"[WARN] from mission_system.memory.manager import MemoryManager")
         print(f"  Dependency missing (OK): {e}")
 
     # Test 5: Import memory.intent_classifier
     try:
-        from jeeves_infra.memory.intent_classifier import IntentClassifier
-        print("✓ from jeeves_infra.memory.intent_classifier import IntentClassifier")
+        from mission_system.memory.intent_classifier import IntentClassifier
+        print("✓ from mission_system.memory.intent_classifier import IntentClassifier")
     except ModuleNotFoundError as e:
-        print(f"✗ from jeeves_infra.memory.intent_classifier import IntentClassifier")
+        print(f"✗ from mission_system.memory.intent_classifier import IntentClassifier")
         print(f"  Error: {e}")
         raise
     except ImportError as e:
         # This is OK - dependency missing
-        print(f"[WARN] from jeeves_infra.memory.intent_classifier import IntentClassifier")
+        print(f"[WARN] from mission_system.memory.intent_classifier import IntentClassifier")
         print(f"  Dependency missing (OK): {e}")
 
     print("\n[OK] All import paths are correct!")

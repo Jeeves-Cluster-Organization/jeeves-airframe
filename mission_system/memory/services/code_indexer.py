@@ -18,7 +18,7 @@ from jeeves_infra.protocols import LanguageConfigProtocol, LoggerProtocol, Datab
 from jeeves_infra.utils.logging import get_component_logger
 
 if TYPE_CHECKING:
-    from jeeves_infra.memory.services.embedding_service import EmbeddingService
+    from mission_system.memory.services.embedding_service import EmbeddingService
 
 
 class CodeIndexer:

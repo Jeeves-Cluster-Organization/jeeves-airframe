@@ -15,8 +15,8 @@ from fastapi.testclient import TestClient
 
 from jeeves_infra.utils.testing import parse_postgres_url
 from jeeves_infra.gateway.server import app, app_state
-from jeeves_infra.memory.services.tool_health_service import ToolHealthService, HealthStatus
-from jeeves_infra.memory.repositories.tool_metrics_repository import ToolMetric
+from mission_system.memory.services.tool_health_service import ToolHealthService, HealthStatus
+from mission_system.memory.repositories.tool_metrics_repository import ToolMetric
 
 
 @pytest.fixture

@@ -20,7 +20,7 @@ import asyncio
 import hashlib
 import json
 
-from jeeves_infra.memory.repositories.event_repository import EventRepository, DomainEvent
+from mission_system.memory.repositories.event_repository import EventRepository, DomainEvent
 from jeeves_infra.utils.logging import get_component_logger
 from jeeves_infra.protocols import LoggerProtocol, FeatureFlagsProtocol
 
@@ -379,7 +379,7 @@ class EventEmitter:
             return
 
         try:
-            from jeeves_infra.memory.messages import MemoryStored
+            from mission_system.memory.messages import MemoryStored
 
             # Create typed CommBus event
             commbus_event = MemoryStored(

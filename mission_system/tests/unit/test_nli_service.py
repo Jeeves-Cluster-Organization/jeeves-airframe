@@ -14,7 +14,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 # Mission system tests avionics functionality - direct import acceptable
-from jeeves_infra.memory.services.nli_service import (
+from mission_system.memory.services.nli_service import (
     NLIService,
     NLIResult,
     ClaimVerificationResult,
@@ -262,7 +262,7 @@ class TestGetNLIServiceSingleton:
     def test_get_nli_service_returns_instance(self):
         """Test get_nli_service returns an NLIService instance."""
         # Reset singleton
-        import jeeves_infra.memory.services.nli_service as nli_module
+        import mission_system.memory.services.nli_service as nli_module
         nli_module._nli_service_instance = None
 
         service = get_nli_service(enabled=False)
@@ -271,7 +271,7 @@ class TestGetNLIServiceSingleton:
     def test_get_nli_service_returns_same_instance(self):
         """Test get_nli_service returns same instance on subsequent calls."""
         # Reset singleton
-        import jeeves_infra.memory.services.nli_service as nli_module
+        import mission_system.memory.services.nli_service as nli_module
         nli_module._nli_service_instance = None
 
         service1 = get_nli_service(enabled=False)

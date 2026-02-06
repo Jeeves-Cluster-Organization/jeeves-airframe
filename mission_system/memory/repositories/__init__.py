@@ -20,15 +20,15 @@ Constitutional Reference:
 - Architecture: PostgreSQL-specific code lives in avionics (L3)
 """
 
-from jeeves_infra.memory.repositories.event_repository import EventRepository, DomainEvent
-from jeeves_infra.memory.repositories.trace_repository import TraceRepository, AgentTrace
-from jeeves_infra.memory.repositories.pgvector_repository import PgVectorRepository
-from jeeves_infra.memory.repositories.chunk_repository import ChunkRepository, Chunk
-from jeeves_infra.memory.repositories.session_state_repository import SessionStateRepository, SessionState
-from jeeves_infra.memory.repositories.tool_metrics_repository import ToolMetricsRepository, ToolMetric
+from mission_system.memory.repositories.event_repository import EventRepository, DomainEvent
+from mission_system.memory.repositories.trace_repository import TraceRepository, AgentTrace
+from mission_system.memory.repositories.pgvector_repository import PgVectorRepository
+from mission_system.memory.repositories.chunk_repository import ChunkRepository, Chunk
+from mission_system.memory.repositories.session_state_repository import SessionStateRepository, SessionState
+from mission_system.memory.repositories.tool_metrics_repository import ToolMetricsRepository, ToolMetric
 # L5-L6 extensible stubs (in-memory implementations for development/testing)
-from jeeves_infra.memory.repositories.graph_stub import InMemoryGraphStorage, GraphNode, GraphEdge
-from jeeves_infra.memory.repositories.skill_stub import InMemorySkillStorage, Skill, SkillUsage
+from mission_system.memory.repositories.graph_stub import InMemoryGraphStorage, GraphNode, GraphEdge
+from mission_system.memory.repositories.skill_stub import InMemorySkillStorage, Skill, SkillUsage
 
 __all__ = [
     # L2 Events

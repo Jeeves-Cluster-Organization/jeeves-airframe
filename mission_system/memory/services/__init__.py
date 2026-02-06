@@ -20,18 +20,18 @@ Memory Module Audit (2025-12-09):
 - Moved from avionics/memory/services/
 """
 
-from jeeves_infra.memory.services.nli_service import NLIService, get_nli_service
+from mission_system.memory.services.nli_service import NLIService, get_nli_service
 
 # Lazy import: EmbeddingService requires sentence-transformers (1.5GB+ ML dep)
-# Import directly when needed: from jeeves_infra.memory.services.embedding_service import EmbeddingService
-from jeeves_infra.memory.services.xref_manager import CrossRefManager
-from jeeves_infra.memory.services.event_emitter import EventEmitter
-from jeeves_infra.memory.services.trace_recorder import TraceRecorder
-from jeeves_infra.memory.services.session_state_service import SessionStateService
-from jeeves_infra.memory.services.session_state_adapter import SessionStateAdapter
-from jeeves_infra.memory.services.chunk_service import ChunkService
-from jeeves_infra.memory.services.tool_health_service import ToolHealthService
-from jeeves_infra.memory.services.code_indexer import CodeIndexer
+# Import directly when needed: from mission_system.memory.services.embedding_service import EmbeddingService
+from mission_system.memory.services.xref_manager import CrossRefManager
+from mission_system.memory.services.event_emitter import EventEmitter
+from mission_system.memory.services.trace_recorder import TraceRecorder
+from mission_system.memory.services.session_state_service import SessionStateService
+from mission_system.memory.services.session_state_adapter import SessionStateAdapter
+from mission_system.memory.services.chunk_service import ChunkService
+from mission_system.memory.services.tool_health_service import ToolHealthService
+from mission_system.memory.services.code_indexer import CodeIndexer
 
 __all__ = [
     # Protocol Adapters (implements Core protocols)

@@ -62,7 +62,7 @@ from jeeves_infra.protocols import RequestContext
 
 if TYPE_CHECKING:
     from jeeves_infra.protocols import LoggerProtocol
-    from jeeves_infra.memory.repositories.event_repository import EventRepository
+    from mission_system.memory.repositories.event_repository import EventRepository
 
 
 @dataclass
@@ -125,7 +125,7 @@ class EventOrchestrator:
 
         # Create domain emitter if enabled and repository provided
         if self.enable_persistence and self.event_repository:
-            from jeeves_infra.memory.services.event_emitter import EventEmitter
+            from mission_system.memory.services.event_emitter import EventEmitter
             self._domain_emitter = EventEmitter(
                 event_repository=self.event_repository,
                 logger=self._logger,

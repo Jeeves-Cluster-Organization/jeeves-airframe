@@ -25,7 +25,7 @@ import json
 from jeeves_infra.utils.logging import get_component_logger
 from jeeves_infra.utils.serialization import parse_datetime
 from jeeves_infra.protocols import LoggerProtocol, DatabaseClientProtocol
-from jeeves_infra.memory.repositories.session_state_repository import (
+from mission_system.memory.repositories.session_state_repository import (
     SessionStateRepository,
     SessionState
 )
