@@ -38,7 +38,7 @@ class TestOTELSpanIntegration:
 
     def test_otel_adapter_creates_spans(self):
         """Test that OTEL adapter creates spans correctly."""
-        from avionics.observability.otel_adapter import (
+        from jeeves_infra.observability.otel_adapter import (
             OpenTelemetryAdapter,
             create_tracer,
             OTEL_AVAILABLE,
@@ -65,7 +65,7 @@ class TestOTELSpanIntegration:
     @pytest.mark.asyncio
     async def test_otel_agent_lifecycle_spans(self):
         """Test OTEL span creation for agent start/complete."""
-        from avionics.observability.otel_adapter import (
+        from jeeves_infra.observability.otel_adapter import (
             OpenTelemetryAdapter,
             create_tracer,
             OTEL_AVAILABLE,
@@ -98,7 +98,7 @@ class TestOTELSpanIntegration:
     @pytest.mark.asyncio
     async def test_otel_llm_call_spans(self):
         """Test OTEL span creation for LLM calls."""
-        from avionics.observability.otel_adapter import (
+        from jeeves_infra.observability.otel_adapter import (
             OpenTelemetryAdapter,
             create_tracer,
             OTEL_AVAILABLE,
@@ -131,8 +131,8 @@ class TestOTELSpanIntegration:
 
     def test_otel_initialization_in_bootstrap(self, mock_logger):
         """Test that OTEL is initialized in bootstrap when enable_tracing=true."""
-        from avionics.feature_flags import FeatureFlags
-        from avionics.observability.otel_adapter import OTEL_AVAILABLE
+        from jeeves_infra.feature_flags import FeatureFlags
+        from jeeves_infra.observability.otel_adapter import OTEL_AVAILABLE
 
         if not OTEL_AVAILABLE:
             pytest.skip("OpenTelemetry not installed")
@@ -141,17 +141,17 @@ class TestOTELSpanIntegration:
         flags = FeatureFlags(enable_tracing=True)
 
         # Import after setting up flags
-        with patch("avionics.settings.get_settings") as mock_settings:
+        with patch("jeeves_infra.settings.get_settings") as mock_settings:
             mock_settings.return_value = MagicMock(log_level="INFO")
 
-            with patch("avionics.feature_flags.get_feature_flags") as mock_flags:
+            with patch("jeeves_infra.feature_flags.get_feature_flags") as mock_flags:
                 mock_flags.return_value = flags
 
                 from mission_system.bootstrap import create_app_context
 
                 # Reset global OTEL adapter to test initialization
                 with patch(
-                    "avionics.observability.otel_adapter._global_adapter",
+                    "jeeves_infra.observability.otel_adapter._global_adapter",
                     None,
                 ):
                     context = create_app_context(feature_flags=flags)
@@ -223,8 +223,11 @@ class TestResourceTrackingPIDContext:
     def test_llm_gateway_resource_callback_uses_pid_context(self, mock_logger):
         """Test that LLMGateway callback uses request PID context."""
         from jeeves_infra.llm.gateway import LLMGateway, LLMResponse
-        from control_tower.resources.tracker import ResourceTracker
-        from control_tower.types import ResourceQuota
+        try:
+            from control_tower.resources.tracker import ResourceTracker
+            from control_tower.types import ResourceQuota
+        except ImportError:
+            pytest.skip("control_tower package not available")
         from mission_system.bootstrap import (
             set_request_pid,
             get_request_pid,
@@ -513,8 +516,8 @@ class TestBootstrapIntegration:
 
     def test_create_avionics_dependencies_with_gateway(self, mock_logger):
         """Test that avionics dependencies creates gateway when enabled."""
-        from avionics.feature_flags import FeatureFlags
-        from avionics.context import AppContext, SystemClock
+        from jeeves_infra.feature_flags import FeatureFlags
+        from jeeves_infra.context import AppContext, SystemClock
 
         flags = FeatureFlags(use_llm_gateway=True)
         mock_settings = MagicMock()
@@ -543,8 +546,8 @@ class TestBootstrapIntegration:
 
     def test_create_avionics_dependencies_wires_resource_callback(self, mock_logger):
         """Test that resource callback is wired when Control Tower available."""
-        from avionics.feature_flags import FeatureFlags
-        from avionics.context import AppContext, SystemClock
+        from jeeves_infra.feature_flags import FeatureFlags
+        from jeeves_infra.context import AppContext, SystemClock
 
         flags = FeatureFlags(use_llm_gateway=True)
         mock_settings = MagicMock()

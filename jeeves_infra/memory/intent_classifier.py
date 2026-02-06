@@ -10,7 +10,7 @@ Determines whether user input is:
 
 from typing import Dict, Any, List, Optional
 import json
-from shared import get_component_logger
+from jeeves_infra.utils.logging import get_component_logger
 from jeeves_infra.protocols import LoggerProtocol, LLMProviderProtocol
 
 

@@ -262,7 +262,7 @@ class TestGetNLIServiceSingleton:
     def test_get_nli_service_returns_instance(self):
         """Test get_nli_service returns an NLIService instance."""
         # Reset singleton
-        import memory_module.services.nli_service as nli_module
+        import jeeves_infra.memory.services.nli_service as nli_module
         nli_module._nli_service_instance = None
 
         service = get_nli_service(enabled=False)
@@ -271,7 +271,7 @@ class TestGetNLIServiceSingleton:
     def test_get_nli_service_returns_same_instance(self):
         """Test get_nli_service returns same instance on subsequent calls."""
         # Reset singleton
-        import memory_module.services.nli_service as nli_module
+        import jeeves_infra.memory.services.nli_service as nli_module
         nli_module._nli_service_instance = None
 
         service1 = get_nli_service(enabled=False)

@@ -8,7 +8,8 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
 from uuid import uuid4
 import json
-from shared import get_component_logger, convert_uuids_to_strings
+from jeeves_infra.utils.logging import get_component_logger
+from jeeves_infra.utils.uuid_utils import convert_uuids_to_strings
 from jeeves_infra.protocols import LoggerProtocol, DatabaseClientProtocol
 
 

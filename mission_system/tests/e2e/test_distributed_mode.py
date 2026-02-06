@@ -83,7 +83,7 @@ class TestRedisDistributedBusE2E:
 
     async def test_enqueue_and_dequeue_task(self, redis_client, mock_logger):
         """Test enqueueing and dequeueing a task through Redis."""
-        from avionics.distributed.redis_bus import RedisDistributedBus
+        from jeeves_infra.distributed.redis_bus import RedisDistributedBus
         from jeeves_infra.protocols import DistributedTask
 
         # Create a wrapper that exposes redis property
@@ -130,7 +130,7 @@ class TestRedisDistributedBusE2E:
 
     async def test_task_completion_flow(self, redis_client, mock_logger):
         """Test full task lifecycle: enqueue -> process -> complete."""
-        from avionics.distributed.redis_bus import RedisDistributedBus
+        from jeeves_infra.distributed.redis_bus import RedisDistributedBus
         from jeeves_infra.protocols import DistributedTask
 
         class RedisClientWrapper:
@@ -173,7 +173,7 @@ class TestRedisDistributedBusE2E:
 
     async def test_task_failure_and_retry(self, redis_client, mock_logger):
         """Test task failure handling and retry mechanism."""
-        from avionics.distributed.redis_bus import RedisDistributedBus
+        from jeeves_infra.distributed.redis_bus import RedisDistributedBus
         from jeeves_infra.protocols import DistributedTask
 
         class RedisClientWrapper:
@@ -221,7 +221,7 @@ class TestRedisDistributedBusE2E:
 
     async def test_worker_heartbeat(self, redis_client, mock_logger):
         """Test worker heartbeat mechanism."""
-        from avionics.distributed.redis_bus import RedisDistributedBus
+        from jeeves_infra.distributed.redis_bus import RedisDistributedBus
 
         class RedisClientWrapper:
             def __init__(self, client):

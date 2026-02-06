@@ -18,7 +18,9 @@ from datetime import datetime, timezone, timedelta
 from uuid import uuid4
 import json
 
-from shared import uuid_str, uuid_read, get_component_logger, parse_datetime
+from jeeves_infra.utils.logging import get_component_logger
+from jeeves_infra.utils.serialization import parse_datetime
+from jeeves_infra.utils.uuid_utils import uuid_str, uuid_read
 from jeeves_infra.protocols import LoggerProtocol, DatabaseClientProtocol
 
 

@@ -992,13 +992,17 @@ async def get_system_metrics() -> SystemMetricsResponse:
     system_usage = app_state.control_tower.resources.get_system_usage()
 
     # Get process state counts from lifecycle manager
-    from control_tower.types import ProcessState
+    try:
+        from control_tower.types import ProcessState
+    except ImportError:
+        ProcessState = None
 
     processes_by_state: Dict[str, int] = {}
-    for state in ProcessState:
-        processes = app_state.control_tower.lifecycle.list_processes(state=state)
-        if processes:
-            processes_by_state[state.value] = len(processes)
+    if ProcessState is not None:
+        for state in ProcessState:
+            processes = app_state.control_tower.lifecycle.list_processes(state=state)
+            if processes:
+                processes_by_state[state.value] = len(processes)
 
     return SystemMetricsResponse(
         total_processes=system_usage.get("total_processes", 0),

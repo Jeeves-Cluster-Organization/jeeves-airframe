@@ -35,7 +35,7 @@ from jeeves_infra.protocols import (
     DomainLLMRegistryProtocol,
     LoggerProtocol,
 )
-from shared import get_component_logger
+from jeeves_infra.utils.logging import get_component_logger
 
 if TYPE_CHECKING:
     pass

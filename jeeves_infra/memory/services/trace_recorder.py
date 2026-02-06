@@ -15,7 +15,7 @@ from contextlib import asynccontextmanager
 import asyncio
 
 from jeeves_infra.memory.repositories.trace_repository import TraceRepository, AgentTrace
-from shared import get_component_logger
+from jeeves_infra.utils.logging import get_component_logger
 from jeeves_infra.protocols import LoggerProtocol, FeatureFlagsProtocol
 
 

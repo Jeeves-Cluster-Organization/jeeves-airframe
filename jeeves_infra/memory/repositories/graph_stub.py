@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from jeeves_infra.protocols import GraphStorageProtocol, LoggerProtocol
-from shared import get_component_logger
+from jeeves_infra.utils.logging import get_component_logger
 
 
 @dataclass

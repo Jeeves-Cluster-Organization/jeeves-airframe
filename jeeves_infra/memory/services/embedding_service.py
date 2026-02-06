@@ -18,7 +18,7 @@ import hashlib
 import numpy as np
 from functools import lru_cache
 
-from shared import get_component_logger
+from jeeves_infra.utils.logging import get_component_logger
 from jeeves_infra.protocols import LoggerProtocol
 
 if TYPE_CHECKING:

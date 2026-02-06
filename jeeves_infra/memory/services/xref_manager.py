@@ -11,7 +11,7 @@ Tracks relationships between:
 from typing import List, Dict, Any, Optional
 from uuid import uuid4
 from datetime import datetime, timezone
-from shared import get_component_logger
+from jeeves_infra.utils.logging import get_component_logger
 from jeeves_infra.protocols import LoggerProtocol, DatabaseClientProtocol
 
 

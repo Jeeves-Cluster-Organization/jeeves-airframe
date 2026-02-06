@@ -418,7 +418,7 @@ async def create_memory_manager(
         return None
 
     try:
-        from memory_module.manager import MemoryManager
+        from jeeves_infra.memory.manager import MemoryManager
         from jeeves_infra.memory.sql_adapter import SQLAdapter
         from jeeves_infra.memory.services.xref_manager import CrossRefManager
         from jeeves_infra.logging import create_logger

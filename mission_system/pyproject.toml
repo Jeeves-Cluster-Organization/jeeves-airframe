@@ -22,11 +22,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-    "protocols>=1.0.0",
-    "shared>=1.0.0",
-    "avionics>=1.0.0",
-    "control_tower>=1.0.0",
-    "memory_module>=1.0.0",
+    "jeeves-infra>=1.0.0",
     "fastapi>=0.109.0",
     "uvicorn[standard]>=0.27.0",
     "httpx>=0.26.0",

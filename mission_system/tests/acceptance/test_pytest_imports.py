@@ -10,12 +10,12 @@ Run with:
 def test_memory_imports():
     """Test that all memory module imports work."""
 
-    # Test 1: Import memory_module package
+    # Test 1: Import jeeves_infra.memory package
     try:
-        import memory_module
-        print("✓ import memory_module")
+        import jeeves_infra.memory
+        print("✓ import jeeves_infra.memory")
     except ModuleNotFoundError as e:
-        print(f"✗ import memory_module - {e}")
+        print(f"✗ import jeeves_infra.memory - {e}")
         raise
 
     # Test 2: Import from jeeves_infra.memory.services (moved from memory_module)
@@ -46,28 +46,28 @@ def test_memory_imports():
 
     # Test 4: Import memory.manager
     try:
-        from memory_module.manager import MemoryManager
-        print("✓ from memory_module.manager import MemoryManager")
+        from jeeves_infra.memory.manager import MemoryManager
+        print("✓ from jeeves_infra.memory.manager import MemoryManager")
     except ModuleNotFoundError as e:
-        print(f"✗ from memory_module.manager import MemoryManager")
+        print(f"✗ from jeeves_infra.memory.manager import MemoryManager")
         print(f"  Error: {e}")
         raise
     except ImportError as e:
         # This is OK - dependency missing
-        print(f"[WARN] from memory_module.manager import MemoryManager")
+        print(f"[WARN] from jeeves_infra.memory.manager import MemoryManager")
         print(f"  Dependency missing (OK): {e}")
 
     # Test 5: Import memory.intent_classifier
     try:
-        from memory_module.intent_classifier import IntentClassifier
-        print("✓ from memory_module.intent_classifier import IntentClassifier")
+        from jeeves_infra.memory.intent_classifier import IntentClassifier
+        print("✓ from jeeves_infra.memory.intent_classifier import IntentClassifier")
     except ModuleNotFoundError as e:
-        print(f"✗ from memory_module.intent_classifier import IntentClassifier")
+        print(f"✗ from jeeves_infra.memory.intent_classifier import IntentClassifier")
         print(f"  Error: {e}")
         raise
     except ImportError as e:
         # This is OK - dependency missing
-        print(f"[WARN] from memory_module.intent_classifier import IntentClassifier")
+        print(f"[WARN] from jeeves_infra.memory.intent_classifier import IntentClassifier")
         print(f"  Dependency missing (OK): {e}")
 
     print("\n[OK] All import paths are correct!")

@@ -36,7 +36,7 @@ from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from jeeves_infra.protocols import DatabaseClientProtocol, GraphStorageProtocol, LoggerProtocol
-from shared import get_component_logger
+from jeeves_infra.utils.logging import get_component_logger
 
 
 class PostgresGraphAdapter:

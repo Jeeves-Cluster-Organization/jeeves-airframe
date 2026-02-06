@@ -108,7 +108,7 @@ class MissionSystemAdapters:
         """
         if not self._memory_service:
             # MemoryService was moved to MemoryManager in memory_module
-            from memory_module.manager import MemoryManager
+            from jeeves_infra.memory.manager import MemoryManager
             # MemoryManager needs additional dependencies - return None for now
             # Capabilities should inject proper memory service
             raise NotImplementedError(

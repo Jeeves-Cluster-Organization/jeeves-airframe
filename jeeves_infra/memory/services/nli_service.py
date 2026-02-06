@@ -21,7 +21,7 @@ Usage:
 from dataclasses import dataclass
 from typing import List, Dict, Any, Optional
 
-from shared import get_component_logger
+from jeeves_infra.utils.logging import get_component_logger
 from jeeves_infra.protocols import LoggerProtocol
 
 

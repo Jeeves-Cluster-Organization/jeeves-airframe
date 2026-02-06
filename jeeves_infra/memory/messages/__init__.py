@@ -9,7 +9,7 @@ Memory Module Audit (2025-12-09):
 - Enables event-driven memory updates
 """
 
-from memory_module.messages.events import (
+from jeeves_infra.memory.messages.events import (
     MemoryStored,
     MemoryRetrieved,
     MemoryDeleted,
@@ -20,14 +20,14 @@ from memory_module.messages.events import (
     ClarificationResolved,
 )
 
-from memory_module.messages.queries import (
+from jeeves_infra.memory.messages.queries import (
     GetSessionState,
     SearchMemory,
     GetClarificationContext,
     GetRecentEntities,
 )
 
-from memory_module.messages.commands import (
+from jeeves_infra.memory.messages.commands import (
     ClearSession,
     InvalidateMemoryCache,
     UpdateFocus,

@@ -21,7 +21,7 @@ import hashlib
 import json
 
 from jeeves_infra.memory.repositories.event_repository import EventRepository, DomainEvent
-from shared import get_component_logger
+from jeeves_infra.utils.logging import get_component_logger
 from jeeves_infra.protocols import LoggerProtocol, FeatureFlagsProtocol
 
 if TYPE_CHECKING:
@@ -379,7 +379,7 @@ class EventEmitter:
             return
 
         try:
-            from memory_module.messages import MemoryStored
+            from jeeves_infra.memory.messages import MemoryStored
 
             # Create typed CommBus event
             commbus_event = MemoryStored(

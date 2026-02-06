@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from jeeves_infra.memory.sql_adapter import SQLAdapter
     from jeeves_infra.memory.services.xref_manager import CrossRefManager
 import asyncio
-from shared import get_component_logger
+from jeeves_infra.utils.logging import get_component_logger
 from jeeves_infra.protocols import LoggerProtocol, VectorStorageProtocol
 
 
