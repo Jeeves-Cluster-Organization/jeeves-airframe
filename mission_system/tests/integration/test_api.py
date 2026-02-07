@@ -23,7 +23,7 @@ import pytest
 from fastapi.testclient import TestClient
 from httpx import AsyncClient, ASGITransport
 
-from mission_system.app_server import app, app_state, lifespan
+from mission_system.app_server import app, app_state, lifespan, get_app_state
 from mission_system.config.constants import PLATFORM_NAME, PLATFORM_VERSION
 
 
@@ -76,21 +76,30 @@ async def test_app(pg_test_db):
     # Inject PostgreSQL database into app state
     app_state.db = pg_test_db
 
+    # Mock kernel client (required -- kernel owns orchestration)
+    mock_kernel = AsyncMock()
+    mock_kernel.create_process = AsyncMock()
+    mock_kernel.get_process = AsyncMock(return_value=None)
+    mock_kernel.get_process_counts = AsyncMock(return_value={"total": 0})
+
     try:
         # Manually trigger the lifespan context to initialize app_state
-        async with lifespan(app):
-            # Now create AsyncClient for making requests
-            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-                # Verify core initialization completed (orchestrator is optional without capability)
-                assert app_state.health_checker is not None
+        # Kernel client is required at startup; provide mock for tests
+        with patch("jeeves_infra.kernel_client.get_kernel_client", new_callable=AsyncMock, return_value=mock_kernel):
+            async with lifespan(app):
+                # Now create AsyncClient for making requests
+                async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                    # Verify core initialization completed (orchestrator is optional without capability)
+                    assert app_state.health_checker is not None
+                    assert app_state.kernel_client is not None
 
-                # If no orchestrator registered (no capability), provide a mock for tests
-                if app_state.orchestrator is None:
-                    mock_orchestrator = AsyncMock()
-                    mock_orchestrator.process_query = AsyncMock()
-                    app_state.orchestrator = mock_orchestrator
+                    # If no orchestrator registered (no capability), provide a mock for tests
+                    if app_state.orchestrator is None:
+                        mock_orchestrator = AsyncMock()
+                        mock_orchestrator.process_query = AsyncMock()
+                        app_state.orchestrator = mock_orchestrator
 
-                yield client
+                    yield client
     finally:
         # Cleanup - restore original environment values
         for key, value in original_env.items():

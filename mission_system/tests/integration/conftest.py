@@ -30,6 +30,7 @@ if str(_project_root) not in sys.path:
 
 import pytest
 from fastapi.testclient import TestClient
+from unittest.mock import AsyncMock, patch
 
 from jeeves_infra.utils.testing import parse_postgres_url
 from mission_system.app_server import app, app_state
@@ -136,9 +137,16 @@ def sync_client(pg_test_db):
     # DO NOT inject app_state.db - let lifespan create its own connection
     # This avoids event loop mismatch with TestClient's separate thread
 
+    # Mock kernel client (required -- kernel owns orchestration)
+    mock_kernel = AsyncMock()
+    mock_kernel.create_process = AsyncMock()
+    mock_kernel.get_process = AsyncMock(return_value=None)
+    mock_kernel.get_process_counts = AsyncMock(return_value={"total": 0})
+
     try:
-        with TestClient(app) as client:
-            yield client
+        with patch("jeeves_infra.kernel_client.get_kernel_client", new_callable=AsyncMock, return_value=mock_kernel):
+            with TestClient(app) as client:
+                yield client
     finally:
         # Cleanup - restore original environment variables
         for key, value in original_env.items():

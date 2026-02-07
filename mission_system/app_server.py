@@ -52,7 +52,7 @@ from jeeves_infra.protocols import (
     get_capability_resource_registry,
 )
 # KernelClient replaces ControlTower (control_tower deleted - Session 14)
-from jeeves_infra.kernel_client import KernelClient
+from jeeves_infra.kernel_client import KernelClient, get_kernel_client, DEFAULT_KERNEL_ADDRESS
 
 # SchedulingPriority is now a string enum: "REALTIME", "HIGH", "NORMAL", "LOW", "IDLE"
 SchedulingPriority = str  # Type alias for migration
@@ -255,15 +255,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     _logger.info("initializing_app_context")
     app_context = create_app_context()
 
-    # Try to connect kernel client (non-blocking -- works without Rust kernel)
-    kernel_client = None
-    try:
-        from jeeves_infra.kernel_client import get_kernel_client, DEFAULT_KERNEL_ADDRESS
-        kernel_client = await get_kernel_client(DEFAULT_KERNEL_ADDRESS)
-        _logger.info("kernel_client_connected", address=DEFAULT_KERNEL_ADDRESS)
-    except Exception as e:
-        _logger.warning("kernel_client_unavailable", error=str(e),
-                        message="Running without Rust kernel -- orchestrator-only mode")
+    # Connect kernel client (REQUIRED -- kernel owns orchestration)
+    kernel_client = await get_kernel_client(DEFAULT_KERNEL_ADDRESS)
+    _logger.info("kernel_client_connected", address=DEFAULT_KERNEL_ADDRESS)
 
     # Get capability registry for dynamic discovery (layer extraction support)
     capability_registry = get_capability_resource_registry()
@@ -274,7 +268,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         "app_context_initialized",
         default_service=default_service,
         registered_capabilities=capability_registry.list_capabilities(),
-        kernel_connected=kernel_client is not None,
+        kernel_connected=True,
     )
 
     # Initialize tools via capability registry (no direct imports from capability)
@@ -309,7 +303,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     _logger.info(
         "orchestrator_initialized",
-        kernel_connected=kernel_client is not None,
+        kernel_connected=True,
         services_registered=len(services),
     )
 
@@ -526,6 +520,8 @@ def _validate_submit_request_state() -> None:
     app_state = get_app_state()
     if app_state.shutdown_event.is_set():
         raise HTTPException(status_code=503, detail="Service is shutting down")
+    if not app_state.kernel_client:
+        raise HTTPException(status_code=503, detail="Kernel not connected")
     if not app_state.orchestrator:
         raise HTTPException(status_code=503, detail="Orchestrator not ready")
 
@@ -633,8 +629,8 @@ def _build_submit_response(
 async def submit_request(body: SubmitRequestBody) -> SubmitRequestResponse:
     """Submit a new capability request for processing.
 
-    Routes through Control Tower for lifecycle management, resource tracking,
-    and service dispatch. The registered capability determines request behavior.
+    Routes through Rust kernel for lifecycle management, resource tracking,
+    and orchestration. The registered capability determines request behavior.
 
     Args:
         body: Request submission payload
@@ -668,16 +664,15 @@ async def submit_request(body: SubmitRequestBody) -> SubmitRequestResponse:
             metadata=body.context,
         )
 
-        # Track process in kernel if available
-        if app_state.kernel_client:
-            await app_state.kernel_client.create_process(
-                pid=request_id,
-                request_id=request_id,
-                user_id=body.user_id,
-                session_id=session_id,
-            )
+        # Create process in kernel (mandatory -- kernel owns lifecycle)
+        await app_state.kernel_client.create_process(
+            pid=request_id,
+            request_id=request_id,
+            user_id=body.user_id,
+            session_id=session_id,
+        )
 
-        # Run orchestrator directly (kernel tracks lifecycle separately)
+        # Execute via orchestrator (uses kernel internally for routing)
         result_envelope = await app_state.orchestrator.process_envelope(envelope)
 
         # Determine response status and build response
@@ -744,7 +739,7 @@ async def submit_confirmation(body: ConfirmationResponse) -> SubmitRequestRespon
 async def submit_clarification(body: ClarificationBody) -> SubmitRequestResponse:
     """Submit user's clarification response to resume interrupted workflow.
 
-    Routes through Control Tower's resume_request for lifecycle continuity.
+    Routes through kernel for lifecycle continuity.
 
     P1 Compliance: When the system is uncertain about a query, it requests
     clarification. This endpoint allows users to provide that clarification
@@ -763,11 +758,13 @@ async def submit_clarification(body: ClarificationBody) -> SubmitRequestResponse
     if app_state.shutdown_event.is_set():
         raise HTTPException(status_code=503, detail="Service is shutting down")
 
+    if not app_state.kernel_client:
+        raise HTTPException(status_code=503, detail="Kernel not connected")
     if not app_state.orchestrator:
         raise HTTPException(status_code=503, detail="Orchestrator not ready")
 
     try:
-        # Resume orchestration with clarification response
+        # Resume orchestration with clarification response via kernel
         # thread_id is the envelope_id (pid) from the original request
         result_envelope = await app_state.orchestrator.resume(
             pid=body.thread_id,
@@ -873,7 +870,7 @@ async def websocket_endpoint(websocket: WebSocket, token: Optional[str] = None) 
 
 
 # ============================================================
-# Control Tower Observability Endpoints (Phase 3)
+# Kernel Observability Endpoints
 # ============================================================
 
 
@@ -906,9 +903,9 @@ class SystemMetricsResponse(BaseModel):
 
 @app.get("/api/v1/requests/{pid}/status", response_model=RequestStatusResponse)
 async def get_request_status(pid: str) -> RequestStatusResponse:
-    """Get the status of a request via Control Tower.
+    """Get the status of a request via kernel.
 
-    Uses Control Tower's process lifecycle and resource tracking
+    Uses kernel process lifecycle and resource tracking
     to provide detailed request status.
 
     Args:
@@ -919,7 +916,7 @@ async def get_request_status(pid: str) -> RequestStatusResponse:
 
     Raises:
         404: If request not found
-        503: If Control Tower not ready
+        503: If kernel not connected
     """
     app_state = get_app_state()
     if not app_state.kernel_client:
@@ -947,7 +944,7 @@ async def get_request_status(pid: str) -> RequestStatusResponse:
 
 @app.get("/api/v1/metrics", response_model=SystemMetricsResponse)
 async def get_system_metrics() -> SystemMetricsResponse:
-    """Get system-wide metrics from Control Tower.
+    """Get system-wide metrics from kernel.
 
     Provides aggregated metrics across all processes:
     - Process counts (total, active)
@@ -958,7 +955,7 @@ async def get_system_metrics() -> SystemMetricsResponse:
         SystemMetricsResponse with system metrics
 
     Raises:
-        503: If Control Tower not ready
+        503: If kernel not connected
     """
     app_state = get_app_state()
     if not app_state.kernel_client:
