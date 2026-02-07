@@ -19,7 +19,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Depends, Query, status
 from pydantic import BaseModel, Field
 
-from services.chat_service import ChatService
+from mission_system.services.chat_service import ChatService
 
 router = APIRouter(prefix="/api/v1/chat", tags=["chat"])
 
@@ -329,7 +329,7 @@ async def send_chat_message(
 
     Note: Old sessions can be viewed but not resumed (simplified mode)
     """
-    from api.server import app_state
+    from mission_system.app_server import app_state
 
     if not app_state.orchestrator:
         raise HTTPException(

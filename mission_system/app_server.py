@@ -107,10 +107,10 @@ class ClarificationBody(BaseModel):
 class AppState:
     """Application-level state for dependency injection.
 
-    Control Tower Integration:
-    - control_tower: Central orchestration kernel (routes all requests)
+    Kernel Integration:
+    - kernel_client: gRPC client to Rust kernel (lifecycle, resources)
     - event_bridge: Bridges kernel events to WebSocket streaming
-    - orchestrator: Capability orchestrator (registered with Control Tower)
+    - orchestrator: Capability orchestrator (runs agents)
 
     Layer Extraction Compliant:
     - Uses Any type for orchestrator (capability-agnostic)
@@ -124,11 +124,11 @@ class AppState:
         self.db: Optional[Union[DatabaseClientProtocol, PostgreSQLClient]] = None
         self.tool_catalog = None  # Tool catalog (single source of truth)
 
-        # Control Tower - central orchestration
-        self.control_tower: Optional[ControlTower] = None
+        # Kernel client (replaces deleted control_tower - Session 14)
+        self.kernel_client: Optional[KernelClient] = None
         self.event_bridge: Optional[EventBridge] = None
 
-        # Services (registered with Control Tower)
+        # Services
         self.orchestrator: Optional[Any] = None  # Capability-specific orchestrator (dynamic)
         self.health_checker: Optional[HealthChecker] = None
         self.event_manager: Optional[WebSocketEventManager] = None
@@ -251,10 +251,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     _logger.info("wiring_capabilities")
     wire_capabilities()
 
-    # Initialize Control Tower (central orchestration kernel)
-    _logger.info("initializing_control_tower")
+    # Initialize app context and kernel client
+    _logger.info("initializing_app_context")
     app_context = create_app_context()
-    control_tower = app_context.control_tower
+
+    # Try to connect kernel client (non-blocking -- works without Rust kernel)
+    kernel_client = None
+    try:
+        from jeeves_infra.kernel_client import get_kernel_client, DEFAULT_KERNEL_ADDRESS
+        kernel_client = await get_kernel_client(DEFAULT_KERNEL_ADDRESS)
+        _logger.info("kernel_client_connected", address=DEFAULT_KERNEL_ADDRESS)
+    except Exception as e:
+        _logger.warning("kernel_client_unavailable", error=str(e),
+                        message="Running without Rust kernel -- orchestrator-only mode")
 
     # Get capability registry for dynamic discovery (layer extraction support)
     capability_registry = get_capability_resource_registry()
@@ -262,9 +271,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     default_service = capability_registry.get_default_service() or "default"
 
     _logger.info(
-        "control_tower_initialized",
+        "app_context_initialized",
         default_service=default_service,
         registered_capabilities=capability_registry.list_capabilities(),
+        kernel_connected=kernel_client is not None,
     )
 
     # Initialize tools via capability registry (no direct imports from capability)
@@ -291,7 +301,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             tool_executor=tool_executor,
             logger=_logger,
             persistence=db,
-            control_tower=control_tower,
+            control_tower=kernel_client,  # kernel_client replaces control_tower
         )
     else:
         _logger.warning("no_orchestrator_registered", message="No capability orchestrator in registry")
@@ -299,44 +309,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     _logger.info(
         "orchestrator_initialized",
-        resource_tracking_enabled=orchestrator is not None,
+        kernel_connected=kernel_client is not None,
+        services_registered=len(services),
     )
 
-    # Register services with Control Tower from capability registry
-    if orchestrator:
-        for service_config in services:
-            _logger.info("registering_service", service_id=service_config.service_id)
-            control_tower.register_service(
-                name=service_config.service_id,
-                service_type=service_config.service_type,
-                handler=orchestrator.get_dispatch_handler(),  # Handler from orchestrator
-                capabilities=service_config.capabilities,
-                max_concurrent=service_config.max_concurrent,
-            )
-            _logger.info("service_registered", service_id=service_config.service_id)
-
-        # Fallback: if no services registered, register default service
-        if not services:
-            _logger.warning("no_services_in_registry", message="Registering default service")
-            control_tower.register_service(
-                name="default",
-                service_type="flow",
-                handler=orchestrator.get_dispatch_handler(),
-                capabilities=["analyze", "clarification"],
-                max_concurrent=10,
-            )
-    else:
-        _logger.error("no_orchestrator_available", message="Cannot register services without orchestrator")
-
-    # Create EventBridge to connect Control Tower events to WebSocket
-    _logger.info("initializing_event_bridge")
-    event_bridge = EventBridge(
-        event_aggregator=control_tower.events,
-        websocket_manager=event_manager,
-        logger=_logger,
-    )
-    event_bridge.start()
-    _logger.info("event_bridge_started")
+    # EventBridge requires an event source -- skip if kernel not connected
+    event_bridge = None
 
     health_checker = HealthChecker(db)
     _logger.info("health_checker_initialized")
@@ -356,7 +334,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Store in app state
     app_state.db = db
     app_state.tool_catalog = catalog
-    app_state.control_tower = control_tower
+    app_state.kernel_client = kernel_client
     app_state.event_bridge = event_bridge
     app_state.orchestrator = orchestrator
     app_state.health_checker = health_checker
@@ -548,8 +526,8 @@ def _validate_submit_request_state() -> None:
     app_state = get_app_state()
     if app_state.shutdown_event.is_set():
         raise HTTPException(status_code=503, detail="Service is shutting down")
-    if not app_state.control_tower:
-        raise HTTPException(status_code=503, detail="Control Tower not ready")
+    if not app_state.orchestrator:
+        raise HTTPException(status_code=503, detail="Orchestrator not ready")
 
 
 def _resolve_capability(body: SubmitRequestBody) -> str:
@@ -690,11 +668,17 @@ async def submit_request(body: SubmitRequestBody) -> SubmitRequestResponse:
             metadata=body.context,
         )
 
-        # Submit to Control Tower
-        result_envelope = await app_state.control_tower.submit_request(
-            envelope=envelope,
-            priority=SchedulingPriority.NORMAL,
-        )
+        # Track process in kernel if available
+        if app_state.kernel_client:
+            await app_state.kernel_client.create_process(
+                pid=request_id,
+                request_id=request_id,
+                user_id=body.user_id,
+                session_id=session_id,
+            )
+
+        # Run orchestrator directly (kernel tracks lifecycle separately)
+        result_envelope = await app_state.orchestrator.process_envelope(envelope)
 
         # Determine response status and build response
         status, response_text, clarification_needed = _determine_response_status(result_envelope)
@@ -779,13 +763,13 @@ async def submit_clarification(body: ClarificationBody) -> SubmitRequestResponse
     if app_state.shutdown_event.is_set():
         raise HTTPException(status_code=503, detail="Service is shutting down")
 
-    if not app_state.control_tower:
-        raise HTTPException(status_code=503, detail="Control Tower not ready")
+    if not app_state.orchestrator:
+        raise HTTPException(status_code=503, detail="Orchestrator not ready")
 
     try:
-        # Resume through Control Tower with clarification response
+        # Resume orchestration with clarification response
         # thread_id is the envelope_id (pid) from the original request
-        result_envelope = await app_state.control_tower.resume_request(
+        result_envelope = await app_state.orchestrator.resume(
             pid=body.thread_id,
             response_data={"clarification_response": body.clarification},
         )
@@ -938,41 +922,26 @@ async def get_request_status(pid: str) -> RequestStatusResponse:
         503: If Control Tower not ready
     """
     app_state = get_app_state()
-    if not app_state.control_tower:
-        raise HTTPException(status_code=503, detail="Control Tower not ready")
+    if not app_state.kernel_client:
+        raise HTTPException(status_code=503, detail="Kernel not connected")
 
-    # Get process from lifecycle manager
-    pcb = app_state.control_tower.lifecycle.get_process(pid)
-    if not pcb:
+    # Get process from kernel via gRPC
+    process = await app_state.kernel_client.get_process(pid)
+    if not process:
         raise HTTPException(status_code=404, detail=f"Request not found: {pid}")
 
-    # Get resource usage and quota
-    usage = app_state.control_tower.resources.get_usage(pid)
-    quota = app_state.control_tower.resources.get_quota(pid)
-
     return RequestStatusResponse(
-        pid=pcb.pid,
-        state=pcb.state.value,
-        priority=pcb.priority.value,
-        current_stage=pcb.current_stage,
-        created_at=pcb.created_at.isoformat() if pcb.created_at else None,
-        started_at=pcb.started_at.isoformat() if pcb.started_at else None,
-        completed_at=pcb.completed_at.isoformat() if pcb.completed_at else None,
+        pid=process.pid,
+        state=process.state,
+        priority=process.priority,
+        current_stage=process.current_stage or None,
         resource_usage={
-            "llm_calls": usage.llm_calls,
-            "tool_calls": usage.tool_calls,
-            "agent_hops": usage.agent_hops,
-            "tokens_in": usage.tokens_in,
-            "tokens_out": usage.tokens_out,
-            "elapsed_seconds": usage.elapsed_seconds,
-        } if usage else None,
-        quota={
-            "max_llm_calls": quota.max_llm_calls,
-            "max_tool_calls": quota.max_tool_calls,
-            "max_agent_hops": quota.max_agent_hops,
-            "timeout_seconds": quota.timeout_seconds,
-        } if quota else None,
-        pending_interrupt=pcb.pending_interrupt.value if pcb.pending_interrupt else None,
+            "llm_calls": process.llm_calls,
+            "tool_calls": process.tool_calls,
+            "agent_hops": process.agent_hops,
+            "tokens_in": process.tokens_in,
+            "tokens_out": process.tokens_out,
+        },
     )
 
 
@@ -992,33 +961,16 @@ async def get_system_metrics() -> SystemMetricsResponse:
         503: If Control Tower not ready
     """
     app_state = get_app_state()
-    if not app_state.control_tower:
-        raise HTTPException(status_code=503, detail="Control Tower not ready")
+    if not app_state.kernel_client:
+        raise HTTPException(status_code=503, detail="Kernel not connected")
 
-    # Get resource tracker system usage
-    system_usage = app_state.control_tower.resources.get_system_usage()
-
-    # Get process state counts from lifecycle manager
-    try:
-        from control_tower.types import ProcessState
-    except ImportError:
-        ProcessState = None
-
-    processes_by_state: Dict[str, int] = {}
-    if ProcessState is not None:
-        for state in ProcessState:
-            processes = app_state.control_tower.lifecycle.list_processes(state=state)
-            if processes:
-                processes_by_state[state.value] = len(processes)
+    # Get process counts from kernel via gRPC
+    counts = await app_state.kernel_client.get_process_counts()
 
     return SystemMetricsResponse(
-        total_processes=system_usage.get("total_processes", 0),
-        active_processes=system_usage.get("active_processes", 0),
-        system_llm_calls=system_usage.get("system_llm_calls", 0),
-        system_tool_calls=system_usage.get("system_tool_calls", 0),
-        system_tokens_in=system_usage.get("system_tokens_in", 0),
-        system_tokens_out=system_usage.get("system_tokens_out", 0),
-        processes_by_state=processes_by_state,
+        total_processes=counts.get("total", 0),
+        active_processes=counts.get("RUNNING", 0),
+        processes_by_state={k: v for k, v in counts.items() if k != "total"},
     )
 
 

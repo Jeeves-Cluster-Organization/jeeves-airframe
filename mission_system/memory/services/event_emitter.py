@@ -223,13 +223,18 @@ class EventEmitter:
 
     @property
     def commbus(self) -> Optional["InMemoryCommBus"]:
-        """Get the CommBus instance (lazy initialization if not provided)."""
+        """Get the CommBus instance (lazy initialization if not provided).
+
+        CommBus is now a gRPC service in the Rust kernel (CommBusServiceStub).
+        When kernel_client is available, events are published via gRPC.
+        When unavailable, event publishing is silently skipped (observability only).
+        """
         if self._commbus is None:
             try:
-                from control_tower.ipc.commbus import get_commbus
-                self._commbus = get_commbus()
+                from jeeves_infra.kernel_client import _global_client
+                if _global_client is not None and hasattr(_global_client, '_commbus_stub'):
+                    self._commbus = _global_client._commbus_stub
             except ImportError:
-                # CommBus not available, continue without it
                 pass
         return self._commbus
 

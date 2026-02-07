@@ -15,7 +15,6 @@ Note: This module requires sentence-transformers (1.5GB+ ML dependency).
 
 from typing import List, Dict, Any, Optional, TYPE_CHECKING
 import hashlib
-import numpy as np
 from functools import lru_cache
 
 from jeeves_infra.utils.logging import get_component_logger
@@ -207,6 +206,8 @@ class EmbeddingService:
             Similarity score between 0 and 1
         """
         try:
+            import numpy as np
+
             emb1 = np.array(self.embed(text1))
             emb2 = np.array(self.embed(text2))
 

@@ -359,42 +359,13 @@ def create_avionics_dependencies(
             logger=gateway_logger,
         )
 
-        # Wire resource tracking callback to Control Tower if available
-        if app_context.control_tower is not None:
-            def create_resource_callback(control_tower: ControlTower):
-                """Create a resource tracking callback for the gateway.
-
-                Uses the request_pid_context ContextVar to get the current
-                request's PID for per-request resource tracking.
-
-                Args:
-                    control_tower: Control Tower instance for resource tracking
-
-                Returns:
-                    Callback function that records LLM usage and checks quota
-                """
-                def track_resources(tokens_in: int, tokens_out: int) -> Optional[str]:
-                    # Get current process ID from request context
-                    pid = get_request_pid()
-                    if pid is None:
-                        # No request context - allow but don't track
-                        return None
-
-                    # Record the LLM call and check quota
-                    return control_tower.record_llm_call(
-                        pid=pid,
-                        tokens_in=tokens_in,
-                        tokens_out=tokens_out,
-                    )
-                return track_resources
-
-            llm_gateway.set_resource_callback(create_resource_callback(app_context.control_tower))
+        # Resource tracking is handled by kernel_client when connected
+        # (control_tower deleted - Session 14, replaced by Rust kernel gRPC)
 
         gateway_logger.info(
             "llm_gateway_initialized",
             primary_provider=primary_provider,
             fallback_providers=fallback_providers,
-            resource_tracking_enabled=app_context.control_tower is not None,
         )
 
     return {

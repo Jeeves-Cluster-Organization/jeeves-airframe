@@ -156,8 +156,8 @@ class TestOTELSpanIntegration:
                 ):
                     context = create_app_context(feature_flags=flags)
 
-                    # Control Tower should have OTEL adapter
-                    assert context.control_tower is not None
+                    # App context should be created successfully
+                    assert context is not None
 
 
 # =============================================================================
@@ -544,17 +544,14 @@ class TestBootstrapIntegration:
         assert deps["llm_gateway"] is not None
         assert deps["llm_factory"] is not None
 
-    def test_create_avionics_dependencies_wires_resource_callback(self, mock_logger):
-        """Test that resource callback is wired when Control Tower available."""
+    def test_create_avionics_dependencies_without_control_tower(self, mock_logger):
+        """Test that dependencies work without control_tower (kernel-driven model)."""
         from jeeves_infra.feature_flags import FeatureFlags
         from jeeves_infra.context import AppContext, SystemClock
 
         flags = FeatureFlags(use_llm_gateway=True)
         mock_settings = MagicMock()
         mock_settings.llm_provider = "llamaserver"
-
-        mock_control_tower = MagicMock()
-        mock_control_tower.record_llm_call.return_value = None  # Within quota
 
         context = AppContext(
             settings=mock_settings,
@@ -565,34 +562,15 @@ class TestBootstrapIntegration:
             core_config=None,
             orchestration_flags=None,
             vertical_registry={},
-            control_tower=mock_control_tower,
+            control_tower=None,  # Kernel-driven: no control_tower
         )
 
-        from mission_system.bootstrap import (
-            create_avionics_dependencies,
-            set_request_pid,
-            clear_request_pid,
-        )
+        from mission_system.bootstrap import create_avionics_dependencies
 
         deps = create_avionics_dependencies(context)
         gateway = deps["llm_gateway"]
 
-        # Gateway should have callback set
-        assert gateway._resource_callback is not None
-
-        # Test callback invokes Control Tower
-        set_request_pid("test-pid-abc")
-
-        # Manually invoke callback
-        result = gateway._resource_callback(100, 50)
-
-        # Should have called Control Tower
-        mock_control_tower.record_llm_call.assert_called_once_with(
-            pid="test-pid-abc",
-            tokens_in=100,
-            tokens_out=50,
-        )
-
-        clear_request_pid()
+        # Gateway works without resource tracking callback
+        assert gateway is not None
 
 
