@@ -19,9 +19,11 @@ import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
 from dataclasses import dataclass
 
-from control_tower.resources.tracker import ResourceTracker
-from control_tower.types import ResourceQuota, ResourceUsage
-from jeeves_infra.protocols import Envelope
+pytest.importorskip("control_tower", reason="control_tower package removed; replaced by kernel_client")
+
+from control_tower.resources.tracker import ResourceTracker  # noqa: E402
+from control_tower.types import ResourceQuota, ResourceUsage  # noqa: E402
+from jeeves_infra.protocols import Envelope  # noqa: E402
 
 
 pytestmark = [

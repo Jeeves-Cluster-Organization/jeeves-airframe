@@ -8,7 +8,7 @@ Models that need to be used in common/ live here.
 """
 
 # Re-export validation types from protocols (L0) for backwards compatibility
-from protocols.validation import MetaValidationIssue, VerificationReport
+from jeeves_infra.protocols.validation import MetaValidationIssue, VerificationReport
 
 __all__ = [
     "MetaValidationIssue",

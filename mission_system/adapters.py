@@ -108,7 +108,7 @@ class MissionSystemAdapters:
         """
         if not self._memory_service:
             # MemoryService was moved to MemoryManager in memory_module
-            from memory_module.manager import MemoryManager
+            from mission_system.memory.manager import MemoryManager
             # MemoryManager needs additional dependencies - return None for now
             # Capabilities should inject proper memory service
             raise NotImplementedError(
@@ -283,8 +283,8 @@ def create_event_emitter(persistence: PersistenceProtocol) -> Any:
     Returns:
         EventEmitter instance
     """
-    from jeeves_infra.memory.repositories.event_repository import EventRepository
-    from jeeves_infra.memory.services.event_emitter import EventEmitter
+    from mission_system.memory.repositories.event_repository import EventRepository
+    from mission_system.memory.services.event_emitter import EventEmitter
     event_repository = EventRepository(persistence)
     return EventEmitter(event_repository)
 
@@ -313,7 +313,7 @@ def create_embedding_service() -> Any:
     Returns:
         EmbeddingService instance
     """
-    from jeeves_infra.memory.services.embedding_service import EmbeddingService
+    from mission_system.memory.services.embedding_service import EmbeddingService
     return EmbeddingService()
 
 
@@ -328,7 +328,7 @@ def create_code_indexer(persistence: PersistenceProtocol, embedding_service: Any
     Returns:
         CodeIndexer instance
     """
-    from jeeves_infra.memory.services.code_indexer import CodeIndexer
+    from mission_system.memory.services.code_indexer import CodeIndexer
     if embedding_service is None:
         embedding_service = create_embedding_service()
     return CodeIndexer(
@@ -347,7 +347,7 @@ def create_tool_health_service(persistence: PersistenceProtocol) -> Any:
     Returns:
         ToolHealthService instance
     """
-    from jeeves_infra.memory.services.tool_health_service import ToolHealthService
+    from mission_system.memory.services.tool_health_service import ToolHealthService
     return ToolHealthService(persistence)
 
 
@@ -415,7 +415,7 @@ def create_nli_service(
     Constitutional compliance:
         Apps access infrastructure via adapters, not direct avionics imports.
     """
-    from jeeves_infra.memory.services.nli_service import NLIService
+    from mission_system.memory.services.nli_service import NLIService
     return NLIService(model_name=model_name, enabled=enabled)
 
 
@@ -442,7 +442,7 @@ async def create_vector_adapter(
         Apps access infrastructure via adapters, not direct avionics imports.
     """
     from jeeves_infra.postgres.client import PostgreSQLClient
-    from jeeves_infra.memory.repositories.pgvector_repository import PgVectorRepository
+    from mission_system.memory.repositories.pgvector_repository import PgVectorRepository
 
     if settings is None:
         settings = get_settings()

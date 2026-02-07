@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from jeeves_infra.gateway.health import (
+from mission_system.health import (
     ComponentHealth,
     ComponentStatus,
     HealthChecker,
@@ -198,7 +198,7 @@ def test_health_check_to_dict():
     """Test conversion of HealthCheckResult to dictionary."""
     now = datetime.now(timezone.utc)
 
-    from jeeves_infra.gateway.health import HealthCheckResult
+    from mission_system.health import HealthCheckResult
 
     result = HealthCheckResult(
         status=HealthStatus.HEALTHY,

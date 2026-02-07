@@ -24,7 +24,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from jeeves_infra.gateway.server import app
+from mission_system.app_server import app
 from mission_system.config.constants import PLATFORM_NAME, PLATFORM_VERSION
 
 

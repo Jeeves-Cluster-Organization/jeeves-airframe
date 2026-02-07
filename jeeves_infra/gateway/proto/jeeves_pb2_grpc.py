@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-from proto import jeeves_pb2 as proto_dot_jeeves__pb2
+from jeeves_infra.gateway.proto import jeeves_pb2 as proto_dot_jeeves__pb2
 
 GRPC_GENERATED_VERSION = '1.76.0'
 GRPC_VERSION = grpc.__version__

@@ -24,6 +24,7 @@ Usage:
 """
 
 import os
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
@@ -61,6 +62,43 @@ class ResourceQuota:
     max_iterations: int = 3
     timeout_seconds: int = 300
     soft_timeout_seconds: int = 240
+
+
+# =============================================================================
+# Request PID Context (per-request process tracking)
+# =============================================================================
+
+_request_pid: ContextVar[Optional[str]] = ContextVar("request_pid", default=None)
+
+
+def set_request_pid(pid: str) -> None:
+    """Set the current request's process ID."""
+    _request_pid.set(pid)
+
+
+def get_request_pid() -> Optional[str]:
+    """Get the current request's process ID."""
+    return _request_pid.get()
+
+
+def clear_request_pid() -> None:
+    """Clear the current request's process ID."""
+    _request_pid.set(None)
+
+
+def request_pid_context(pid: str):
+    """Context manager for request PID."""
+    import contextlib
+
+    @contextlib.contextmanager
+    def _ctx():
+        token = _request_pid.set(pid)
+        try:
+            yield pid
+        finally:
+            _request_pid.reset(token)
+
+    return _ctx()
 
 
 def _parse_bool(value: str, default: bool = True) -> bool:
@@ -321,42 +359,13 @@ def create_avionics_dependencies(
             logger=gateway_logger,
         )
 
-        # Wire resource tracking callback to Control Tower if available
-        if app_context.control_tower is not None:
-            def create_resource_callback(control_tower: ControlTower):
-                """Create a resource tracking callback for the gateway.
-
-                Uses the request_pid_context ContextVar to get the current
-                request's PID for per-request resource tracking.
-
-                Args:
-                    control_tower: Control Tower instance for resource tracking
-
-                Returns:
-                    Callback function that records LLM usage and checks quota
-                """
-                def track_resources(tokens_in: int, tokens_out: int) -> Optional[str]:
-                    # Get current process ID from request context
-                    pid = get_request_pid()
-                    if pid is None:
-                        # No request context - allow but don't track
-                        return None
-
-                    # Record the LLM call and check quota
-                    return control_tower.record_llm_call(
-                        pid=pid,
-                        tokens_in=tokens_in,
-                        tokens_out=tokens_out,
-                    )
-                return track_resources
-
-            llm_gateway.set_resource_callback(create_resource_callback(app_context.control_tower))
+        # Resource tracking is handled by kernel_client when connected
+        # (control_tower deleted - Session 14, replaced by Rust kernel gRPC)
 
         gateway_logger.info(
             "llm_gateway_initialized",
             primary_provider=primary_provider,
             fallback_providers=fallback_providers,
-            resource_tracking_enabled=app_context.control_tower is not None,
         )
 
     return {
@@ -392,161 +401,6 @@ def create_tool_executor_with_access(
     )
 
 
-def create_distributed_infrastructure(
-    app_context: AppContext,
-    redis_url: Optional[str] = None,
-    postgres_client: Optional[Any] = None,
-) -> Dict[str, Any]:
-    """Create distributed infrastructure when enable_distributed_mode is true.
-
-    Creates Redis client and RedisDistributedBus for horizontal scaling.
-    Optionally wires checkpoint adapter when enable_checkpoints is true.
-
-    Args:
-        app_context: AppContext with feature flags and logger
-        redis_url: Optional Redis URL (uses REDIS_URL env var if not provided)
-        postgres_client: Optional PostgreSQLClient for checkpoint persistence
-
-    Returns:
-        Dict containing:
-        - redis_client: AsyncRedis client instance
-        - distributed_bus: RedisDistributedBus instance
-        - worker_coordinator: WorkerCoordinator instance
-        - checkpoint_adapter: PostgresCheckpointAdapter (if checkpoints enabled)
-
-    Raises:
-        RuntimeError: If distributed mode is enabled but Redis unavailable
-    """
-    from jeeves_infra.logging import create_logger
-
-    result: Dict[str, Any] = {
-        "redis_client": None,
-        "distributed_bus": None,
-        "worker_coordinator": None,
-        "checkpoint_adapter": None,
-    }
-
-    # Only create if distributed mode is enabled
-    if not app_context.feature_flags.enable_distributed_mode:
-        return result
-
-    # Verify Redis state flag is also enabled (required dependency)
-    if not app_context.feature_flags.use_redis_state:
-        app_context.logger.warning(
-            "distributed_mode_requires_redis",
-            message="enable_distributed_mode requires use_redis_state=true",
-        )
-        return result
-
-    # Get Redis URL from param or environment
-    import os
-    actual_redis_url = redis_url or os.getenv("REDIS_URL", "redis://localhost:6379")
-
-    try:
-        # Import Redis async client
-        import redis.asyncio as redis_async
-        from jeeves_infra.distributed import RedisDistributedBus
-        from mission_system.services.worker_coordinator import WorkerCoordinator
-
-        # Create async Redis client wrapper
-        # Note: The actual client is created as a coroutine factory
-        # since async operations can't be awaited at module import time
-        class AsyncRedisWrapper:
-            """Wrapper for async Redis client to match RedisDistributedBus interface."""
-
-            def __init__(self, url: str):
-                self._url = url
-                self._client = None
-
-            @property
-            def redis(self):
-                """Get the underlying Redis client, creating if needed."""
-                if self._client is None:
-                    self._client = redis_async.from_url(
-                        self._url,
-                        decode_responses=True,
-                    )
-                return self._client
-
-            async def close(self):
-                """Close the Redis connection."""
-                if self._client:
-                    await self._client.close()
-                    self._client = None
-
-        redis_client = AsyncRedisWrapper(actual_redis_url)
-        result["redis_client"] = redis_client
-
-        # Create distributed bus
-        bus_logger = create_logger("distributed_bus")
-        distributed_bus = RedisDistributedBus(
-            redis_client=redis_client,
-            logger=bus_logger,
-        )
-        result["distributed_bus"] = distributed_bus
-
-        # Create checkpoint adapter if checkpoints enabled and postgres available
-        checkpoint_adapter = None
-        if app_context.feature_flags.enable_checkpoints:
-            if postgres_client is not None:
-                from jeeves_infra.postgres.checkpoint import PostgresCheckpointAdapter
-
-                checkpoint_logger = create_logger("checkpoint_adapter")
-                checkpoint_adapter = PostgresCheckpointAdapter(
-                    postgres_client=postgres_client,
-                    logger=checkpoint_logger,
-                )
-                result["checkpoint_adapter"] = checkpoint_adapter
-
-                app_context.logger.info(
-                    "checkpoint_adapter_created",
-                    message="PostgresCheckpointAdapter wired for distributed checkpointing",
-                )
-            else:
-                app_context.logger.warning(
-                    "checkpoint_adapter_skipped",
-                    message="enable_checkpoints=true but no postgres_client provided",
-                )
-
-        # Create worker coordinator with Control Tower and checkpoint integration
-        coordinator_logger = create_logger("worker_coordinator")
-        worker_coordinator = WorkerCoordinator(
-            distributed_bus=distributed_bus,
-            checkpoint_adapter=checkpoint_adapter,
-            runtime=None,  # Runtime provided separately per worker
-            logger=coordinator_logger,
-            control_tower=app_context.control_tower,
-        )
-        result["worker_coordinator"] = worker_coordinator
-
-        app_context.logger.info(
-            "distributed_infrastructure_created",
-            redis_url=actual_redis_url.split("@")[-1],  # Redact credentials
-            has_control_tower=app_context.control_tower is not None,
-            has_checkpoint_adapter=checkpoint_adapter is not None,
-        )
-
-    except ImportError as e:
-        app_context.logger.error(
-            "distributed_import_error",
-            error=str(e),
-            message="Install redis package: pip install redis",
-        )
-        raise RuntimeError(
-            f"Failed to import distributed dependencies: {e}. "
-            "Install with: pip install redis"
-        ) from e
-    except Exception as e:
-        app_context.logger.error(
-            "distributed_init_error",
-            error=str(e),
-            redis_url=actual_redis_url.split("@")[-1],
-        )
-        raise RuntimeError(f"Failed to create distributed infrastructure: {e}") from e
-
-    return result
-
-
 async def create_memory_manager(
     app_context: AppContext,
     postgres_client: Optional[Any] = None,
@@ -573,9 +427,9 @@ async def create_memory_manager(
         return None
 
     try:
-        from memory_module.manager import MemoryManager
-        from jeeves_infra.memory.sql_adapter import SQLAdapter
-        from jeeves_infra.memory.services.xref_manager import CrossRefManager
+        from mission_system.memory.manager import MemoryManager
+        from mission_system.memory.sql_adapter import SQLAdapter
+        from mission_system.memory.services.xref_manager import CrossRefManager
         from jeeves_infra.logging import create_logger
 
         memory_logger = create_logger("memory_manager")
@@ -622,8 +476,6 @@ __all__ = [
     "create_core_config_from_env",
     "create_orchestration_flags_from_env",
     "core_config_to_resource_quota",
-    # Distributed infrastructure
-    "create_distributed_infrastructure",
     # Memory management
     "create_memory_manager",
     # Per-request PID context for resource tracking

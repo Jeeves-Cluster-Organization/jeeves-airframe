@@ -137,6 +137,7 @@ from jeeves_infra.runtime.agents import (
     PipelineRunner,
     create_pipeline_runner,
     create_envelope,
+    OptionalCheckpoint,
 )
 
 # =============================================================================
@@ -151,7 +152,35 @@ from jeeves_infra.utils.strings import normalize_string_list
 # =============================================================================
 
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any, Dict, List, Optional
+
+
+class FocusType(str, Enum):
+    """Focus type for session state."""
+    GENERAL = "general"
+    TASK = "task"
+    EXPLORATION = "exploration"
+    ENTITY = "entity"
+    CLARIFICATION = "clarification"
+
+
+@dataclass
+class EntityRef:
+    """Reference to a domain entity."""
+    entity_id: str = ""
+    entity_type: str = ""
+    name: str = ""
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class ClarificationContext:
+    """Context for clarification focus state."""
+    original_query: str = ""
+    clarification_type: str = ""
+    options: List[str] = field(default_factory=list)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -319,6 +348,7 @@ __all__ = [
     "PipelineRunner",
     "create_pipeline_runner",
     "create_envelope",
+    "OptionalCheckpoint",
     # Utilities
     "JSONRepairKit",
     "normalize_string_list",
@@ -326,4 +356,7 @@ __all__ = [
     "WorkingMemory",
     "Finding",
     "FocusState",
+    "FocusType",
+    "EntityRef",
+    "ClarificationContext",
 ]

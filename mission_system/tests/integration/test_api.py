@@ -23,7 +23,7 @@ import pytest
 from fastapi.testclient import TestClient
 from httpx import AsyncClient, ASGITransport
 
-from jeeves_infra.gateway.server import app, app_state, lifespan
+from mission_system.app_server import app, app_state, lifespan
 from mission_system.config.constants import PLATFORM_NAME, PLATFORM_VERSION
 
 
@@ -171,7 +171,7 @@ async def test_submit_request_success(test_app):
         return result
 
     # Patch control_tower.submit_request to return mock result
-    with patch.object(app_state.control_tower, "submit_request", side_effect=create_mock_envelope):
+    with patch.object(app_state.orchestrator, "process_envelope", side_effect=create_mock_envelope):
         response = await test_app.post(
             "/api/v1/requests",
             json={
@@ -221,7 +221,7 @@ async def test_submit_request_clarification(test_app):
         )
         return result
 
-    with patch.object(app_state.control_tower, "submit_request", side_effect=create_mock_envelope):
+    with patch.object(app_state.orchestrator, "process_envelope", side_effect=create_mock_envelope):
         response = await test_app.post(
             "/api/v1/requests",
             json={
@@ -259,7 +259,7 @@ async def test_submit_request_validation_error(test_app):
 async def test_submit_request_orchestrator_error(test_app):
     """Test request submission when control tower fails."""
     with patch.object(
-        app_state.control_tower, "submit_request", side_effect=Exception("Test error")
+        app_state.orchestrator, "process_envelope", side_effect=Exception("Test error")
     ):
         response = await test_app.post(
             "/api/v1/requests",

@@ -32,7 +32,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from jeeves_infra.utils.testing import parse_postgres_url
-from jeeves_infra.gateway.server import app, app_state
+from mission_system.app_server import app, app_state
 
 # CI detection constants
 IS_CI = os.environ.get("CI", "").lower() in ("true", "1", "yes")

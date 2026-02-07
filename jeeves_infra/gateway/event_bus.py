@@ -13,7 +13,7 @@ UNIFIED EVENT SUPPORT (2025-12-14):
 Usage:
     # NEW: Using Event (preferred)
     from jeeves_infra.gateway.event_bus import gateway_events
-    from protocols.events import Event, EventCategory
+    from jeeves_infra.protocols.events import Event, EventCategory
 
     event = Event.create_now(
         event_type="agent.started",
@@ -41,7 +41,7 @@ from typing import Any, Awaitable, Callable, Dict, List, Set
 from weakref import WeakSet
 
 from jeeves_infra.logging import get_current_logger
-from protocols.events import (
+from jeeves_infra.protocols.events import (
     Event,
     EventCategory,
     EventSeverity,
