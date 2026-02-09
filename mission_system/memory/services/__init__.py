@@ -17,7 +17,6 @@ EmbeddingService is owned by capabilities (concrete DB concern).
 CodeIndexer has moved to jeeves_capability_hello_world.database.services.code_indexer.
 """
 
-from mission_system.memory.services.nli_service import NLIService, get_nli_service
 from mission_system.memory.services.xref_manager import CrossRefManager
 from mission_system.memory.services.event_emitter import EventEmitter
 from mission_system.memory.services.trace_recorder import TraceRecorder
@@ -29,9 +28,7 @@ from mission_system.memory.services.tool_health_service import ToolHealthService
 __all__ = [
     # Protocol Adapters (implements Core protocols)
     "SessionStateAdapter",
-    # Infrastructure Services (EmbeddingService is lazy - import directly when needed)
-    "NLIService",
-    "get_nli_service",
+    # Infrastructure Services
     "CrossRefManager",
     "EventEmitter",
     "TraceRecorder",

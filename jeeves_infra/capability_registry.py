@@ -17,7 +17,7 @@ Usage:
     registry = get_capability_registry()
     registry.register("my_capability", "my_agent", AgentLLMConfig(
         agent_name="my_agent",
-        model="qwen2.5-7b-instruct-q4_k_m",
+        model="your-model-here",  # Required — no default
         temperature=0.3,
     ))
 

@@ -207,32 +207,46 @@ class EventContext:
         return event_id
 
     # ========================================================================
-    # Critic Events
+    # Agent Decision Events
     # ========================================================================
 
-    async def emit_critic_decision(
+    async def emit_agent_decision(
         self,
+        agent_name: str,
         action: str,
         confidence: float,
         issue: Optional[str] = None,
         feedback: Optional[str] = None,
     ) -> Optional[str]:
         """
-        Emit critic decision event (domain event for audit).
+        Emit agent decision event (domain event for audit).
 
-        This is emitted by the Critic agent after evaluating results.
+        Generic decision event — any capability-defined agent can emit decisions.
 
         Args:
-            action: Critic verdict ("approved", "loop_back", "next_stage")
+            agent_name: The deciding agent (capability-defined)
+            action: Decision action (capability-defined, e.g., "approved", "loop_back")
             confidence: Decision confidence (0.0-1.0)
             issue: Issue description if not approved
-            feedback: Refine intent hint for loop_back verdict
+            feedback: Refinement hint for loop_back verdict
 
         Returns:
             Event ID if domain event emitted, None otherwise
         """
         event_id = None
 
+        # Emit real-time decision event
+        if self.agent_event_emitter:
+            await self.agent_event_emitter.emit_agent_decision(
+                agent_name=agent_name,
+                request_context=self.request_context,
+                action=action,
+                confidence=confidence,
+                issue=issue,
+                feedback=feedback,
+            )
+
+        # Emit domain event for audit (uses critic_decision for backward compat with domain event schema)
         if self.domain_event_emitter:
             event_id = await self.domain_event_emitter.emit_critic_decision(
                 request_id=self.request_context.request_id,
@@ -241,13 +255,14 @@ class EventContext:
                 confidence=confidence,
                 issue=issue,
                 feedback=feedback,
-                actor="critic",
+                actor=agent_name,
                 correlation_id=self.correlation_id,
                 session_id=self.request_context.session_id or "",
             )
 
         self._logger.info(
-            "critic_decision",
+            "agent_decision",
+            agent_name=agent_name,
             action=action,
             confidence=confidence,
             issue=issue,
@@ -303,30 +318,27 @@ class EventContext:
         params: Optional[Dict[str, Any]] = None,
         step_number: Optional[int] = None,
         total_steps: Optional[int] = None,
+        agent_name: str,
         **payload,
     ) -> None:
         """
         Emit tool execution started event with parameter preview.
-
-        Phase 2.1: Includes truncated, serializable parameter preview.
 
         Args:
             tool_name: Name of the tool being executed
             params: Tool parameters (will be truncated for streaming)
             step_number: Current step number (1-indexed)
             total_steps: Total number of steps in plan
+            agent_name: Agent executing the tool (capability-defined)
             **payload: Additional payload data
-
-        Constitutional compliance (P2 - Code Context Priority):
-            Provides visibility into tool calls without exposing full params.
         """
-        # Phase 2.1: Create truncated params preview
         params_preview = self._create_params_preview(params) if params else None
 
         if self.agent_event_emitter:
             await self.agent_event_emitter.emit_tool_started(
                 tool_name=tool_name,
                 request_context=self.request_context,
+                agent_name=agent_name,
                 params_preview=params_preview,
                 step_number=step_number,
                 total_steps=total_steps,
@@ -347,11 +359,10 @@ class EventContext:
         execution_time_ms: Optional[int] = None,
         error: Optional[str] = None,
         error_type: Optional[str] = None,
+        agent_name: str,
     ) -> Optional[str]:
         """
         Emit tool execution completed event to both systems.
-
-        Phase 2.2: Includes error_type for better observability.
 
         Args:
             tool_name: Name of the tool
@@ -359,26 +370,23 @@ class EventContext:
             execution_time_ms: Duration in milliseconds
             error: Error message if failed
             error_type: Error classification (e.g., "validation_error", "tool_error")
+            agent_name: Agent that executed the tool (capability-defined)
 
         Returns:
             Event ID if domain event emitted, None otherwise
-
-        Constitutional compliance (P3 - Bounded Efficiency):
-            Provides clear error categorization for debugging without exposing internals.
         """
         event_id = None
 
-        # Real-time event with error details
         if self.agent_event_emitter:
             await self.agent_event_emitter.emit_tool_completed(
                 tool_name=tool_name,
                 request_context=self.request_context,
+                agent_name=agent_name,
                 status=status,
-                error_type=error_type,  # Phase 2.2: Include error type
+                error_type=error_type,
                 execution_time_ms=execution_time_ms,
             )
 
-        # Domain event for audit
         if self.domain_event_emitter:
             event_id = await self.domain_event_emitter.emit_tool_executed(
                 request_id=self.request_context.request_id,
@@ -387,7 +395,7 @@ class EventContext:
                 status=status,
                 execution_time_ms=execution_time_ms,
                 error=error,
-                actor="traverser",
+                actor=agent_name,
                 correlation_id=self.correlation_id,
                 session_id=self.request_context.session_id or "",
             )

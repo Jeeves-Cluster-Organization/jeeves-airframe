@@ -27,7 +27,7 @@ from pydantic import BaseModel, Field
 
 from jeeves_infra.gateway.websocket_manager import WebSocketEventManager
 from mission_system.events.bridge import EventBridge
-from mission_system.bootstrap import create_app_context, core_config_to_resource_quota
+from mission_system.bootstrap import create_app_context
 from jeeves_infra.wiring import create_llm_provider_factory, create_tool_executor
 from mission_system.api.health import HealthChecker, health_check_to_dict
 from jeeves_infra.settings import settings, get_settings

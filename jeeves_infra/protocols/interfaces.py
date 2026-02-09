@@ -574,7 +574,7 @@ class AgentLLMConfig:
     This Python dataclass version provides validation and defaults.
     """
     agent_name: str
-    model: str = "qwen2.5-7b-instruct-q4_k_m"
+    model: str  # Required — capability must specify
     temperature: Optional[float] = 0.3
     max_tokens: int = 2000
     server_url: Optional[str] = None

@@ -46,10 +46,6 @@ gateway = [
 redis = [
     "redis>=5.0.0",
 ]
-embeddings = [
-    "sentence-transformers>=2.2.0",
-    "numpy>=1.24.0",
-]
 llm = [
     "litellm>=1.0.0",
     "tiktoken>=0.5.0",
@@ -64,7 +60,7 @@ dev = [
     "mypy>=1.0.0",
 ]
 all = [
-    "jeeves-infra[gateway,redis,embeddings,llm]",
+    "jeeves-infra[gateway,redis,llm]",
 ]
 
 [project.urls]

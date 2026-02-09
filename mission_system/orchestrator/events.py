@@ -251,19 +251,21 @@ class EventOrchestrator:
         )
 
     # =========================================================================
-    # Delegated methods - Critic Events
+    # Delegated methods - Agent Decision Events
     # =========================================================================
 
-    async def emit_critic_decision(
+    async def emit_agent_decision(
         self,
+        agent_name: str,
         action: str,
         confidence: float,
         issue: Optional[str] = None,
         feedback: Optional[str] = None,
     ) -> Optional[str]:
-        """Emit critic decision event (domain event for audit)."""
+        """Emit agent decision event (domain event for audit)."""
         self._ensure_initialized()
-        return await self._context.emit_critic_decision(
+        return await self._context.emit_agent_decision(
+            agent_name=agent_name,
             action=action,
             confidence=confidence,
             issue=issue,

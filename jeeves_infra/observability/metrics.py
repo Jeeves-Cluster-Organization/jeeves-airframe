@@ -1,4 +1,4 @@
-"""Prometheus metrics instrumentation for the 7-agent stack."""
+"""Prometheus metrics instrumentation for the agent pipeline."""
 
 from __future__ import annotations
 

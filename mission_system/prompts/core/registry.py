@@ -43,21 +43,10 @@ class PromptRegistry:
             # Auto-import GENERIC prompt versions (not capability-specific)
             # Capability-specific prompts are registered via CapabilityResourceRegistry
             # at application startup, not via hardcoded imports.
-            generic_prompt_modules = [
-                "mission_system.prompts.core.versions.intent",
-                "mission_system.prompts.core.versions.planner",
-                "mission_system.prompts.core.versions.confirmation",
-                "mission_system.prompts.core.versions.critic",
-            ]
-            for module_name in generic_prompt_modules:
-                try:
-                    __import__(module_name)
-                except (ImportError, FileNotFoundError) as e:
-                    get_current_logger().warning(
-                        "prompt_module_import_failed",
-                        module=module_name,
-                        error=str(e)
-                    )
+            # Domain-specific prompt modules (planner, critic, intent, confirmation)
+            # have been removed from airframe. Capabilities register their own
+            # prompts via CapabilityResourceRegistry and @register_prompt.
+            pass
         return cls._instance
 
     def register(self, prompt_version: PromptVersion) -> None:

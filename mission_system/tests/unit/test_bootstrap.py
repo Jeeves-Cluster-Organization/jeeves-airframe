@@ -130,28 +130,6 @@ class TestRequestPidContext:
         assert get_request_pid() is None
 
 
-class TestExecutionConfigToResourceQuota:
-    """Tests for core_config_to_resource_quota conversion."""
-
-    def test_converts_correctly(self):
-        """Test conversion from ExecutionConfig to ResourceQuota."""
-        from mission_system.bootstrap import core_config_to_resource_quota
-        from jeeves_infra.protocols import ExecutionConfig
-
-        # max_iterations etc are on ExecutionConfig directly
-        config = ExecutionConfig(
-            max_iterations=10,
-            max_llm_calls=100,
-            max_agent_hops=15,
-        )
-
-        quota = core_config_to_resource_quota(config)
-
-        assert quota.max_iterations == 10
-        assert quota.max_llm_calls == 100
-        assert quota.max_agent_hops == 15
-
-
 class TestCreateMemoryManager:
     """Tests for create_memory_manager async factory."""
 

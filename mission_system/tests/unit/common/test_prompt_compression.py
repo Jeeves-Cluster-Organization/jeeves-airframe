@@ -5,7 +5,7 @@ models with limited context windows (3B-14B on consumer hardware).
 """
 
 import pytest
-from mission_system.common.prompt_compression import (
+from jeeves_infra.utils.prompt_compression import (
     compress_for_prompt,
     compress_json_for_prompt,
     estimate_tokens,

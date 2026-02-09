@@ -362,32 +362,6 @@ def create_llm_provider_factory(settings: Optional[SettingsProtocol] = None) -> 
     return _create_factory(settings)
 
 
-def create_nli_service(
-    model_name: Optional[str] = None,
-    enabled: bool = True
-) -> Any:
-    """
-    Create NLI (Natural Language Inference) service for claim verification.
-
-    Decision 3:A: NLI service is required for evidence-gated synthesis.
-    Critic uses this to verify claims are entailed by their cited evidence.
-
-    Per Constitution P1 (Accuracy First): Anti-hallucination gate.
-
-    Args:
-        model_name: Optional HuggingFace model name (uses default if None)
-        enabled: Whether NLI verification is enabled
-
-    Returns:
-        NLIService instance implementing ClaimVerificationProtocol
-
-    Constitutional compliance:
-        Apps access infrastructure via adapters, not direct avionics imports.
-    """
-    from mission_system.memory.services.nli_service import NLIService
-    return NLIService(model_name=model_name, enabled=enabled)
-
-
 __all__ = [
     "SettingsProtocol",
     "MissionSystemAdapters",
@@ -404,6 +378,4 @@ __all__ = [
     "create_event_emitter",
     "create_graph_storage",
     "create_tool_health_service",
-    # NLI service factory (Decision 3:A)
-    "create_nli_service",
 ]

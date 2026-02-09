@@ -5,7 +5,7 @@ enabling debugging without exposing internal reasoning to users.
 """
 
 import pytest
-from mission_system.common.cot_proxy import (
+from jeeves_infra.utils.cot import (
     extract_and_strip_cot,
     extract_cot_only,
     strip_cot_only,

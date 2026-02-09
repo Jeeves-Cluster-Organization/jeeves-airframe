@@ -18,20 +18,7 @@ def test_memory_imports():
         print(f"✗ import mission_system.memory - {e}")
         raise
 
-    # Test 2: Import from mission_system.memory.services (moved from memory_module)
-    try:
-        from mission_system.memory.services.embedding_service import EmbeddingService
-        print("✓ from mission_system.memory.services.embedding_service import EmbeddingService")
-    except ModuleNotFoundError as e:
-        print(f"✗ from mission_system.memory.services.embedding_service import EmbeddingService")
-        print(f"  Error: {e}")
-        raise
-    except ImportError as e:
-        # This is OK - dependency missing
-        print(f"[WARN] from mission_system.memory.services.embedding_service import EmbeddingService")
-        print(f"  Dependency missing (OK): {e}")
-
-    # Test 3: Import from mission_system.memory (moved from memory_module.adapters)
+    # Test 2: Import from mission_system.memory (moved from memory_module.adapters)
     try:
         from mission_system.memory.sql_adapter import SQLAdapter
         print("✓ from mission_system.memory.sql_adapter import SQLAdapter")
@@ -55,19 +42,6 @@ def test_memory_imports():
     except ImportError as e:
         # This is OK - dependency missing
         print(f"[WARN] from mission_system.memory.manager import MemoryManager")
-        print(f"  Dependency missing (OK): {e}")
-
-    # Test 5: Import memory.intent_classifier
-    try:
-        from mission_system.memory.intent_classifier import IntentClassifier
-        print("✓ from mission_system.memory.intent_classifier import IntentClassifier")
-    except ModuleNotFoundError as e:
-        print(f"✗ from mission_system.memory.intent_classifier import IntentClassifier")
-        print(f"  Error: {e}")
-        raise
-    except ImportError as e:
-        # This is OK - dependency missing
-        print(f"[WARN] from mission_system.memory.intent_classifier import IntentClassifier")
         print(f"  Dependency missing (OK): {e}")
 
     print("\n[OK] All import paths are correct!")

@@ -39,25 +39,6 @@ __all__ = [
     "get_safety_block",
 ]
 
-# Import GENERIC prompt version modules to ensure they're registered
-# Capability-specific prompts (e.g., code_analysis) are registered by capabilities
-# via CapabilityResourceRegistry at application startup
-try:
-    from mission_system.prompts.core.versions import confirmation  # noqa: F401
-except (ImportError, FileNotFoundError):
-    pass  # Ignore import errors to prevent blocking other prompts
-
-try:
-    from mission_system.prompts.core.versions import intent  # noqa: F401
-except (ImportError, FileNotFoundError):
-    pass
-
-try:
-    from mission_system.prompts.core.versions import planner  # noqa: F401
-except (ImportError, FileNotFoundError):
-    pass
-
-try:
-    from mission_system.prompts.core.versions import critic  # noqa: F401
-except (ImportError, FileNotFoundError):
-    pass
+# Domain-specific prompt versions (planner, critic, intent, confirmation) have been
+# removed from airframe. Capabilities register their own prompts via
+# CapabilityResourceRegistry and the @register_prompt decorator.

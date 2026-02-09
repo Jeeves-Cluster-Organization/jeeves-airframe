@@ -303,12 +303,10 @@ def _is_internal_event(event_type: "jeeves_pb2.FlowEvent") -> bool:
         - WebSocket handler subscribes and broadcasts to frontend
         - Zero coupling between router and WebSocket implementation
 
-    Extended mapping for 7-agent pipeline visibility:
+    Event mapping for pipeline visibility:
         - AGENT_STARTED/COMPLETED: Generic agent lifecycle events
-        - PLAN_CREATED: Planner generates execution plan
-        - TOOL_STARTED/COMPLETED: Traverser tool executions
-        - CRITIC_DECISION: Critic validates results
-        - SYNTHESIZER_COMPLETE: Understanding structure built
+        - AGENT_DECISION: Agent decision events
+        - TOOL_STARTED/COMPLETED: Tool executions
         - STAGE_TRANSITION: Multi-stage execution transitions
 
     Note: RESPONSE_READY, CLARIFICATION, CONFIRMATION, ERROR are NOT broadcast

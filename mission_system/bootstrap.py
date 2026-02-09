@@ -25,7 +25,6 @@ Usage:
 
 import os
 from contextvars import ContextVar
-from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from jeeves_infra.context import AppContext, SystemClock
@@ -48,20 +47,6 @@ if TYPE_CHECKING:
         AgentToolAccessProtocol,
         ConfigRegistryProtocol,
     )
-
-
-@dataclass
-class ResourceQuota:
-    """Resource quota configuration for kernel processes."""
-    max_input_tokens: int = 4096
-    max_output_tokens: int = 2048
-    max_context_tokens: int = 16384
-    max_llm_calls: int = 10
-    max_tool_calls: int = 50
-    max_agent_hops: int = 21
-    max_iterations: int = 3
-    timeout_seconds: int = 300
-    soft_timeout_seconds: int = 240
 
 
 # =============================================================================
@@ -170,31 +155,6 @@ def create_orchestration_flags_from_env() -> OrchestrationFlags:
     )
 
 
-def core_config_to_resource_quota(core_config: ExecutionConfig) -> ResourceQuota:
-    """Convert ExecutionConfig to Control Tower ResourceQuota.
-
-    Control Tower's ResourceQuota is the canonical source for resource limits.
-    This adapter ensures consistency with legacy ExecutionConfig values.
-
-    Args:
-        core_config: ExecutionConfig from environment/config
-
-    Returns:
-        ResourceQuota for Control Tower
-    """
-    return ResourceQuota(
-        max_input_tokens=core_config.context_bounds.max_input_tokens,
-        max_output_tokens=core_config.context_bounds.max_output_tokens,
-        max_context_tokens=core_config.context_bounds.max_context_tokens,
-        max_llm_calls=core_config.max_llm_calls,
-        max_tool_calls=50,  # Default, not in ExecutionConfig
-        max_agent_hops=core_config.max_agent_hops,
-        max_iterations=core_config.max_iterations,
-        timeout_seconds=300,  # Default timeout
-        soft_timeout_seconds=240,
-    )
-
-
 def create_app_context(
     settings: Optional[Settings] = None,
     feature_flags: Optional[FeatureFlags] = None,
@@ -276,15 +236,12 @@ def create_app_context(
             enabled=otel_adapter is not None and otel_adapter.enabled,
         )
 
-    # Build default resource quota from ExecutionConfig
-    default_quota = core_config_to_resource_quota(core_config)
-
     root_logger.info(
         "app_context_created",
         default_service=default_service,
-        max_llm_calls=default_quota.max_llm_calls,
-        max_iterations=default_quota.max_iterations,
-        max_agent_hops=default_quota.max_agent_hops,
+        max_llm_calls=core_config.max_llm_calls,
+        max_iterations=core_config.max_iterations,
+        max_agent_hops=core_config.max_agent_hops,
     )
 
     # Note: kernel_client is None here - connect via connect_kernel_client() async
@@ -472,7 +429,6 @@ __all__ = [
     "create_tool_executor_with_access",
     "create_core_config_from_env",
     "create_orchestration_flags_from_env",
-    "core_config_to_resource_quota",
     # Memory management
     "create_memory_manager",
     # Per-request PID context for resource tracking

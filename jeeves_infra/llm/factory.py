@@ -100,8 +100,13 @@ def create_llm_provider(
     model = (
         os.getenv("JEEVES_LLM_MODEL") or
         getattr(settings, "jeeves_llm_model", None) or
-        getattr(settings, "default_model", "gpt-4-turbo")
+        getattr(settings, "default_model", None)
     )
+    if not model:
+        raise ValueError(
+            "No LLM model configured. Set JEEVES_LLM_MODEL env var "
+            "or configure default_model in settings."
+        )
     api_base = (
         os.getenv("JEEVES_LLM_BASE_URL") or
         getattr(settings, "jeeves_llm_base_url", None)

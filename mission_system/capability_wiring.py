@@ -94,10 +94,9 @@ def _discover_capabilities() -> List[str]:
     if capabilities_env:
         return [c.strip() for c in capabilities_env.split(",") if c.strip()]
 
-    # Default: try to import common capability packages
-    return [
-        "jeeves_capability_code_analyser.wiring",
-    ]
+    # No hardcoded fallbacks — env-only discovery.
+    # Set JEEVES_CAPABILITIES to register capabilities.
+    return []
 
 
 def _try_import_capability(module_path: str) -> bool:
@@ -115,46 +114,14 @@ def _try_import_capability(module_path: str) -> bool:
         return False
 
 
-def _register_fallback_capability() -> None:
-    """Register a fallback capability when no capabilities are discovered.
-
-    This provides a minimal working configuration for development/testing.
-    """
-    registry = get_capability_resource_registry()
-
-    # Check if any capabilities already registered
-    if registry.list_capabilities():
-        return  # Skip fallback if capabilities exist
-
-    # Register minimal fallback
-    register_capability(
-        capability_id="default",
-        service_config=DomainServiceConfig(
-            service_id="default",
-            service_type="flow",
-            capabilities=["query"],
-            max_concurrent=10,
-            is_default=True,
-            is_readonly=True,
-            requires_confirmation=False,
-            default_session_title="Session",
-            pipeline_stages=[],
-        ),
-        orchestrator_factory=None,
-        tools_initializer=None,
-    )
-
-
 def wire_capabilities() -> None:
     """Discover and wire all capabilities with the CapabilityResourceRegistry.
 
     Call this during application startup before the API server
     queries the registry.
 
-    Discovery order:
-    1. JEEVES_CAPABILITIES environment variable (comma-separated module paths)
-    2. Known capability package entry points
-    3. Fallback to minimal default capability
+    Discovery: JEEVES_CAPABILITIES environment variable (comma-separated module paths).
+    Fails loud if no capabilities are discovered.
     """
     discovered = _discover_capabilities()
     registered = []
@@ -163,9 +130,11 @@ def wire_capabilities() -> None:
         if _try_import_capability(module_path):
             registered.append(module_path)
 
-    # Register fallback if nothing discovered
     if not registered:
-        _register_fallback_capability()
+        raise RuntimeError(
+            "No capabilities registered. Set JEEVES_CAPABILITIES env var "
+            "to a comma-separated list of capability wiring module paths."
+        )
 
     # Log registration
     registry = get_capability_resource_registry()

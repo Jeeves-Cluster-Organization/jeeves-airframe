@@ -22,7 +22,7 @@ class LLMProfile:
 
     Generic type - capabilities define specific values.
     """
-    model_name: str = "qwen2.5-7b-instruct-q4_k_m"
+    model_name: str  # Required — capability must specify
     temperature: float = 0.3
     max_tokens: int = 2000
     context_window: int = 16384

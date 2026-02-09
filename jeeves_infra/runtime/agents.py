@@ -174,93 +174,7 @@ class Agent:
 
         prompt_key = self.config.prompt_key or f"{envelope.metadata.get('pipeline', 'default')}.{self.name}"
 
-        # Build context dict from envelope for prompt template interpolation
-        import os
-        repo_path = os.environ.get("REPO_PATH", "/workspace")
-        context = {
-            "raw_input": envelope.raw_input,
-            "user_input": envelope.raw_input,  # Alias for compatibility
-            "user_id": envelope.user_id,
-            "session_id": envelope.session_id,
-            "system_identity": "You are a code analysis assistant.",
-            "role_description": f"As the {self.name} agent, you process information and pass results to the next stage.",
-            "normalized_input": envelope.raw_input,  # Default, may be overridden by perception output
-            "context_summary": "",
-            "detected_languages": "[]",
-            "capabilities_summary": "Code search, file reading, symbol lookup, dependency analysis",
-            "user_query": envelope.raw_input,
-            "repo_path": repo_path,
-            "session_state": f"Session: {envelope.session_id}",
-            # Provide safe defaults for common prompt placeholders
-            "intent": "",
-            "goals": "[]",
-            "scope_path": "",
-            "exploration_summary": "",
-            "available_tools": "",
-            "bounds_description": "",
-            "max_files": 50,
-            "max_tokens": 100000,
-            "files_explored": 0,
-            "tokens_used": 0,
-            "remaining_files": 50,
-            "remaining_tokens": 100000,
-            "retry_feedback": "",
-            "execution_results": "",
-            "relevant_snippets": "",
-            "verdict": "",
-            "suggested_response": "",
-            "pipeline_overview": "7-agent code analysis pipeline",
-            "files_examined": "[]",
-        }
-
-        # Include all agent outputs as nested dicts (e.g., context["intent"] = {...})
-        context.update(envelope.outputs)
-
-        # Extract commonly needed fields from nested outputs
-        # This allows prompts to use both {intent} (dict) and flattened fields
-        if "perception" in envelope.outputs:
-            perception = envelope.outputs["perception"]
-            if isinstance(perception, dict):
-                context["normalized_input"] = perception.get("normalized_query", context["normalized_input"])
-                context["scope_path"] = perception.get("scope", "")
-
-        if "intent" in envelope.outputs:
-            intent_output = envelope.outputs["intent"]
-            if isinstance(intent_output, dict):
-                # Extract tool_suite classification (new architecture)
-                # Fallback to "intent" field for backwards compatibility
-                tool_suite = intent_output.get("tool_suite") or intent_output.get("intent", "")
-                context["tool_suite"] = tool_suite
-                context["intent"] = tool_suite  # Backwards compatibility alias
-                # Extract goals (list or string representation)
-                goals = intent_output.get("goals", [])
-                context["goals"] = str(goals) if isinstance(goals, list) else goals
-                # Extract search targets (Amendment XXII v2 - Two-Tool Architecture)
-                search_targets = intent_output.get("search_targets", [])
-                if search_targets:
-                    context["search_targets"] = ", ".join(f'"{t}"' for t in search_targets)
-                else:
-                    context["search_targets"] = "none extracted - use keywords from query"
-
-        if "plan" in envelope.outputs:
-            plan_output = envelope.outputs["plan"]
-            if isinstance(plan_output, dict):
-                context["execution_results"] = str(plan_output.get("steps", ""))
-
-        if "execution" in envelope.outputs:
-            exec_output = envelope.outputs["execution"]
-            if isinstance(exec_output, dict):
-                context["execution_results"] = str(exec_output.get("results", ""))
-                context["relevant_snippets"] = str(exec_output.get("snippets", ""))
-
-        if "critic" in envelope.outputs:
-            critic_output = envelope.outputs["critic"]
-            if isinstance(critic_output, dict):
-                context["verdict"] = critic_output.get("verdict", "")
-                context["suggested_response"] = critic_output.get("suggested_response", "")
-
-        # Include metadata last (can override extracted fields if needed)
-        context.update(envelope.metadata)
+        context = self._build_prompt_context(envelope)
 
         prompt = self.prompt_registry.get(prompt_key, context=context)
 
@@ -409,72 +323,44 @@ class Agent:
         envelope.llm_call_count += 1
 
     def _build_prompt_context(self, envelope: Envelope) -> Dict[str, Any]:
-        """Build context for prompt template interpolation."""
+        """Build context for prompt template interpolation.
+
+        Context is built generically from:
+        1. Base envelope fields (raw_input, user_id, session_id)
+        2. All prior agent outputs (flattened — both raw and field-level)
+        3. Envelope metadata (capability-provided overrides and defaults)
+
+        Capabilities control prompt templates and agent outputs, so they
+        align template placeholders with actual output keys. No hardcoded
+        agent names or domain-specific defaults live here.
+        """
         import os
         repo_path = os.environ.get("REPO_PATH", "/workspace")
-        context = {
+
+        context: Dict[str, Any] = {
             "raw_input": envelope.raw_input,
             "user_input": envelope.raw_input,
             "user_id": envelope.user_id,
             "session_id": envelope.session_id,
-            "system_identity": "You are a code analysis assistant.",
-            "role_description": f"As the {self.name} agent, you process information and pass results to the next stage.",
-            "normalized_input": envelope.raw_input,
-            "context_summary": "",
-            "detected_languages": "[]",
-            "capabilities_summary": "Code search, file reading, symbol lookup, dependency analysis",
             "user_query": envelope.raw_input,
             "repo_path": repo_path,
             "session_state": f"Session: {envelope.session_id}",
-            # Safe defaults for common placeholders
-            "intent": "",
-            "goals": "[]",
-            "scope_path": "",
-            "exploration_summary": "",
-            "available_tools": "",
-            "bounds_description": "",
-            "max_files": 50,
-            "max_tokens": 100000,
-            "files_explored": 0,
-            "tokens_used": 0,
-            "remaining_files": 50,
-            "remaining_tokens": 100000,
-            "retry_feedback": "",
-            "execution_results": "",
-            "relevant_snippets": "",
-            "verdict": "",
-            "suggested_response": "",
-            "pipeline_overview": "7-agent code analysis pipeline",
-            "files_examined": "[]",
+            "role_description": f"As the {self.name} agent in this pipeline stage.",
         }
 
-        # Include all agent outputs
-        context.update(envelope.outputs)
+        # Generically flatten all prior agent outputs into context.
+        # Each output is available both as its raw key (e.g., context["planner"])
+        # and, if it's a dict, its fields are promoted to top-level
+        # (e.g., context["normalized_query"] from planner output).
+        _base_keys = frozenset(context.keys())
+        for output_key, output_value in envelope.outputs.items():
+            context[output_key] = output_value
+            if isinstance(output_value, dict):
+                for field_key, field_value in output_value.items():
+                    if field_key not in _base_keys:
+                        context[field_key] = field_value
 
-        # Extract commonly needed fields from nested outputs
-        if "perception" in envelope.outputs:
-            perception = envelope.outputs["perception"]
-            if isinstance(perception, dict):
-                context["normalized_input"] = perception.get("normalized_query", context["normalized_input"])
-                context["scope_path"] = perception.get("scope", "")
-
-        if "intent" in envelope.outputs:
-            intent_output = envelope.outputs["intent"]
-            if isinstance(intent_output, dict):
-                # Extract tool_suite classification (new architecture)
-                # Fallback to "intent" field for backwards compatibility
-                tool_suite = intent_output.get("tool_suite") or intent_output.get("intent", "")
-                context["tool_suite"] = tool_suite
-                context["intent"] = tool_suite  # Backwards compatibility alias
-                goals = intent_output.get("goals", [])
-                context["goals"] = str(goals) if isinstance(goals, list) else goals
-                search_targets = intent_output.get("search_targets", [])
-                if search_targets:
-                    context["search_targets"] = ", ".join(f'"{t}"' for t in search_targets)
-                else:
-                    context["search_targets"] = "none extracted - use keywords from query"
-
-        # Include metadata last
+        # Metadata last — capabilities inject defaults and overrides here
         context.update(envelope.metadata)
 
         return context

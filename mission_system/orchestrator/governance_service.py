@@ -5,7 +5,7 @@ Provides gRPC interface for system health, tool metrics, agent status,
 and memory layer introspection (L7).
 
 Per JEEVES_CORE_CONSTITUTION.md Amendment X (Agent Boundaries):
-- Reports on the 7-agent pipeline status
+- Reports on agent pipeline status (agents discovered via registry)
 - Single responsibility per agent; prompts externalized
 
 Per MEMORY_INFRASTRUCTURE_CONTRACT.md:

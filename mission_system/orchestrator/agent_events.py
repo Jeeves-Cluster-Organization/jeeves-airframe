@@ -1,13 +1,13 @@
 """
 Agent event streaming for real-time frontend updates.
 
-Provides an async queue-based mechanism to stream events from the
-CodeAnalysisFlowService to the gRPC servicer, enabling real-time
+Provides an async queue-based mechanism to stream events from
+capability orchestrators to the gRPC servicer, enabling real-time
 visibility into agent activity.
 
-Each agent (perception, intent, planner, traverser, synthesizer,
-critic, integration) emits start and complete events that are
-broadcast to the frontend via WebSocket.
+Agent names and pipeline structure are capability-owned — this module
+provides only generic event types. Events are dynamically qualified as
+``agent.{name}.started`` / ``agent.{name}.completed`` at serialization time.
 """
 
 from __future__ import annotations
@@ -23,33 +23,23 @@ from jeeves_infra.protocols import RequestContext
 
 
 class AgentEventType(Enum):
-    """Types of agent events for frontend display."""
+    """Generic event types — no agent names hardcoded.
 
-    # Agent lifecycle events
-    AGENT_STARTED = "agent_started"
-    AGENT_COMPLETED = "agent_completed"
+    Capabilities define their own agent names; airframe only knows
+    about lifecycle categories.
+    """
 
-    # Specific agent events (for richer details)
-    # Standardized naming: agent.<component>.<action>
-    PERCEPTION_STARTED = "agent.perception.started"
-    PERCEPTION_COMPLETED = "agent.perception.completed"
-    INTENT_STARTED = "agent.intent.started"
-    INTENT_COMPLETED = "agent.intent.completed"
-    PLANNER_STARTED = "agent.planner.started"
-    PLANNER_COMPLETED = "agent.planner.completed"
-    TRAVERSER_STARTED = "agent.traverser.started"
-    TRAVERSER_COMPLETED = "agent.traverser.completed"
+    # Agent lifecycle (capability provides agent_name at emit time)
+    AGENT_STARTED = "agent.started"
+    AGENT_COMPLETED = "agent.completed"
+    AGENT_DECISION = "agent.decision"
+
+    # Tool execution
     TOOL_STARTED = "tool.started"
     TOOL_COMPLETED = "tool.completed"
-    SYNTHESIZER_STARTED = "agent.synthesizer.started"
-    SYNTHESIZER_COMPLETED = "agent.synthesizer.completed"
-    CRITIC_STARTED = "agent.critic.started"
-    CRITIC_DECISION = "agent.critic.decision"
-    INTEGRATION_STARTED = "agent.integration.started"
-    INTEGRATION_COMPLETED = "agent.integration.completed"
-    STAGE_TRANSITION = "orchestrator.stage_transition"
 
-    # Flow events
+    # Orchestrator-level events
+    STAGE_TRANSITION = "orchestrator.stage_transition"
     FLOW_STARTED = "orchestrator.started"
     FLOW_COMPLETED = "orchestrator.completed"
     FLOW_ERROR = "orchestrator.error"
@@ -57,11 +47,10 @@ class AgentEventType(Enum):
 
 @dataclass
 class AgentEvent:
-    """
-    An event emitted by an agent during processing.
+    """An event emitted by an agent during processing.
 
     These events are streamed to the frontend for real-time visibility
-    into the 7-agent pipeline activity.
+    into capability pipeline activity.
     """
 
     event_type: AgentEventType
@@ -83,12 +72,19 @@ class AgentEvent:
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization.
 
-        Key names match what gateway/routers/chat.py expects:
-        - event_type: The event type string (e.g., "perception.started")
-        - agent_name: The agent that emitted the event
+        Emits a qualified event_type: ``agent.{agent_name}.started``
+        so consumers can filter by agent without airframe knowing names.
         """
+        # Build qualified event string: "agent.planner.started" etc.
+        base = self.event_type.value  # e.g. "agent.started"
+        parts = base.split(".")
+        if parts[0] == "agent" and self.agent_name:
+            qualified = f"agent.{self.agent_name}.{parts[-1]}"
+        else:
+            qualified = base
+
         return {
-            "event_type": self.event_type.value,
+            "event_type": qualified,
             "agent_name": self.agent_name,
             "session_id": self.session_id,
             "request_id": self.request_id,
@@ -103,20 +99,18 @@ class AgentEvent:
 
 
 class EventEmitter:
-    """
-    Async queue-based event emitter for agent activity.
+    """Async queue-based event emitter for agent activity.
 
-    Used by the CodeAnalysisFlowService to emit events during processing,
-    which are then consumed by the gRPC servicer and broadcast to WebSocket
-    clients.
+    Capability orchestrators use this to emit events during processing,
+    which are consumed by the gRPC servicer and broadcast to WebSocket clients.
 
     Example:
         emitter = EventEmitter()
 
-        # In service/nodes:
+        # In capability nodes:
         await emitter.emit_agent_started("planner", request_context)
         # ... do work ...
-        await emitter.emit_agent_completed("planner", request_context, payload)
+        await emitter.emit_agent_completed("planner", request_context, result=data)
 
         # In servicer:
         async for event in emitter.events():
@@ -124,25 +118,13 @@ class EventEmitter:
     """
 
     def __init__(self, maxsize: int = 100):
-        """
-        Initialize the event emitter.
-
-        Args:
-            maxsize: Maximum queue size (prevents memory bloat)
-        """
         self._queue: asyncio.Queue[Optional[AgentEvent]] = asyncio.Queue(maxsize=maxsize)
         self._closed = False
 
     async def emit(self, event: AgentEvent) -> None:
-        """
-        Emit an event to the queue.
-
-        Args:
-            event: The event to emit
-        """
+        """Emit an event to the queue."""
         if not self._closed:
             await self._queue.put(event)
-            # Diagnostic: log queue state after emit
             from mission_system.adapters import get_logger
             logger = get_logger()
             logger.debug(
@@ -158,30 +140,15 @@ class EventEmitter:
         request_context: RequestContext,
         **payload,
     ) -> None:
-        """
-        Emit an agent started event.
+        """Emit an agent started event.
 
         Args:
-            agent_name: Name of the agent (e.g., "planner", "critic")
-            session_id: Current session ID
-            request_id: Current request ID
+            agent_name: Capability-defined agent name (e.g., "planner", "critic")
+            request_context: Current request context
             **payload: Additional payload data
         """
-        # Map agent name to specific event type
-        event_type_map = {
-            "perception": AgentEventType.PERCEPTION_STARTED,
-            "intent": AgentEventType.INTENT_STARTED,
-            "planner": AgentEventType.PLANNER_STARTED,
-            "executor": AgentEventType.TRAVERSER_STARTED,  # executor is the new name for traverser
-            "traverser": AgentEventType.TRAVERSER_STARTED,
-            "synthesizer": AgentEventType.SYNTHESIZER_STARTED,
-            "critic": AgentEventType.CRITIC_STARTED,
-            "integration": AgentEventType.INTEGRATION_STARTED,
-        }
-        event_type = event_type_map.get(agent_name.lower(), AgentEventType.AGENT_STARTED)
-
         event = AgentEvent(
-            event_type=event_type,
+            event_type=AgentEventType.AGENT_STARTED,
             agent_name=agent_name,
             request_context=request_context,
             session_id=request_context.session_id or "",
@@ -196,30 +163,15 @@ class EventEmitter:
         request_context: RequestContext,
         **payload,
     ) -> None:
-        """
-        Emit an agent completed event.
+        """Emit an agent completed event.
 
         Args:
-            agent_name: Name of the agent
-            session_id: Current session ID
-            request_id: Current request ID
+            agent_name: Capability-defined agent name
+            request_context: Current request context
             **payload: Additional payload data (results, stats, etc.)
         """
-        # Map agent name to specific event type
-        event_type_map = {
-            "perception": AgentEventType.PERCEPTION_COMPLETED,
-            "intent": AgentEventType.INTENT_COMPLETED,
-            "planner": AgentEventType.PLANNER_COMPLETED,
-            "executor": AgentEventType.TRAVERSER_COMPLETED,  # executor is the new name for traverser
-            "traverser": AgentEventType.TRAVERSER_COMPLETED,
-            "synthesizer": AgentEventType.SYNTHESIZER_COMPLETED,
-            "critic": AgentEventType.CRITIC_DECISION,
-            "integration": AgentEventType.INTEGRATION_COMPLETED,
-        }
-        event_type = event_type_map.get(agent_name.lower(), AgentEventType.AGENT_COMPLETED)
-
         event = AgentEvent(
-            event_type=event_type,
+            event_type=AgentEventType.AGENT_COMPLETED,
             agent_name=agent_name,
             request_context=request_context,
             session_id=request_context.session_id or "",
@@ -228,16 +180,51 @@ class EventEmitter:
         )
         await self.emit(event)
 
+    async def emit_agent_decision(
+        self,
+        agent_name: str,
+        request_context: RequestContext,
+        action: str,
+        confidence: float = 1.0,
+        **payload,
+    ) -> None:
+        """Emit an agent decision event (e.g., critic verdict).
+
+        Args:
+            agent_name: The deciding agent (capability-defined)
+            request_context: Current request context
+            action: Decision action (capability-defined, e.g., "approved", "loop_back")
+            confidence: Decision confidence (0.0-1.0)
+            **payload: Additional payload (issue, feedback, etc.)
+        """
+        event = AgentEvent(
+            event_type=AgentEventType.AGENT_DECISION,
+            agent_name=agent_name,
+            request_context=request_context,
+            session_id=request_context.session_id or "",
+            request_id=request_context.request_id,
+            payload={"action": action, "confidence": confidence, **payload},
+        )
+        await self.emit(event)
+
     async def emit_tool_started(
         self,
         tool_name: str,
         request_context: RequestContext,
+        agent_name: str,
         **payload,
     ) -> None:
-        """Emit a tool execution started event."""
+        """Emit a tool execution started event.
+
+        Args:
+            tool_name: Name of the tool being executed
+            request_context: Current request context
+            agent_name: Agent executing the tool (capability-defined)
+            **payload: Additional payload data
+        """
         event = AgentEvent(
             event_type=AgentEventType.TOOL_STARTED,
-            agent_name="traverser",
+            agent_name=agent_name,
             request_context=request_context,
             session_id=request_context.session_id or "",
             request_id=request_context.request_id,
@@ -249,13 +236,22 @@ class EventEmitter:
         self,
         tool_name: str,
         request_context: RequestContext,
+        agent_name: str,
         status: str = "success",
         **payload,
     ) -> None:
-        """Emit a tool execution completed event."""
+        """Emit a tool execution completed event.
+
+        Args:
+            tool_name: Name of the tool that completed
+            request_context: Current request context
+            agent_name: Agent that executed the tool (capability-defined)
+            status: Execution status
+            **payload: Additional payload data
+        """
         event = AgentEvent(
             event_type=AgentEventType.TOOL_COMPLETED,
-            agent_name="traverser",
+            agent_name=agent_name,
             request_context=request_context,
             session_id=request_context.session_id or "",
             request_id=request_context.request_id,
@@ -288,38 +284,20 @@ class EventEmitter:
         await self.emit(event)
 
     async def close(self) -> None:
-        """
-        Close the emitter, signaling no more events will be sent.
-
-        This puts a None sentinel in the queue to signal the consumer
-        that event streaming is complete.
-        """
+        """Close the emitter, signaling no more events will be sent."""
         self._closed = True
         await self._queue.put(None)
 
     async def events(self) -> AsyncIterator[AgentEvent]:
-        """
-        Iterate over emitted events.
-
-        Yields events until close() is called and the sentinel is received.
-
-        Yields:
-            AgentEvent instances as they are emitted
-        """
+        """Iterate over emitted events until close() is called."""
         while True:
             event = await self._queue.get()
             if event is None:
-                # Sentinel received, stop iterating
                 break
             yield event
 
     def get_nowait(self) -> Optional[AgentEvent]:
-        """
-        Get an event without waiting.
-
-        Returns:
-            AgentEvent if available, None if queue is empty
-        """
+        """Get an event without waiting, or None if queue is empty."""
         try:
             return self._queue.get_nowait()
         except asyncio.QueueEmpty:
