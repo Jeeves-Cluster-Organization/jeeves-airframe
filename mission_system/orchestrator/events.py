@@ -24,7 +24,7 @@ Usage:
             session_id="sess_123",
             user_id="user_789",
         ),
-        event_repository=repo,
+        persistence=db,
     )
 
     # Emit agent lifecycle events (real-time + audit)
@@ -35,8 +35,8 @@ Usage:
     await orchestrator.emit_tool_started("grep_search", params={"query": "test"})
     await orchestrator.emit_tool_completed("grep_search", status="success")
 
-    # Emit domain events (audit only)
-    await orchestrator.emit_plan_created(plan_id="p123", intent="find code", ...)
+    # Emit retry events (audit only)
+    await orchestrator.emit_retry_attempt(retry_type="validator", attempt_number=1, reason="...")
 """
 
 from __future__ import annotations
@@ -62,7 +62,6 @@ from jeeves_infra.protocols import RequestContext
 
 if TYPE_CHECKING:
     from jeeves_infra.protocols import LoggerProtocol
-    from mission_system.memory.repositories.event_repository import EventRepository
 
 
 @dataclass
@@ -85,13 +84,13 @@ class EventOrchestrator:
 
     Attributes:
         request_context: RequestContext for the request
-        event_repository: Optional repository for domain event persistence
+        persistence: Optional database client for domain event persistence (via registry)
         enable_streaming: Whether to enable real-time event streaming
         enable_persistence: Whether to persist domain events
     """
 
     request_context: RequestContext
-    event_repository: Optional["EventRepository"] = None
+    persistence: Optional[Any] = None
     enable_streaming: bool = True
     enable_persistence: bool = True
     correlation_id: Optional[str] = None
@@ -123,13 +122,12 @@ class EventOrchestrator:
         if self.enable_streaming:
             self._agent_emitter = create_agent_event_emitter()
 
-        # Create domain emitter if enabled and repository provided
-        if self.enable_persistence and self.event_repository:
-            from mission_system.memory.services.event_emitter import EventEmitter
-            self._domain_emitter = EventEmitter(
-                event_repository=self.event_repository,
-                logger=self._logger,
-            )
+        # Create domain emitter if enabled — uses capability registry
+        if self.enable_persistence and self.persistence:
+            from jeeves_infra.protocols import get_capability_resource_registry
+            factory = get_capability_resource_registry().get_memory_service_factory("event_emitter")
+            if factory:
+                self._domain_emitter = factory(self.persistence)
 
         # Create unified context
         self._context = create_event_context(
@@ -227,52 +225,6 @@ class EventOrchestrator:
         )
 
     # =========================================================================
-    # Delegated methods - Planner Events
-    # =========================================================================
-
-    async def emit_plan_created(
-        self,
-        plan_id: str,
-        intent: str,
-        confidence: float,
-        tools: List[str],
-        step_count: int,
-        clarification_needed: bool = False,
-    ) -> Optional[str]:
-        """Emit plan created event (domain event for audit)."""
-        self._ensure_initialized()
-        return await self._context.emit_plan_created(
-            plan_id=plan_id,
-            intent=intent,
-            confidence=confidence,
-            tools=tools,
-            step_count=step_count,
-            clarification_needed=clarification_needed,
-        )
-
-    # =========================================================================
-    # Delegated methods - Agent Decision Events
-    # =========================================================================
-
-    async def emit_agent_decision(
-        self,
-        agent_name: str,
-        action: str,
-        confidence: float,
-        issue: Optional[str] = None,
-        feedback: Optional[str] = None,
-    ) -> Optional[str]:
-        """Emit agent decision event (domain event for audit)."""
-        self._ensure_initialized()
-        return await self._context.emit_agent_decision(
-            agent_name=agent_name,
-            action=action,
-            confidence=confidence,
-            issue=issue,
-            feedback=feedback,
-        )
-
-    # =========================================================================
     # Delegated methods - Flow Events
     # =========================================================================
 
@@ -332,24 +284,6 @@ class EventOrchestrator:
         )
 
     # =========================================================================
-    # Delegated methods - Response Events
-    # =========================================================================
-
-    async def emit_response_drafted(
-        self,
-        response_id: str,
-        response_preview: str,
-        validation_status: str = "pending",
-    ) -> Optional[str]:
-        """Emit response drafted event (domain event for audit)."""
-        self._ensure_initialized()
-        return await self._context.emit_response_drafted(
-            response_id=response_id,
-            response_preview=response_preview,
-            validation_status=validation_status,
-        )
-
-    # =========================================================================
     # Delegated methods - Reasoning Events
     # =========================================================================
 
@@ -370,41 +304,6 @@ class EventOrchestrator:
             confidence=confidence,
             metadata=metadata,
         )
-
-    # =========================================================================
-    # Direct Domain Event Methods (for events without real-time component)
-    # =========================================================================
-
-    async def emit_task_created(
-        self,
-        task_id: str,
-        title: str,
-        description: Optional[str] = None,
-        priority: Optional[int] = None,
-    ) -> Optional[str]:
-        """Emit task_created domain event."""
-        self._ensure_initialized()
-        if self._domain_emitter:
-            return await self._domain_emitter.emit_task_created(
-                task_id=task_id,
-                user_id=self.request_context.user_id or "",
-                title=title,
-                description=description,
-                priority=priority,
-                session_id=self.request_context.session_id or "",
-            )
-        return None
-
-    async def emit_task_completed(self, task_id: str) -> Optional[str]:
-        """Emit task_completed domain event."""
-        self._ensure_initialized()
-        if self._domain_emitter:
-            return await self._domain_emitter.emit_task_completed(
-                task_id=task_id,
-                user_id=self.request_context.user_id or "",
-                session_id=self.request_context.session_id or "",
-            )
-        return None
 
     # =========================================================================
     # Streaming Access
@@ -461,7 +360,7 @@ class EventOrchestrator:
 
 def create_event_orchestrator(
     request_context: RequestContext,
-    event_repository: Optional["EventRepository"] = None,
+    persistence: Optional[Any] = None,
     enable_streaming: bool = True,
     enable_persistence: bool = True,
     correlation_id: Optional[str] = None,
@@ -474,7 +373,7 @@ def create_event_orchestrator(
 
     Args:
         request_context: RequestContext for the request
-        event_repository: Optional repository for domain event persistence
+        persistence: Optional database client for domain event persistence (via registry)
         enable_streaming: Whether to enable real-time event streaming
         enable_persistence: Whether to persist domain events
         correlation_id: Optional correlation ID for domain events
@@ -484,7 +383,7 @@ def create_event_orchestrator(
     """
     return EventOrchestrator(
         request_context=request_context,
-        event_repository=event_repository,
+        persistence=persistence,
         enable_streaming=enable_streaming,
         enable_persistence=enable_persistence,
         correlation_id=correlation_id,

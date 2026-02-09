@@ -37,7 +37,7 @@ from mission_system.config.constants import (
 )
 
 from mission_system.config.agent_profiles import (
-    LLMProfile,
+    AgentLLMConfig,
     ThresholdProfile,
     AgentProfile,
     get_agent_profile,
@@ -80,7 +80,7 @@ __all__ = [
     # Response Limits
     "VALIDATOR_RESPONSE_WORD_LIMIT",
     # Agent Profile Types (generic)
-    "LLMProfile",
+    "AgentLLMConfig",
     "ThresholdProfile",
     "AgentProfile",
     "get_agent_profile",

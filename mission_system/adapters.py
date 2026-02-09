@@ -273,24 +273,26 @@ def create_event_emitter(persistence: PersistenceProtocol) -> Any:
     """
     Create L2 event emitter for domain events.
 
+    Delegates to capability-registered factory via CapabilityResourceRegistry.
+
     Args:
         persistence: Database client
 
     Returns:
         EventEmitter instance
     """
-    from mission_system.memory.repositories.event_repository import EventRepository
-    from mission_system.memory.services.event_emitter import EventEmitter
-    event_repository = EventRepository(persistence)
-    return EventEmitter(event_repository)
+    from jeeves_infra.protocols import get_capability_resource_registry
+    factory = get_capability_resource_registry().get_memory_service_factory("event_emitter")
+    if factory:
+        return factory(persistence)
+    raise RuntimeError("No event_emitter registered by any capability")
 
 
 def create_graph_storage(persistence: PersistenceProtocol) -> Any:
     """
     Create graph storage for entity relationships.
 
-    Returns InMemoryGraphStorage as default. Capabilities may register
-    their own graph storage backends (e.g. graph storage adapter).
+    Delegates to capability-registered factory via CapabilityResourceRegistry.
 
     Args:
         persistence: Database client
@@ -298,8 +300,11 @@ def create_graph_storage(persistence: PersistenceProtocol) -> Any:
     Returns:
         GraphStorageProtocol implementation
     """
-    from mission_system.memory.repositories.graph_stub import InMemoryGraphStorage
-    return InMemoryGraphStorage()
+    from jeeves_infra.protocols import get_capability_resource_registry
+    factory = get_capability_resource_registry().get_memory_service_factory("graph_storage")
+    if factory:
+        return factory(persistence)
+    raise RuntimeError("No graph_storage registered by any capability")
 
 
 def create_tool_health_service(persistence: PersistenceProtocol) -> Any:

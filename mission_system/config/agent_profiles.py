@@ -15,18 +15,7 @@ IMPORTANT: AGENT_PROFILES has been moved to capability layer.
 from dataclasses import dataclass, field
 from typing import Dict, Optional
 
-
-@dataclass
-class LLMProfile:
-    """LLM configuration for an agent role.
-
-    Generic type - capabilities define specific values.
-    """
-    model_name: str  # Required — capability must specify
-    temperature: float = 0.3
-    max_tokens: int = 2000
-    context_window: int = 16384
-    timeout_seconds: int = 120
+from jeeves_infra.protocols import AgentLLMConfig
 
 
 @dataclass
@@ -52,12 +41,12 @@ class AgentProfile:
     Example:
         profile = AgentProfile(
             role="planner",
-            llm=LLMProfile(temperature=0.3),
+            llm=AgentLLMConfig(agent_name="planner", model="default", temperature=0.3),
             thresholds=ThresholdProfile(clarification_threshold=0.7),
         )
     """
     role: str
-    llm: Optional[LLMProfile] = None
+    llm: Optional[AgentLLMConfig] = None
     thresholds: ThresholdProfile = field(default_factory=ThresholdProfile)
     latency_budget_ms: int = 30000
     retry_limit: int = 2
@@ -90,7 +79,7 @@ def get_agent_profile(
 def get_llm_profile(
     profiles: Dict[str, AgentProfile],
     role: str
-) -> Optional[LLMProfile]:
+) -> Optional[AgentLLMConfig]:
     """Get LLM config for agent role from a profiles dict.
 
     Args:
@@ -98,7 +87,7 @@ def get_llm_profile(
         role: Agent role name
 
     Returns:
-        LLMProfile or None if agent has no LLM
+        AgentLLMConfig or None if agent has no LLM
     """
     profile = profiles.get(role)
     return profile.llm if profile else None
@@ -139,7 +128,7 @@ def get_latency_budget(
 
 
 __all__ = [
-    "LLMProfile",
+    "AgentLLMConfig",
     "ThresholdProfile",
     "AgentProfile",
     "get_agent_profile",

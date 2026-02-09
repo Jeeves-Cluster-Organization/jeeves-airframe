@@ -29,7 +29,7 @@ async def session_service(test_db):
 
     Provides L4 working memory functionality for tests.
     """
-    from mission_system.memory.services.session_state_service import SessionStateService
+    from jeeves_capability_hello_world.memory.services.session_state_service import SessionStateService
 
     service = SessionStateService(test_db)
     await service.ensure_initialized()

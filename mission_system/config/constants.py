@@ -5,7 +5,7 @@ Centralizes operational constants. Product identity is capability-specific
 and should be queried from CapabilityResourceRegistry (Avionics R4).
 
 NOTE: LLM parameters and agent thresholds have been moved to:
-- mission_system/config/agent_profiles.py (AgentProfile, LLMProfile, ThresholdProfile)
+- mission_system/config/agent_profiles.py (AgentProfile, AgentLLMConfig, ThresholdProfile)
 - avionics/thresholds.py (operational thresholds)
 """
 

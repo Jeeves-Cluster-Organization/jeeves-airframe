@@ -158,67 +158,6 @@ class TestEventContextDomainEvents:
     """Tests for domain event emission."""
 
     @pytest.mark.asyncio
-    async def test_emit_plan_created_with_domain_emitter(self):
-        """Test emitting plan_created domain event."""
-        mock_domain_emitter = AsyncMock()
-        mock_domain_emitter.emit_plan_created.return_value = "event_123"
-
-        context = EventContext(
-            request_context=_ctx(),
-            domain_event_emitter=mock_domain_emitter,
-        )
-
-        event_id = await context.emit_plan_created(
-            plan_id="plan_abc",
-            intent="understand_architecture",
-            confidence=0.85,
-            tools=["tree_structure", "read_file"],
-            step_count=2,
-            clarification_needed=False,
-        )
-
-        assert event_id == "event_123"
-        mock_domain_emitter.emit_plan_created.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_emit_plan_created_without_domain_emitter(self):
-        """Test emitting plan_created when no domain emitter (returns None)."""
-        context = EventContext(
-            request_context=_ctx(),
-        )
-
-        event_id = await context.emit_plan_created(
-            plan_id="plan_abc",
-            intent="understand_architecture",
-            confidence=0.85,
-            tools=["tree_structure"],
-            step_count=1,
-        )
-
-        assert event_id is None
-
-    @pytest.mark.asyncio
-    async def test_emit_critic_decision(self):
-        """Test emitting critic_decision domain event."""
-        mock_domain_emitter = AsyncMock()
-        mock_domain_emitter.emit_critic_decision.return_value = "event_456"
-
-        context = EventContext(
-            request_context=_ctx(),
-            domain_event_emitter=mock_domain_emitter,
-        )
-
-        event_id = await context.emit_critic_decision(
-            action="approved",
-            confidence=0.9,
-            issue=None,
-            feedback=None,
-        )
-
-        assert event_id == "event_456"
-        mock_domain_emitter.emit_critic_decision.assert_called_once()
-
-    @pytest.mark.asyncio
     async def test_emit_tool_completed_with_both_emitters(self):
         """Test emit_tool_completed emits to both agent and domain emitters."""
         mock_agent_emitter = AsyncMock()

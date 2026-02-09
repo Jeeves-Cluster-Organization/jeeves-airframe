@@ -95,7 +95,7 @@ from mission_system.config.registry import (
 # Agent profiles (generic types - capability-specific profiles in capability layer)
 # See: jeeves-capability-code-analyser/config/llm_config.py
 from mission_system.config.agent_profiles import (
-    LLMProfile,
+    AgentLLMConfig,
     ThresholdProfile,
     AgentProfile,
     get_agent_profile,
@@ -174,7 +174,7 @@ __all__ = [
 
     # ─── Agent Profiles (generic types) ───
     # Capability-specific profiles in: jeeves-capability-code-analyser/config/llm_config.py
-    "LLMProfile",
+    "AgentLLMConfig",
     "ThresholdProfile",
     "AgentProfile",
     "get_agent_profile",

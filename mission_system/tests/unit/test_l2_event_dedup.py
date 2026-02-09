@@ -12,8 +12,8 @@ Constitutional Import Boundary Note:
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-# Mission system tests avionics functionality - direct import acceptable
-from mission_system.memory.services.event_emitter import (
+# EventEmitter is now capability-owned
+from jeeves_capability_hello_world.memory.services.event_emitter import (
     EventEmitter,
     SessionDedupCache,
     get_global_dedup_cache,
@@ -326,30 +326,6 @@ class TestEventEmitterDeduplication:
         assert result == "event-123"
         mock_repository.append.assert_called_once()
 
-    @pytest.mark.asyncio
-    async def test_task_created_factory_with_session(self, emitter, mock_repository):
-        """Test task_created factory method with session_id."""
-        result = await emitter.emit_task_created(
-            task_id="task-1",
-            user_id="user-1",
-            title="Test task",
-            session_id="session-1"
-        )
-
-        assert result == "event-123"
-        mock_repository.append.assert_called_once()
-
-        # Second call - should be deduplicated
-        mock_repository.append.reset_mock()
-        result2 = await emitter.emit_task_created(
-            task_id="task-1",
-            user_id="user-1",
-            title="Test task",
-            session_id="session-1"
-        )
-
-        assert result2 is None
-        mock_repository.append.assert_not_called()
 
 
 class TestGlobalDedupCache:

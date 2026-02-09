@@ -29,12 +29,12 @@ def test_memory_imports():
     except ImportError as e:
         print(f"[WARN] from mission_system.memory.handlers - dependency missing (OK): {e}")
 
-    # Test 3: Import memory services
+    # Test 3: Import capability-owned memory services
     try:
-        from mission_system.memory.services.session_state_service import SessionStateService
-        print("✓ from mission_system.memory.services.session_state_service import SessionStateService")
+        from jeeves_capability_hello_world.memory.services.session_state_service import SessionStateService
+        print("✓ from jeeves_capability_hello_world.memory.services.session_state_service import SessionStateService")
     except ModuleNotFoundError as e:
-        print(f"✗ from mission_system.memory.services.session_state_service")
+        print(f"✗ from jeeves_capability_hello_world.memory.services.session_state_service")
         print(f"  Error: {e}")
         raise
     except ImportError as e:

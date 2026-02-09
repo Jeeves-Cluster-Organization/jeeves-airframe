@@ -38,7 +38,9 @@ from mission_system.adapters import get_logger
 
 if TYPE_CHECKING:
     from mission_system.orchestrator.agent_events import AgentEventEmitter
-    from mission_system.memory.services.event_emitter import EventEmitter as DomainEventEmitter
+
+# Domain event emitter is now capability-owned; use Any for decoupling
+DomainEventEmitter = Any
 
 
 @dataclass
@@ -148,127 +150,6 @@ class EventContext:
             error=error,
             **payload,
         )
-
-    # ========================================================================
-    # Planner Events
-    # ========================================================================
-
-    async def emit_plan_created(
-        self,
-        plan_id: str,
-        intent: str,
-        confidence: float,
-        tools: List[str],
-        step_count: int,
-        clarification_needed: bool = False,
-    ) -> Optional[str]:
-        """
-        Emit plan created event (domain event for audit).
-
-        This is emitted by the Planner agent after generating a plan.
-
-        Args:
-            plan_id: Generated plan identifier
-            intent: Intent being planned for
-            confidence: Plan confidence/feasibility score (0.0-1.0)
-            tools: List of tool names in the plan
-            step_count: Number of steps in the plan
-            clarification_needed: Whether clarification is needed
-
-        Returns:
-            Event ID if domain event emitted, None otherwise
-        """
-        event_id = None
-
-        if self.domain_event_emitter:
-            event_id = await self.domain_event_emitter.emit_plan_created(
-                plan_id=plan_id,
-                request_id=self.request_context.request_id,
-                user_id=self.request_context.user_id or "",
-                intent=intent,
-                confidence=confidence,
-                tool_count=step_count,
-                tools=tools,
-                clarification_needed=clarification_needed,
-                actor="planner",
-                correlation_id=self.correlation_id,
-                session_id=self.request_context.session_id or "",
-            )
-
-        self._logger.info(
-            "plan_created",
-            plan_id=plan_id,
-            intent=intent,
-            confidence=confidence,
-            step_count=step_count,
-            tools=tools[:5],  # Limit for logging
-        )
-
-        return event_id
-
-    # ========================================================================
-    # Agent Decision Events
-    # ========================================================================
-
-    async def emit_agent_decision(
-        self,
-        agent_name: str,
-        action: str,
-        confidence: float,
-        issue: Optional[str] = None,
-        feedback: Optional[str] = None,
-    ) -> Optional[str]:
-        """
-        Emit agent decision event (domain event for audit).
-
-        Generic decision event — any capability-defined agent can emit decisions.
-
-        Args:
-            agent_name: The deciding agent (capability-defined)
-            action: Decision action (capability-defined, e.g., "approved", "loop_back")
-            confidence: Decision confidence (0.0-1.0)
-            issue: Issue description if not approved
-            feedback: Refinement hint for loop_back verdict
-
-        Returns:
-            Event ID if domain event emitted, None otherwise
-        """
-        event_id = None
-
-        # Emit real-time decision event
-        if self.agent_event_emitter:
-            await self.agent_event_emitter.emit_agent_decision(
-                agent_name=agent_name,
-                request_context=self.request_context,
-                action=action,
-                confidence=confidence,
-                issue=issue,
-                feedback=feedback,
-            )
-
-        # Emit domain event for audit (uses critic_decision for backward compat with domain event schema)
-        if self.domain_event_emitter:
-            event_id = await self.domain_event_emitter.emit_critic_decision(
-                request_id=self.request_context.request_id,
-                user_id=self.request_context.user_id or "",
-                action=action,
-                confidence=confidence,
-                issue=issue,
-                feedback=feedback,
-                actor=agent_name,
-                correlation_id=self.correlation_id,
-                session_id=self.request_context.session_id or "",
-            )
-
-        self._logger.info(
-            "agent_decision",
-            agent_name=agent_name,
-            action=action,
-            confidence=confidence,
-            issue=issue,
-        )
-
-        return event_id
 
     # ========================================================================
     # Tool Execution Events
@@ -456,43 +337,6 @@ class EventContext:
             attempt_number=attempt_number,
             reason=reason,
         )
-
-        return event_id
-
-    # ========================================================================
-    # Response Events
-    # ========================================================================
-
-    async def emit_response_drafted(
-        self,
-        response_id: str,
-        response_preview: str,
-        validation_status: str = "pending",
-    ) -> Optional[str]:
-        """
-        Emit response drafted event (domain event for audit).
-
-        Args:
-            response_id: Response identifier
-            response_preview: Preview of the response (first 200 chars)
-            validation_status: Validation status
-
-        Returns:
-            Event ID if domain event emitted, None otherwise
-        """
-        event_id = None
-
-        if self.domain_event_emitter:
-            event_id = await self.domain_event_emitter.emit_response_drafted(
-                response_id=response_id,
-                request_id=self.request_context.request_id,
-                user_id=self.request_context.user_id or "",
-                response_preview=response_preview,
-                validation_status=validation_status,
-                actor="integration",
-                correlation_id=self.correlation_id,
-                session_id=self.request_context.session_id or "",
-            )
 
         return event_id
 

@@ -9,12 +9,11 @@ from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from jeeves_infra.protocols import DatabaseClientProtocol, LoggerProtocol
-    from mission_system.memory.services.session_state_service import SessionStateService
 
 
 def register_memory_handlers(
     commbus: Any,
-    session_state_service: Optional["SessionStateService"] = None,
+    session_state_service: Optional[Any] = None,
     db: Optional["DatabaseClientProtocol"] = None,
     logger: Optional["LoggerProtocol"] = None,
 ) -> None:
@@ -165,15 +164,15 @@ def register_memory_handlers(
 
 
 # Cache for lazy-initialized service
-_cached_session_service: Optional["SessionStateService"] = None
+_cached_session_service: Optional[Any] = None
 
 
 def _get_session_service(
-    provided: Optional["SessionStateService"],
+    provided: Optional[Any],
     db: Optional["DatabaseClientProtocol"],
     logger: Optional["LoggerProtocol"],
-) -> Optional["SessionStateService"]:
-    """Get or create SessionStateService."""
+) -> Optional[Any]:
+    """Get or create SessionStateService via capability registry."""
     global _cached_session_service
 
     if provided is not None:
@@ -183,9 +182,11 @@ def _get_session_service(
         return _cached_session_service
 
     if db is not None:
-        from mission_system.memory.services.session_state_service import SessionStateService
-        _cached_session_service = SessionStateService(db=db, logger=logger)
-        return _cached_session_service
+        from jeeves_infra.protocols import get_capability_resource_registry
+        factory = get_capability_resource_registry().get_memory_service_factory("session_state_service")
+        if factory:
+            _cached_session_service = factory(db)
+            return _cached_session_service
 
     return None
 
