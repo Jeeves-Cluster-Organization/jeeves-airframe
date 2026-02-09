@@ -18,31 +18,27 @@ def test_memory_imports():
         print(f"✗ import mission_system.memory - {e}")
         raise
 
-    # Test 2: Import from mission_system.memory (moved from memory_module.adapters)
+    # Test 2: Import memory handlers
     try:
-        from mission_system.memory.sql_adapter import SQLAdapter
-        print("✓ from mission_system.memory.sql_adapter import SQLAdapter")
+        from mission_system.memory.handlers import register_memory_handlers
+        print("✓ from mission_system.memory.handlers import register_memory_handlers")
     except ModuleNotFoundError as e:
-        print(f"✗ from mission_system.memory.sql_adapter import SQLAdapter")
+        print(f"✗ from mission_system.memory.handlers import register_memory_handlers")
         print(f"  Error: {e}")
         raise
     except ImportError as e:
-        # This is OK - dependency missing
-        print(f"[WARN] from mission_system.memory.sql_adapter import SQLAdapter")
-        print(f"  Dependency missing (OK): {e}")
+        print(f"[WARN] from mission_system.memory.handlers - dependency missing (OK): {e}")
 
-    # Test 4: Import memory.manager
+    # Test 3: Import memory services
     try:
-        from mission_system.memory.manager import MemoryManager
-        print("✓ from mission_system.memory.manager import MemoryManager")
+        from mission_system.memory.services.session_state_service import SessionStateService
+        print("✓ from mission_system.memory.services.session_state_service import SessionStateService")
     except ModuleNotFoundError as e:
-        print(f"✗ from mission_system.memory.manager import MemoryManager")
+        print(f"✗ from mission_system.memory.services.session_state_service")
         print(f"  Error: {e}")
         raise
     except ImportError as e:
-        # This is OK - dependency missing
-        print(f"[WARN] from mission_system.memory.manager import MemoryManager")
-        print(f"  Dependency missing (OK): {e}")
+        print(f"[WARN] session_state_service - dependency missing (OK): {e}")
 
     print("\n[OK] All import paths are correct!")
     print("(Some modules may fail to fully import due to missing dependencies,")

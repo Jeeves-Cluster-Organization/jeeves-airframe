@@ -274,7 +274,7 @@ class CapabilityToolsConfig:
 @dataclass
 class CapabilityOrchestratorConfig:
     """Configuration for orchestrator service registered by a capability."""
-    factory: Callable[..., Any]  # Function: (llm_factory, tool_executor, logger, persistence, control_tower) -> service
+    factory: Callable[..., Any]  # Function: (llm_factory, tool_executor, logger, persistence, kernel_client) -> service
     result_type: Optional[type] = None  # The result type class (e.g., CapabilityResult)
 
 

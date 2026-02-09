@@ -21,7 +21,7 @@ Usage:
             extensions = config.code_extensions
 
 Standard Keys:
-    - "language_config": Language configuration for code analysis capability
+    - "language_config": Language configuration for capability
     - Future: "agent_config", "tool_access_config", etc.
 """
 

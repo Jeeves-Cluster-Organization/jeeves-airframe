@@ -1180,11 +1180,11 @@ class EventEmitter:
         status: str,
         execution_time_ms: Optional[int] = None,
         error: Optional[str] = None,
-        actor: str = "traverser",
+        actor: str,
         correlation_id: Optional[str] = None,
         session_id: Optional[str] = None
     ) -> Optional[str]:
-        """Emit tool_executed event when Traverser runs a tool."""
+        """Emit tool_executed event."""
         return await self.emit(
             aggregate_type="workflow",
             aggregate_id=request_id,

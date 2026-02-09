@@ -39,29 +39,13 @@ router = APIRouter()
 # =============================================================================
 
 # Event type → category mapping (Configuration Over Code - Avionics R2)
-# Standardized naming convention: <component>.<subcomponent>.<action>
+# Uses prefix-based matching: agent.{name}.started → AGENT_LIFECYCLE
+# No hardcoded agent names — capabilities define their own agents.
 EVENT_CATEGORY_MAP: Dict[str, "EventCategory"] = {
-    # Generic agent lifecycle events
+    # Agent lifecycle events (generic — matches any agent.*.started/completed)
     "agent.started": "AGENT_LIFECYCLE",
     "agent.completed": "AGENT_LIFECYCLE",
-
-    # Specific agent lifecycle events (agent.<component>.<action>)
-    "agent.perception.started": "AGENT_LIFECYCLE",
-    "agent.perception.completed": "AGENT_LIFECYCLE",
-    "agent.intent.started": "AGENT_LIFECYCLE",
-    "agent.intent.completed": "AGENT_LIFECYCLE",
-    "agent.planner.started": "AGENT_LIFECYCLE",
-    "agent.planner.completed": "AGENT_LIFECYCLE",
-    "agent.traverser.started": "AGENT_LIFECYCLE",
-    "agent.traverser.completed": "AGENT_LIFECYCLE",
-    "agent.synthesizer.started": "AGENT_LIFECYCLE",
-    "agent.synthesizer.completed": "AGENT_LIFECYCLE",
-    "agent.integration.started": "AGENT_LIFECYCLE",
-    "agent.integration.completed": "AGENT_LIFECYCLE",
-
-    # Critic events
-    "agent.critic.started": "CRITIC_DECISION",
-    "agent.critic.decision": "CRITIC_DECISION",
+    "agent.decision": "AGENT_LIFECYCLE",
 
     # Tool events
     "tool.started": "TOOL_EXECUTION",
@@ -71,10 +55,12 @@ EVENT_CATEGORY_MAP: Dict[str, "EventCategory"] = {
     # Pipeline events
     "orchestrator.started": "PIPELINE_FLOW",
     "orchestrator.completed": "PIPELINE_FLOW",
+    "orchestrator.error": "PIPELINE_FLOW",
     "flow.started": "PIPELINE_FLOW",
     "flow.completed": "PIPELINE_FLOW",
 
     # Stage events
+    "orchestrator.stage_transition": "STAGE_TRANSITION",
     "stage.transition": "STAGE_TRANSITION",
     "stage.completed": "STAGE_TRANSITION",
 }
@@ -103,7 +89,7 @@ def _classify_event_category(event_type: str) -> "EventCategory":
         >>> _classify_event_category("agent.started")
         EventCategory.AGENT_LIFECYCLE
 
-        >>> _classify_event_category("perception.complete")  # legacy
+        >>> _classify_event_category("agent.planner.started")
         EventCategory.AGENT_LIFECYCLE  # via prefix match
     """
     from jeeves_infra.protocols.events import EventCategory
@@ -111,6 +97,18 @@ def _classify_event_category(event_type: str) -> "EventCategory":
     # Exact match lookup (O(1))
     if event_type in EVENT_CATEGORY_MAP:
         return getattr(EventCategory, EVENT_CATEGORY_MAP[event_type])
+
+    # Prefix-based matching for dynamic agent.{name}.{action} patterns
+    # e.g., "agent.planner.started" → matches "agent." prefix → AGENT_LIFECYCLE
+    prefix_map = {
+        "agent.": "AGENT_LIFECYCLE",
+        "tool.": "TOOL_EXECUTION",
+        "orchestrator.": "PIPELINE_FLOW",
+        "stage.": "STAGE_TRANSITION",
+    }
+    for prefix, category in prefix_map.items():
+        if event_type.startswith(prefix):
+            return getattr(EventCategory, category)
 
     # Default category for unknown event types
     return EventCategory.DOMAIN_EVENT
@@ -921,7 +919,7 @@ def _event_type_to_name(event_type: int, payload: dict = None) -> str:
     """
     Map gRPC event type enum to SSE event name.
 
-    If payload contains a specific 'event_type' field (e.g., "perception.started"),
+    If payload contains a specific 'event_type' field (e.g., "agent.planner.started"),
     use that for more granular event names. Otherwise, use the generic mapping.
     """
     if jeeves_pb2 is None:

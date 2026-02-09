@@ -19,28 +19,27 @@ from typing import Any, Callable, Dict, Optional
 from jeeves_infra.protocols import InterruptKind
 from jeeves_infra.protocols import LoggerProtocol
 
-# KernelEvent - simple dataclass for kernel events (control_tower deleted - Session 14)
 from dataclasses import dataclass
 from typing import Dict, Any as _Any
 
 @dataclass
 class KernelEvent:
-    """Kernel event (migrated from control_tower.types)."""
+    """Kernel event for pipeline orchestration."""
     event_type: str
     pid: str
     data: Dict[str, _Any]
 
 
 class EventBridge:
-    """Bridges Control Tower kernel events to Mission System event streams.
+    """Bridges kernel events to Mission System event streams.
 
-    This is the integration layer between:
-    - Control Tower's EventAggregator (kernel-level events)
+    Integration layer between:
+    - Kernel EventAggregator (kernel-level events)
     - Mission System's WebSocketEventManager (frontend streaming)
 
     Usage:
         bridge = EventBridge(
-            event_aggregator=control_tower.events,
+            event_aggregator=kernel_events,
             websocket_manager=event_manager,
             logger=logger,
         )

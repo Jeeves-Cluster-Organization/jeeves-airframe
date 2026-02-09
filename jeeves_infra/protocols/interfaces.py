@@ -502,7 +502,7 @@ class ConfigRegistryProtocol(Protocol):
 
 @runtime_checkable
 class LanguageConfigProtocol(Protocol):
-    """Language configuration for code analysis."""
+    """Language configuration for source file handling."""
 
     def get_extensions(self, language: str) -> List[str]: ...
     def get_comment_patterns(self, language: str) -> Dict[str, str]: ...

@@ -16,9 +16,9 @@ Capabilities register their orchestrators via CapabilityResourceRegistry.
 The FlowServicer delegates to registered capability servicers without
 hardcoded knowledge of specific capabilities.
 
-Unified Interrupt System (v4.0):
-- ConfirmationOrchestrator has been REMOVED
-- All interrupt handling now goes through control_tower.services.InterruptService
+Unified Interrupt System:
+- ConfirmationOrchestrator has been removed
+- Interrupt handling goes through InterruptService
 - EventOrchestrator remains for agent event emission
 """
 

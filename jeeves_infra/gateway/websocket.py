@@ -129,25 +129,19 @@ async def setup_websocket_subscriptions() -> None:
 
     Call this once at application startup (in main.py lifespan).
 
-    Subscribes to all pipeline event categories:
-    - agent.* (generic agent lifecycle)
-    - perception.*, intent.*, planner.*, executor.*, synthesizer.*, critic.*, integration.*
+    Subscribes to generic pipeline event categories:
+    - agent.* (all agent lifecycle events)
+    - tool.* (tool execution events)
     - orchestrator.* (flow-level events)
     """
     from jeeves_infra.gateway.event_bus import gateway_events
 
     _logger = get_current_logger()
 
-    # Subscribe to all agent-related events with Event handler
+    # Subscribe to generic event patterns — no hardcoded agent names
     patterns = [
         "agent.*",
-        "perception.*",
-        "intent.*",
-        "planner.*",
-        "executor.*",
-        "synthesizer.*",
-        "critic.*",
-        "integration.*",
+        "tool.*",
         "orchestrator.*",
     ]
 
