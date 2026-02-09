@@ -154,7 +154,30 @@ def wire_capabilities() -> None:
         pass
 
 
+def wire_infra_routers() -> None:
+    """Register infrastructure API routers (governance, etc.).
+
+    These are infrastructure concerns (P6 observability) not owned by any capability.
+    They use the same registry mechanism as capability routers.
+    """
+    from mission_system.api.governance import router as gov_router, get_tool_health_service
+
+    registry = get_capability_resource_registry()
+
+    def _create_governance_deps(db, event_manager, orchestrator, **kwargs):
+        from mission_system.app_server import get_app_state
+        return {get_tool_health_service: lambda: get_app_state().tool_health_service}
+
+    registry.register_api_router(
+        "_infra_governance",
+        gov_router,
+        deps_factory=_create_governance_deps,
+        feature_flag=None,
+    )
+
+
 __all__ = [
     "register_capability",
     "wire_capabilities",
+    "wire_infra_routers",
 ]

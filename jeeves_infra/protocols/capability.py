@@ -459,6 +459,7 @@ class CapabilityResourceRegistry:
         self._agents: Dict[str, List[DomainAgentConfig]] = {}
         self._contracts: Dict[str, CapabilityContractsConfig] = {}
         self._memory_layers: Dict[str, List[Dict[str, Any]]] = {}
+        self._api_routers: Dict[str, Dict[str, Any]] = {}
 
     def _track_capability(self, capability_id: str) -> None:
         """Track a capability ID if not already tracked."""
@@ -731,6 +732,40 @@ class CapabilityResourceRegistry:
             return next(iter(self._contracts.values()))
         return None
 
+    def register_api_router(
+        self,
+        capability_id: str,
+        router: Any,
+        deps_factory: Optional[Callable] = None,
+        feature_flag: Optional[str] = None,
+    ) -> None:
+        """Register a FastAPI API router for a capability.
+
+        The router is mounted by app_server.py at startup. The deps_factory
+        receives (db, event_manager, orchestrator) and returns a dict of
+        FastAPI dependency overrides.
+
+        Args:
+            capability_id: Unique capability identifier
+            router: FastAPI APIRouter instance
+            deps_factory: Optional callable(db, event_manager, orchestrator) -> dict of overrides
+            feature_flag: Optional settings attribute to check before mounting
+        """
+        self._track_capability(capability_id)
+        self._api_routers[capability_id] = {
+            "router": router,
+            "deps_factory": deps_factory,
+            "feature_flag": feature_flag,
+        }
+
+    def get_api_routers(self) -> Dict[str, Dict[str, Any]]:
+        """Get all registered API routers.
+
+        Returns:
+            Dict of capability_id -> {router, deps_factory, feature_flag}
+        """
+        return dict(self._api_routers)
+
     def register_memory_layers(
         self,
         capability_id: str,
@@ -771,6 +806,7 @@ class CapabilityResourceRegistry:
         self._agents.clear()
         self._contracts.clear()
         self._memory_layers.clear()
+        self._api_routers.clear()
 
 
 # =============================================================================

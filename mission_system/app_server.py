@@ -34,7 +34,6 @@ from jeeves_infra.settings import settings, get_settings
 from jeeves_infra.database.client import DatabaseClientProtocol
 from jeeves_infra.database.factory import create_database_client, reset_factory
 from jeeves_infra.logging import get_current_logger
-from mission_system.services.chat_service import ChatService
 try:
     from jeeves_infra.observability.tracing import init_tracing, instrument_fastapi, shutdown_tracing
     _TRACING_AVAILABLE = True
@@ -53,7 +52,7 @@ from jeeves_infra.protocols import (
 )
 from jeeves_infra.kernel_client import KernelClient
 
-from mission_system.capability_wiring import wire_capabilities
+from mission_system.capability_wiring import wire_capabilities, wire_infra_routers
 
 
 class SubmitRequestBody(BaseModel):
@@ -125,7 +124,6 @@ class AppState:
         self.orchestrator: Optional[Any] = None  # Capability-specific orchestrator (dynamic)
         self.health_checker: Optional[HealthChecker] = None
         self.event_manager: Optional[WebSocketEventManager] = None
-        self.chat_service: Optional[ChatService] = None
         self.tool_health_service = None  # L7 governance service
         self.shutdown_event: asyncio.Event = asyncio.Event()
 
@@ -204,6 +202,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Wire capabilities BEFORE database — backends are registered during wiring
     _logger.info("wiring_capabilities")
     wire_capabilities()
+    wire_infra_routers()
 
     # Database initialization with clear ownership
     db = None
@@ -304,11 +303,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     health_checker = HealthChecker(db)
     _logger.info("health_checker_initialized")
 
-    # Initialize ChatService for Chat UI integration
-    _logger.info("initializing_chat_service")
-    chat_service = ChatService(db, event_manager)
-    _logger.info("chat_service_initialized")
-
     # Initialize ToolHealthService for L7 governance
     _logger.info("initializing_tool_health_service")
     from mission_system.memory.services.tool_health_service import ToolHealthService
@@ -324,8 +318,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app_state.orchestrator = orchestrator
     app_state.health_checker = health_checker
     app_state.event_manager = event_manager
-    app_state.chat_service = chat_service
     app_state.tool_health_service = tool_health_service
+
+    # Mount ALL routers from registry (single generic loop — no router imports in app_server)
+    for cap_id, router_config in capability_registry.get_api_routers().items():
+        feature_flag = router_config.get("feature_flag")
+        if feature_flag and not getattr(current_settings, feature_flag, True):
+            _logger.info("router_skipped", capability=cap_id, feature_flag=feature_flag)
+            continue
+        app.include_router(router_config["router"])
+        if router_config.get("deps_factory"):
+            overrides = router_config["deps_factory"](
+                db=db, event_manager=event_manager, orchestrator=orchestrator,
+            )
+            app.dependency_overrides.update(overrides)
+        _logger.info("router_mounted", capability=cap_id)
 
     # Setup graceful shutdown handlers
     _setup_signal_handlers()
@@ -405,50 +412,23 @@ except RuntimeError:
     # Directories don't exist (e.g., in tests)
     templates = None
 
-# Mount Chat router if feature flag enabled
-if settings.chat_enabled:
-    from mission_system.api.chat import router as chat_router, get_chat_service
+# UI routes — template-serving infrastructure (no capability imports, runtime settings check)
+@app.get("/chat", response_class=HTMLResponse)
+async def chat_ui(request: Request):
+    """Serve Chat UI if chat capability is registered."""
+    if not templates:
+        raise HTTPException(status_code=503, detail="Templates not available")
+    current_settings = get_settings()
+    if not current_settings.chat_enabled:
+        raise HTTPException(status_code=404, detail="Chat not enabled")
+    return templates.TemplateResponse(request, "chat.html", {"active_page": "chat"})
 
-    # Override dependency to use app_state.chat_service
-    app.dependency_overrides[get_chat_service] = lambda: get_app_state().chat_service
-    app.include_router(chat_router)
 
-    # Add Chat UI route
-    @app.get("/chat", response_class=HTMLResponse)
-    async def chat_ui(request: Request):
-        """Serve Chat UI."""
-        if not templates:
-            raise HTTPException(
-                status_code=503,
-                detail="Chat UI templates not available"
-            )
-
-        return templates.TemplateResponse(request, "chat.html", {"active_page": "chat"})
-
-# Mount Governance router (L7 System Introspection)
-# Always enabled - governance is a core feature for observability (P6)
-from mission_system.api.governance import router as governance_router, get_tool_health_service
-
-# Override dependency to use app_state.tool_health_service
-app.dependency_overrides[get_tool_health_service] = lambda: get_app_state().tool_health_service
-app.include_router(governance_router)
-
-get_current_logger().info("governance_router_mounted", endpoints=[
-    "/api/v1/governance/health",
-    "/api/v1/governance/tools/{tool_name}",
-    "/api/v1/governance/dashboard"
-])
-
-# Add Governance UI route
 @app.get("/governance", response_class=HTMLResponse)
 async def governance_ui(request: Request):
     """Serve Governance UI."""
     if not templates:
-        raise HTTPException(
-            status_code=503,
-            detail="Governance UI templates not available"
-        )
-
+        raise HTTPException(status_code=503, detail="Templates not available")
     return templates.TemplateResponse(request, "governance.html", {"active_page": "governance"})
 
 

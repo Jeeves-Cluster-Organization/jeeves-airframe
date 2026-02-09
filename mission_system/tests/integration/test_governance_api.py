@@ -353,18 +353,13 @@ class TestGovernanceConstitutionalAlignment:
 class TestGovernanceFeatureFlags:
     """Test feature flag compliance for v0.9."""
 
-    @pytest.mark.asyncio
-    async def test_governance_enabled_by_default(self):
-        """Test that governance endpoints are always enabled (no feature flag)."""
+    def test_governance_enabled_by_default(self, governance_client):
+        """Test that governance endpoints are always enabled (no feature flag).
 
-        # Governance is a core P6 feature and should always be available
-        # This is verified by the fact that the router is mounted unconditionally
-        # in server.py (not behind a feature flag like kanban/chat)
-
-        # Execute: Check that endpoints are registered
-        routes = [route.path for route in app.routes]
-
-        # Verify: Governance routes exist
-        assert any("/governance/health" in route for route in routes)
-        assert any("/governance/tools" in route for route in routes)
-        assert any("/governance/dashboard" in route for route in routes)
+        Governance is a core P6 feature and should always be available.
+        Routes are mounted during lifespan, so we verify via HTTP requests.
+        """
+        # Verify: Governance routes exist (may return 503 if service not fully ready, but NOT 404)
+        for path in ["/api/v1/governance/health", "/api/v1/governance/tools/get_time", "/api/v1/governance/dashboard"]:
+            response = governance_client.get(path)
+            assert response.status_code != 404, f"Route {path} not mounted"

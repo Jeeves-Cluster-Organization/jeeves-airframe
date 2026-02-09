@@ -2,11 +2,9 @@
 
 Constitutional Amendments:
 - DebugAPIService: Time-travel debugging (Amendment XXIII)
-"""
 
-from mission_system.services.chat_service import (
-    ChatService,
-)
+Note: ChatService moved to jeeves_capability_hello_world.services.chat_service
+"""
 
 from mission_system.services.debug_api import (
     DebugAPIService,
@@ -16,8 +14,6 @@ from mission_system.services.debug_api import (
 )
 
 __all__ = [
-    # Chat Service
-    "ChatService",
     # Amendment XXIII: Time-Travel Debugging
     "DebugAPIService",
     "ExecutionTimeline",
