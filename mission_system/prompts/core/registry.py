@@ -40,13 +40,6 @@ class PromptRegistry:
     def get_instance(cls) -> 'PromptRegistry':
         if cls._instance is None:
             cls._instance = cls()
-            # Auto-import GENERIC prompt versions (not capability-specific)
-            # Capability-specific prompts are registered via CapabilityResourceRegistry
-            # at application startup, not via hardcoded imports.
-            # Domain-specific prompt modules (planner, critic, intent, confirmation)
-            # have been removed from airframe. Capabilities register their own
-            # prompts via CapabilityResourceRegistry and @register_prompt.
-            pass
         return cls._instance
 
     def register(self, prompt_version: PromptVersion) -> None:

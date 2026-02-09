@@ -51,11 +51,8 @@ from jeeves_infra.protocols import (
     TerminalReason,
     get_capability_resource_registry,
 )
-# KernelClient replaces ControlTower (control_tower deleted - Session 14)
 from jeeves_infra.kernel_client import KernelClient
 
-# SchedulingPriority is now a string enum: "REALTIME", "HIGH", "NORMAL", "LOW", "IDLE"
-SchedulingPriority = str  # Type alias for migration
 from mission_system.capability_wiring import wire_capabilities
 
 
@@ -121,7 +118,6 @@ class AppState:
         self.db: Optional[DatabaseClientProtocol] = None
         self.tool_catalog = None  # Tool catalog (single source of truth)
 
-        # Kernel client (replaces deleted control_tower - Session 14)
         self.kernel_client: Optional[KernelClient] = None
         self.event_bridge: Optional[EventBridge] = None
 
@@ -175,14 +171,6 @@ def reset_app_state() -> None:
     global _app_state
     _app_state = None
 
-
-# Module-level accessor for backward compatibility
-# All internal code should use get_app_state() for testability
-def __getattr__(name: str):
-    """Module-level __getattr__ to provide lazy app_state access."""
-    if name == "app_state":
-        return get_app_state()
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 @asynccontextmanager
@@ -298,7 +286,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             tool_executor=tool_executor,
             logger=_logger,
             persistence=db,
-            control_tower=kernel_client,  # kernel_client replaces control_tower
+            kernel_client=kernel_client,
         )
     else:
         _logger.warning("no_orchestrator_registered", message="No capability orchestrator in registry")

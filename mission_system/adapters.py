@@ -107,13 +107,9 @@ class MissionSystemAdapters:
             MemoryService instance
         """
         if not self._memory_service:
-            # MemoryService was moved to MemoryManager in memory_module
-            from mission_system.memory.manager import MemoryManager
-            # MemoryManager needs additional dependencies - return None for now
-            # Capabilities should inject proper memory service
             raise NotImplementedError(
-                "MemoryService has been replaced by MemoryManager. "
-                "Inject memory_service via constructor."
+                "Memory service must be injected by capability. "
+                "Pass memory_service to MissionSystemAdapters constructor."
             )
         return self._memory_service
 

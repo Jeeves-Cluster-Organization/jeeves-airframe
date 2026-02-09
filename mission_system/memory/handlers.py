@@ -1,20 +1,6 @@
 """CommBus Handler Registration for Memory Module.
 
 Registers handlers for memory queries and commands with the CommBus.
-
-Constitutional Reference:
-- Memory Module CONSTITUTION P4: Memory operations publish events via CommBus
-- Control Tower CONSTITUTION: CommBus communication for service dispatch
-
-Usage:
-    from memory_module.handlers import register_memory_handlers
-
-    # In application startup
-    register_memory_handlers(
-        commbus=commbus,
-        session_state_service=session_state_service,
-        db=db_client,
-    )
 """
 
 from __future__ import annotations
@@ -22,20 +8,12 @@ from __future__ import annotations
 from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    # CommBus is now in Go (commbus/) - Python uses gRPC or protocol interface
-    # Using Protocol for type hints during migration
-    from typing import Protocol as CommBusProtocol
     from jeeves_infra.protocols import DatabaseClientProtocol, LoggerProtocol
     from mission_system.memory.services.session_state_service import SessionStateService
 
-# Stub type for CommBus during migration (actual implementation is Go)
-class InMemoryCommBus:
-    """Stub for CommBus - actual implementation is in Go commbus/."""
-    def register_handler(self, name: str, handler: Any) -> None: ...
-
 
 def register_memory_handlers(
-    commbus: "InMemoryCommBus",
+    commbus: Any,
     session_state_service: Optional["SessionStateService"] = None,
     db: Optional["DatabaseClientProtocol"] = None,
     logger: Optional["LoggerProtocol"] = None,

@@ -109,10 +109,6 @@ class AppContext:
     # Uses string annotation for TYPE_CHECKING-only import (layer extraction support)
     kernel_client: Optional["KernelClient"] = None
 
-    # Deprecated: control_tower is replaced by kernel_client
-    # Keeping for backward compatibility during migration
-    control_tower: Optional[Any] = None
-
     # Optional request-scoped context
     request_id: Optional[str] = None
     envelope_id: Optional[str] = None
@@ -148,7 +144,6 @@ class AppContext:
             orchestration_flags=self.orchestration_flags,
             vertical_registry=self.vertical_registry,
             kernel_client=self.kernel_client,
-            control_tower=self.control_tower,  # Deprecated, kept for migration
             request_id=request_id,
             envelope_id=envelope_id,
             user_id=user_id,

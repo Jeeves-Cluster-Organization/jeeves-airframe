@@ -316,9 +316,6 @@ def create_avionics_dependencies(
             logger=gateway_logger,
         )
 
-        # Resource tracking is handled by kernel_client when connected
-        # (control_tower deleted - Session 14, replaced by Rust kernel gRPC)
-
         gateway_logger.info(
             "llm_gateway_initialized",
             primary_provider=primary_provider,
@@ -358,69 +355,10 @@ def create_tool_executor_with_access(
     )
 
 
-async def create_memory_manager(
-    app_context: AppContext,
-    db_client: Optional[Any] = None,
-    vector_adapter: Optional[Any] = None,
-) -> Optional[Any]:
-    """Create MemoryManager facade for unified memory operations.
 
-    Wires the MemoryManager with SQL adapter, vector adapter, and cross-ref manager.
-    This is the unified memory interface per Memory Module Constitution.
-
-    Args:
-        app_context: AppContext with logger and settings
-        db_client: Database client for SQL operations
-        vector_adapter: Vector storage adapter for semantic search
-
-    Returns:
-        MemoryManager instance, or None if dependencies unavailable
-    """
-    if db_client is None:
-        app_context.logger.warning(
-            "memory_manager_skipped",
-            message="No db_client provided - MemoryManager requires database",
-        )
-        return None
-
-    try:
-        from mission_system.memory.manager import MemoryManager
-        from mission_system.memory.sql_adapter import SQLAdapter
-        from mission_system.memory.services.xref_manager import CrossRefManager
-        from jeeves_infra.logging import create_logger
-
-        memory_logger = create_logger("memory_manager")
-
-        sql_adapter = SQLAdapter(db_client=db_client, logger=memory_logger)
-        xref_manager = CrossRefManager(db_client=db_client, logger=memory_logger)
-
-        # Create MemoryManager facade
-        memory_manager = MemoryManager(
-            sql_adapter=sql_adapter,
-            vector_adapter=vector_adapter,
-            xref_manager=xref_manager,
-            logger=memory_logger,
-        )
-
-        app_context.logger.info(
-            "memory_manager_created",
-            has_vector_adapter=vector_adapter is not None,
-        )
-
-        return memory_manager
-
-    except ImportError as e:
-        app_context.logger.error(
-            "memory_manager_import_error",
-            error=str(e),
-        )
-        return None
-    except Exception as e:
-        app_context.logger.error(
-            "memory_manager_init_error",
-            error=str(e),
-        )
-        return None
+# MemoryManager has been moved to capability layer.
+# Capabilities create their own MemoryManager via their wiring code.
+# See: jeeves_capability_hello_world/database/services/memory_manager.py
 
 
 __all__ = [
@@ -429,8 +367,6 @@ __all__ = [
     "create_tool_executor_with_access",
     "create_core_config_from_env",
     "create_orchestration_flags_from_env",
-    # Memory management
-    "create_memory_manager",
     # Per-request PID context for resource tracking
     "set_request_pid",
     "clear_request_pid",
