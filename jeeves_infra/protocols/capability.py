@@ -459,6 +459,7 @@ class CapabilityResourceRegistry:
         self._agents: Dict[str, List[DomainAgentConfig]] = {}
         self._contracts: Dict[str, CapabilityContractsConfig] = {}
         self._memory_layers: Dict[str, List[Dict[str, Any]]] = {}
+        self._memory_services: Dict[str, Dict[str, Callable]] = {}
         self._api_routers: Dict[str, Dict[str, Any]] = {}
 
     def _track_capability(self, capability_id: str) -> None:
@@ -791,6 +792,44 @@ class CapabilityResourceRegistry:
             all_layers.extend(layers)
         return all_layers
 
+    def register_memory_service(
+        self,
+        capability_id: str,
+        service_name: str,
+        factory: Callable[..., Any],
+    ) -> None:
+        """Register a memory service factory.
+
+        Capability provides the concrete implementation. Infrastructure
+        queries by service_name to get the factory.
+
+        Args:
+            capability_id: Unique capability identifier
+            service_name: Service name (e.g., "event_emitter", "session_state_service")
+            factory: Factory callable — receives (db, **kwargs), returns service instance
+        """
+        self._track_capability(capability_id)
+        if capability_id not in self._memory_services:
+            self._memory_services[capability_id] = {}
+        self._memory_services[capability_id][service_name] = factory
+
+    def get_memory_service_factory(
+        self,
+        service_name: str,
+    ) -> Optional[Callable]:
+        """Get memory service factory by name (first registered wins).
+
+        Args:
+            service_name: Service name to look up
+
+        Returns:
+            Factory callable or None if not registered
+        """
+        for services in self._memory_services.values():
+            if service_name in services:
+                return services[service_name]
+        return None
+
     def clear(self) -> None:
         """Clear all registrations. Primarily for testing."""
         self._schemas.clear()
@@ -806,6 +845,7 @@ class CapabilityResourceRegistry:
         self._agents.clear()
         self._contracts.clear()
         self._memory_layers.clear()
+        self._memory_services.clear()
         self._api_routers.clear()
 
 
