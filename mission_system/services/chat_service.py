@@ -19,7 +19,7 @@ import asyncio
 import json
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
@@ -80,7 +80,6 @@ class ChatService:
         self.event_manager = event_manager
         self.lock = ChatMutationLock()
         self.logger = self._logger.bind(component="chat_service")
-        self.is_postgres = getattr(db, "backend", None) == "postgres"
 
     # =========================================================================
     # SESSION OPERATIONS
@@ -161,80 +160,46 @@ class ChatService:
         Returns:
             List of sessions sorted by last_activity DESC
         """
-        # Query sessions from the orchestrator's sessions table with message counts from requests
-        if self.is_postgres:
-            query = """
-                SELECT
-                    s.session_id,
-                    s.user_id,
-                    s.title,
-                    s.created_at,
-                    s.last_activity,
-                    s.deleted_at,
-                    s.archived_at,
-                    COALESCE(COUNT(r.request_id), 0) AS message_count,
-                    COALESCE(MAX(r.received_at), s.created_at) AS last_message_at
-                FROM sessions s
-                LEFT JOIN requests r ON s.session_id = r.session_id
-                WHERE s.user_id = :user_id
-            """
-            params: Dict[str, Any] = {"user_id": user_id, "limit": limit, "offset": offset}
+        query = """
+            SELECT
+                s.session_id,
+                s.user_id,
+                s.title,
+                s.created_at,
+                s.last_activity,
+                s.deleted_at,
+                s.archived_at,
+                COALESCE(COUNT(r.request_id), 0) as message_count,
+                COALESCE(MAX(r.received_at), s.created_at) as last_message_at
+            FROM sessions s
+            LEFT JOIN requests r ON s.session_id = r.session_id
+            WHERE s.user_id = ?
+        """
+        params: list = [user_id]
 
-            if not include_deleted:
-                query += " AND s.deleted_at IS NULL"
+        if not include_deleted:
+            query += " AND s.deleted_at IS NULL"
 
-            if filter == "today":
-                query += " AND s.last_activity::date = CURRENT_DATE"
-            elif filter == "week":
-                query += " AND s.last_activity >= NOW() - INTERVAL '7 days'"
-            elif filter == "month":
-                query += " AND s.last_activity >= NOW() - INTERVAL '30 days'"
+        now = datetime.now(timezone.utc)
+        if filter == "today":
+            cutoff = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            query += " AND s.last_activity >= ?"
+            params.append(cutoff)
+        elif filter == "week":
+            query += " AND s.last_activity >= ?"
+            params.append(now - timedelta(days=7))
+        elif filter == "month":
+            query += " AND s.last_activity >= ?"
+            params.append(now - timedelta(days=30))
 
-            query += """
-                GROUP BY s.session_id, s.user_id, s.title, s.created_at, s.last_activity, s.deleted_at, s.archived_at
-                ORDER BY last_message_at DESC
-                LIMIT :limit OFFSET :offset
-            """
+        query += """
+            GROUP BY s.session_id
+            ORDER BY last_message_at DESC
+            LIMIT ? OFFSET ?
+        """
+        params.extend([limit, offset])
 
-            sessions = await self.db.fetch_all(query, params)
-        else:
-            query = """
-                SELECT
-                    s.session_id,
-                    s.user_id,
-                    s.title,
-                    s.created_at,
-                    s.last_activity,
-                    s.deleted_at,
-                    s.archived_at,
-                    COALESCE(COUNT(r.request_id), 0) as message_count,
-                    COALESCE(MAX(r.received_at), s.created_at) as last_message_at
-                FROM sessions s
-                LEFT JOIN requests r ON s.session_id = r.session_id
-                WHERE s.user_id = ?
-            """
-            params = [user_id]
-
-            # Filter deleted sessions unless requested
-            if not include_deleted:
-                query += " AND s.deleted_at IS NULL"
-
-            # Apply time filter
-            if filter == "today":
-                query += " AND date(s.last_activity) = date('now')"
-            elif filter == "week":
-                query += " AND s.last_activity >= datetime('now', '-7 days')"
-            elif filter == "month":
-                query += " AND s.last_activity >= datetime('now', '-30 days')"
-
-            query += """
-                GROUP BY s.session_id
-                ORDER BY last_message_at DESC
-                LIMIT ? OFFSET ?
-            """
-            params.extend([limit, offset])
-
-            sessions = await self.db.fetch_all(query, tuple(params))
+        sessions = await self.db.fetch_all(query, tuple(params))
 
         # Format sessions, auto-generating titles only if not set
         result = []
@@ -491,7 +456,7 @@ class ChatService:
 
         rows = await self.db.fetch_all(query, tuple(params))
 
-        # Use _prepare_message_payload for consistent serialization (handles PostgreSQL UUID/datetime)
+        # Use _prepare_message_payload for consistent serialization (handles UUID/datetime)
         messages = [self._prepare_message_payload(dict(row)) for row in rows]
 
         return messages
@@ -638,11 +603,8 @@ class ChatService:
             List of matching messages with session info
 
         Note:
-            Uses PostgreSQL ILIKE for pattern matching.
-            For better full-text search, consider using tsvector/tsquery.
+            Uses LIKE for pattern matching.
         """
-        # Use PostgreSQL ILIKE for simple text search
-        # Wrap query in wildcards for substring matching
         search_pattern = f"%{query}%"
         search_results = await self.db.fetch_all(
             """
@@ -652,7 +614,7 @@ class ChatService:
                 s.title as session_title
             FROM messages m
             JOIN sessions s ON m.session_id = s.session_id
-            WHERE m.content ILIKE ?
+            WHERE m.content LIKE ?
                 AND s.user_id = ?
                 AND m.deleted_at IS NULL
             ORDER BY m.created_at DESC
@@ -762,7 +724,7 @@ class ChatService:
         """Normalize message dictionaries with consistent serialization."""
         result = dict(message)
 
-        # Normalize UUIDs to strings for API responses (PostgreSQL returns UUID objects)
+        # Normalize UUIDs to strings for API responses (database may return UUID objects)
         if "session_id" in result and not isinstance(result["session_id"], str):
             result["session_id"] = str(result["session_id"])
 

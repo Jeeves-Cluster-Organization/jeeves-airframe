@@ -35,7 +35,7 @@ Database clients implement `DatabaseClientProtocol` from `protocols`.
 
 ## Key Components
 
-### PostgresClient (`postgres_client.py`)
+### DatabaseClient (`client.py`)
 Primary database client:
 ```python
 class PostgresClient:

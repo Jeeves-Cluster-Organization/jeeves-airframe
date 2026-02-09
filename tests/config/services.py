@@ -1,12 +1,12 @@
 """Service Availability Detection for Tests.
 
 Provides centralized service detection for test skip logic:
-- PostgreSQL availability
+- Database availability
 - llama-server availability
 - API availability
 
 Services are checked via actual connectivity - no environment magic.
-Configure hosts via env vars: POSTGRES_HOST, LLAMASERVER_HOST, API_HOST.
+Configure hosts via env vars: DB_HOST, LLAMASERVER_HOST, API_HOST.
 
 Constitutional Compliance:
 - P6: Testable - environment-aware test execution
@@ -14,7 +14,7 @@ Constitutional Compliance:
 
 Usage:
     from mission_system.tests.config.services import (
-        is_postgres_available,
+        is_database_available,
         is_llama_server_available,
         is_api_available,
         are_all_services_available,
@@ -34,11 +34,11 @@ from functools import lru_cache
 from typing import Optional
 
 from mission_system.tests.config.environment import (
-    TEST_POSTGRES_HOST,
-    TEST_POSTGRES_PORT,
-    TEST_POSTGRES_USER,
-    TEST_POSTGRES_PASSWORD,
-    TEST_POSTGRES_DATABASE,
+    TEST_DB_HOST,
+    TEST_DB_PORT,
+    TEST_DB_USER,
+    TEST_DB_PASSWORD,
+    TEST_DB_NAME,
 )
 
 
@@ -55,9 +55,9 @@ class ServiceStatus:
 # Service Hosts (from env vars with defaults)
 # ============================================================
 
-def _get_postgres_host() -> str:
-    """Get PostgreSQL host from env var or default."""
-    return TEST_POSTGRES_HOST
+def _get_db_host() -> str:
+    """Get database host from env var or default."""
+    return TEST_DB_HOST
 
 
 def _get_llama_server_host() -> str:
@@ -83,8 +83,8 @@ def _get_api_host() -> str:
 # Service Availability Checks
 # ============================================================
 
-def is_postgres_available(timeout: float = 2.0) -> bool:
-    """Check if PostgreSQL is available.
+def is_database_available(timeout: float = 2.0) -> bool:
+    """Check if database is available.
 
     Uses socket connection to test TCP connectivity, then
     optionally tests actual psycopg2 connection.
@@ -93,10 +93,10 @@ def is_postgres_available(timeout: float = 2.0) -> bool:
         timeout: Connection timeout in seconds
 
     Returns:
-        True if PostgreSQL is reachable
+        True if database is reachable
     """
-    host = _get_postgres_host()
-    port = TEST_POSTGRES_PORT
+    host = _get_db_host()
+    port = TEST_DB_PORT
 
     # Quick TCP check first
     try:
@@ -115,9 +115,9 @@ def is_postgres_available(timeout: float = 2.0) -> bool:
         conn = psycopg2.connect(
             host=host,
             port=port,
-            user=TEST_POSTGRES_USER,
-            password=TEST_POSTGRES_PASSWORD,
-            database=TEST_POSTGRES_DATABASE,
+            user=TEST_DB_USER,
+            password=TEST_DB_PASSWORD,
+            database=TEST_DB_NAME,
             connect_timeout=int(timeout)
         )
         conn.close()
@@ -180,10 +180,10 @@ def are_all_services_available(timeout: float = 2.0) -> bool:
         timeout: Timeout for each service check
 
     Returns:
-        True if PostgreSQL AND llama-server are available
+        True if database AND llama-server are available
     """
     return (
-        is_postgres_available(timeout) and
+        is_database_available(timeout) and
         is_llama_server_available(timeout)
     )
 
@@ -203,7 +203,7 @@ def get_cached_service_status() -> dict:
         Dict with service availability flags
     """
     return {
-        "postgres": is_postgres_available(),
+        "database": is_database_available(),
         "llama_server": is_llama_server_available(),
         "api": is_api_available(),
         "all_services": are_all_services_available(),
@@ -235,7 +235,7 @@ def get_service_status_report() -> str:
     lines = [
         "Service Status Report",
         "=" * 40,
-        f"PostgreSQL ({_get_postgres_host()}:{TEST_POSTGRES_PORT}): {'✓' if status['postgres'] else '✗'}",
+        f"Database ({_get_db_host()}:{TEST_DB_PORT}): {'✓' if status['database'] else '✗'}",
         f"llama-server ({_get_llama_server_host()}:8080): {'✓' if status['llama_server'] else '✗'}",
         f"API ({_get_api_host()}:8000): {'✓' if status['api'] else '✗'}",
         "-" * 40,

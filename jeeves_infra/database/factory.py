@@ -4,7 +4,7 @@ Constitutional Reference:
 - Avionics R4: Swappable Implementations
 - Avionics R6: Database Backend Registry
 - Avionics R2: Configuration Over Code
-- PostgreSQL Decoupling Audit (Option B)
+- Database Decoupling Audit (Option B)
 
 Ownership Model:
 - Production: Server lifespan owns database lifecycle

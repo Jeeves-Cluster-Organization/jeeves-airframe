@@ -7,14 +7,14 @@ must be registered by the application/capability at startup.
 Constitutional Reference:
 - Avionics R4: Swappable Implementations
 - Avionics R6: Database Backend Registry
-- PostgreSQL Decoupling Audit (Option B)
+- Database Decoupling Audit (Option B)
 
 Usage:
     # In capability startup (e.g. register_capability()):
-    from jeeves_infra.database.registry import register_backend, postgres_config_builder
-    from my_capability.database.postgres.client import PostgreSQLClient
+    from jeeves_infra.database.registry import register_backend
+    from my_capability.database.client import MyDBClient
 
-    register_backend("postgres", PostgreSQLClient, postgres_config_builder)
+    register_backend("mydb", MyDBClient, my_config_builder)
 
     # Then create clients:
     client = await create_database_client(settings)
@@ -46,14 +46,13 @@ def register_backend(
         config_builder: Function that builds client config from settings
 
     Example:
-        def postgres_config(settings, logger):
+        def my_config(settings, logger):
             return {
-                "database_url": settings.get_postgres_url(),
-                "pool_size": settings.postgres_pool_size,
-                ...
+                "database_url": f"sqlite:///{settings.db_name}.db",
+                "pool_size": settings.db_pool_size,
             }
 
-        register_backend("postgres", PostgreSQLClient, postgres_config)
+        register_backend("mydb", MyDBClient, my_config)
     """
     _BACKENDS[name] = (client_class, config_builder)
 
@@ -155,30 +154,6 @@ async def create_database_client(
 
 
 # =============================================================================
-# Config Builder Helpers (for use by jeeves-infra or capabilities)
-# =============================================================================
-
-def postgres_config_builder(settings: 'Settings', logger: LoggerProtocol) -> Dict[str, Any]:
-    """Build PostgreSQL client configuration from settings.
-
-    This is a helper function that can be used when registering the postgres backend:
-
-        from my_capability.database.postgres.client import PostgreSQLClient
-        from jeeves_infra.database.registry import register_backend, postgres_config_builder
-
-        register_backend("postgres", PostgreSQLClient, postgres_config_builder)
-    """
-    return {
-        "database_url": settings.get_postgres_url(),
-        "pool_size": settings.postgres_pool_size,
-        "max_overflow": settings.postgres_max_overflow,
-        "pool_timeout": settings.postgres_pool_timeout,
-        "pool_recycle": settings.postgres_pool_recycle,
-        "logger": logger,
-    }
-
-
-# =============================================================================
 # Public API
 # =============================================================================
 
@@ -191,6 +166,4 @@ __all__ = [
     "is_backend_registered",
     # Factory function
     "create_database_client",
-    # Config builder helpers
-    "postgres_config_builder",
 ]

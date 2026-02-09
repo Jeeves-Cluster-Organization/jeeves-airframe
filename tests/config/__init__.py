@@ -27,19 +27,19 @@ from mission_system.tests.config.environment import (
     is_running_in_ci,
     # Database Configuration
     TEST_DATABASE_BACKEND,
-    TEST_POSTGRES_HOST,
-    TEST_POSTGRES_PORT,
-    TEST_POSTGRES_USER,
-    TEST_POSTGRES_PASSWORD,
-    TEST_POSTGRES_DATABASE,
-    get_test_postgres_url,
+    TEST_DB_HOST,
+    TEST_DB_PORT,
+    TEST_DB_USER,
+    TEST_DB_PASSWORD,
+    TEST_DB_NAME,
+    get_test_database_url,
     # Feature Flags
     MEMORY_TESTS_ENABLED,
     PROD_TESTS_ENABLED,
     CONTRACT_TESTS_ENABLED,
     # Performance
     TEST_TIMEOUT,
-    POSTGRES_CONTAINER_TIMEOUT,
+    DB_CONTAINER_TIMEOUT,
     TEST_DB_SCOPE,
     should_skip_slow_tests,
     # Logging
@@ -60,7 +60,7 @@ from mission_system.tests.config.llm_config import (
 
 from mission_system.tests.config.services import (
     # Service Detection (v4.3)
-    is_postgres_available,
+    is_database_available,
     is_llama_server_available,
     is_api_available,
     are_all_services_available,
@@ -117,7 +117,7 @@ from mission_system.tests.config.test_thresholds import (
 from mission_system.tests.config.timeouts import (
     # Server Startup
     TEST_SERVER_STARTUP_TIMEOUT,
-    TEST_POSTGRES_STARTUP_TIMEOUT,
+    TEST_DB_STARTUP_TIMEOUT,
     TEST_LLAMASERVER_STARTUP_TIMEOUT,
     # HTTP
     TEST_HTTP_REQUEST_TIMEOUT,
@@ -228,19 +228,19 @@ __all__ = [
     "is_running_in_ci",
     # Database
     "TEST_DATABASE_BACKEND",
-    "TEST_POSTGRES_HOST",
-    "TEST_POSTGRES_PORT",
-    "TEST_POSTGRES_USER",
-    "TEST_POSTGRES_PASSWORD",
-    "TEST_POSTGRES_DATABASE",
-    "get_test_postgres_url",
+    "TEST_DB_HOST",
+    "TEST_DB_PORT",
+    "TEST_DB_USER",
+    "TEST_DB_PASSWORD",
+    "TEST_DB_NAME",
+    "get_test_database_url",
     # Feature Flags
     "MEMORY_TESTS_ENABLED",
     "PROD_TESTS_ENABLED",
     "CONTRACT_TESTS_ENABLED",
     # Performance
     "TEST_TIMEOUT",
-    "POSTGRES_CONTAINER_TIMEOUT",
+    "DB_CONTAINER_TIMEOUT",
     "TEST_DB_SCOPE",
     "should_skip_slow_tests",
     # Logging
@@ -255,7 +255,7 @@ __all__ = [
     "get_llm_provider_type",
     "is_llamaserver_available",
     # Service Detection (v4.3)
-    "is_postgres_available",
+    "is_database_available",
     "is_llama_server_available",
     "is_api_available",
     "are_all_services_available",
@@ -296,7 +296,7 @@ __all__ = [
     "TEST_COSINE_SIMILARITY_IDENTITY",
     # Timeouts (v4.2)
     "TEST_SERVER_STARTUP_TIMEOUT",
-    "TEST_POSTGRES_STARTUP_TIMEOUT",
+    "TEST_DB_STARTUP_TIMEOUT",
     "TEST_LLAMASERVER_STARTUP_TIMEOUT",
     "TEST_HTTP_REQUEST_TIMEOUT",
     "TEST_HEALTH_CHECK_TIMEOUT",

@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 
-from jeeves_infra.utils.testing import parse_postgres_url
+from jeeves_infra.utils.testing import parse_database_url
 from mission_system.app_server import app, app_state
 from mission_system.memory.services.tool_health_service import ToolHealthService, HealthStatus
 from mission_system.memory.repositories.tool_metrics_repository import ToolMetric
@@ -21,10 +21,9 @@ from mission_system.memory.repositories.tool_metrics_repository import ToolMetri
 
 @pytest.fixture
 async def db(test_db):
-    """PostgreSQL test database with schema.
+    """Test database with schema.
 
-    Uses test_db fixture from conftest.py for PostgreSQL-only testing.
-    All tests now use PostgreSQL instead of SQLite (as of 2025-11-27).
+    Uses test_db fixture from conftest.py for database testing.
     """
     return test_db
 
@@ -39,7 +38,7 @@ async def tool_health_service(db):
 
 @pytest.fixture
 def governance_client(test_db):
-    """Create test client with properly configured PostgreSQL connection.
+    """Create test client with properly configured database connection.
 
     For sync tests (TestClient), we set the database URL in environment
     and let the lifespan create its own connection in the correct event loop.
@@ -49,25 +48,25 @@ def governance_client(test_db):
     from jeeves_infra.database.factory import reset_factory
 
     # Parse the test database URL into environment variables
-    db_env = parse_postgres_url(test_db.database_url)
+    db_env = parse_database_url(test_db.database_url)
 
     # Save original environment values for cleanup
     original_env = {
         "DATABASE_BACKEND": os.environ.get("DATABASE_BACKEND"),
         "MOCK_MODE": os.environ.get("MOCK_MODE"),
         "LLM_PROVIDER": os.environ.get("LLM_PROVIDER"),
-        "POSTGRES_HOST": os.environ.get("POSTGRES_HOST"),
-        "POSTGRES_PORT": os.environ.get("POSTGRES_PORT"),
-        "POSTGRES_DATABASE": os.environ.get("POSTGRES_DATABASE"),
-        "POSTGRES_USER": os.environ.get("POSTGRES_USER"),
-        "POSTGRES_PASSWORD": os.environ.get("POSTGRES_PASSWORD"),
+        "DB_HOST": os.environ.get("DB_HOST"),
+        "DB_PORT": os.environ.get("DB_PORT"),
+        "DB_NAME": os.environ.get("DB_NAME"),
+        "DB_USER": os.environ.get("DB_USER"),
+        "DB_PASSWORD": os.environ.get("DB_PASSWORD"),
     }
 
     # Reset factory state
     reset_factory()
 
-    # Configure environment for PostgreSQL testing
-    os.environ["DATABASE_BACKEND"] = "postgres"
+    # Configure environment for database testing
+    os.environ.setdefault("DATABASE_BACKEND", "postgres")
     os.environ["MOCK_MODE"] = "true"
     os.environ["LLM_PROVIDER"] = "mock"
 

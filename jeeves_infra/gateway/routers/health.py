@@ -181,7 +181,7 @@ async def get_dashboard(request: Request):
     # Configuration from environment (this is real local config, not dummy data)
     config = ConfigInfo(
         llm_provider=os.environ.get("LLM_PROVIDER", "llamaserver"),
-        database_backend=os.environ.get("DATABASE_BACKEND", "postgres"),
+        database_backend=os.environ.get("DATABASE_BACKEND", "unknown"),
         log_level=os.environ.get("LOG_LEVEL", "INFO"),
     )
 

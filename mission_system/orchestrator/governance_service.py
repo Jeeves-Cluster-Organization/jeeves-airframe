@@ -60,58 +60,6 @@ def get_agent_definitions() -> List[dict]:
     # Fallback: return empty list if no agents registered
     return []
 
-# Memory Layer Definitions (from MEMORY_INFRASTRUCTURE_CONTRACT.md)
-MEMORY_LAYER_DEFINITIONS = [
-    {
-        "layer_id": "L1",
-        "name": "Canonical State Store",
-        "description": "Single source of truth - tasks, journal_entries, sessions, messages",
-        "backend": "postgres",
-        "tables": ["tasks", "journal_entries", "sessions", "messages", "kv_store"],
-    },
-    {
-        "layer_id": "L2",
-        "name": "Event Log & Trace Store",
-        "description": "Immutable record of state changes and agent decisions",
-        "backend": "postgres",
-        "tables": ["domain_events", "agent_traces"],
-    },
-    {
-        "layer_id": "L3",
-        "name": "Semantic Memory",
-        "description": "Semantic search with pgvector embeddings",
-        "backend": "pgvector",
-        "tables": ["semantic_chunks"],
-    },
-    {
-        "layer_id": "L4",
-        "name": "Working Memory",
-        "description": "Bounded context for conversations, open loops, flow interrupts",
-        "backend": "postgres",
-        "tables": ["session_state", "open_loops", "flow_interrupts"],
-    },
-    {
-        "layer_id": "L5",
-        "name": "State Graph",
-        "description": "Entity relationships and dependencies",
-        "backend": "postgres",
-        "tables": ["graph_nodes", "graph_edges"],
-    },
-    {
-        "layer_id": "L6",
-        "name": "Skills & Patterns",
-        "description": "Reusable workflow patterns (deferred to v3.x)",
-        "backend": "none",
-        "tables": [],
-    },
-    {
-        "layer_id": "L7",
-        "name": "Meta-Memory & Governance",
-        "description": "System behavior tracking, tool metrics, prompt versions",
-        "backend": "postgres",
-        "tables": ["tool_metrics", "prompt_versions", "agent_evaluations"],
-    },
-]
 
 
 class HealthServicer(jeeves_pb2_grpc.GovernanceServiceServicer):
@@ -233,10 +181,14 @@ class HealthServicer(jeeves_pb2_grpc.GovernanceServiceServicer):
         request: jeeves_pb2.GetMemoryLayersRequest,
         context: grpc.aio.ServicerContext,
     ) -> jeeves_pb2.GetMemoryLayersResponse:
-        """Get status of all memory layers (L1-L7)."""
+        """Get status of all memory layers."""
         try:
+            from jeeves_infra.protocols.capability import get_capability_resource_registry
+            registry = get_capability_resource_registry()
+            memory_layer_defs = registry.get_memory_layers()
+
             layers = []
-            for layer_def in MEMORY_LAYER_DEFINITIONS:
+            for layer_def in memory_layer_defs:
                 # Determine layer status by checking if tables exist and are accessible
                 status = await self._check_layer_status(layer_def)
 

@@ -458,6 +458,7 @@ class CapabilityResourceRegistry:
         self._prompts: Dict[str, List[CapabilityPromptConfig]] = {}
         self._agents: Dict[str, List[DomainAgentConfig]] = {}
         self._contracts: Dict[str, CapabilityContractsConfig] = {}
+        self._memory_layers: Dict[str, List[Dict[str, Any]]] = {}
 
     def _track_capability(self, capability_id: str) -> None:
         """Track a capability ID if not already tracked."""
@@ -730,6 +731,31 @@ class CapabilityResourceRegistry:
             return next(iter(self._contracts.values()))
         return None
 
+    def register_memory_layers(
+        self,
+        capability_id: str,
+        layers: List[Dict[str, Any]],
+    ) -> None:
+        """Register memory layer definitions for a capability.
+
+        Args:
+            capability_id: Unique capability identifier
+            layers: List of memory layer definitions (layer_id, name, description, backend, tables)
+        """
+        self._track_capability(capability_id)
+        self._memory_layers[capability_id] = layers
+
+    def get_memory_layers(self) -> List[Dict[str, Any]]:
+        """Get all registered memory layer definitions.
+
+        Returns:
+            Flat list of all memory layer defs across capabilities.
+        """
+        all_layers: List[Dict[str, Any]] = []
+        for layers in self._memory_layers.values():
+            all_layers.extend(layers)
+        return all_layers
+
     def clear(self) -> None:
         """Clear all registrations. Primarily for testing."""
         self._schemas.clear()
@@ -744,6 +770,7 @@ class CapabilityResourceRegistry:
         self._prompts.clear()
         self._agents.clear()
         self._contracts.clear()
+        self._memory_layers.clear()
 
 
 # =============================================================================

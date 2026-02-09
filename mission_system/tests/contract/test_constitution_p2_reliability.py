@@ -150,7 +150,7 @@ class TestP2Reliability:
         long_value = "A" * 10000  # 10KB value
         fact_id = str(uuid4())
 
-        # PostgreSQL TEXT columns have no length limit, so this should succeed
+        # TEXT columns have no length limit, so this should succeed
         await test_db.insert("knowledge_facts", {
             "fact_id": fact_id,
             "user_id": "test_user",

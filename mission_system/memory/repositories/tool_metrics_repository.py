@@ -127,8 +127,8 @@ class ToolMetricsRepository:
     Provides append-only storage for tool metrics with aggregation queries.
     """
 
-    # Note: This SQL should match postgres_schema.sql
-    # The authoritative schema is in postgres_schema.sql
+    # Note: This SQL should match the schema file
+    # The authoritative schema is in the capability schema files
     CREATE_TABLE_SQL = """
         CREATE TABLE IF NOT EXISTS tool_metrics (
             metric_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -198,7 +198,7 @@ class ToolMetricsRepository:
             metric.input_size,
             metric.output_size,
             json.dumps(metric.metadata) if metric.metadata else None,
-            metric.recorded_at  # Pass datetime directly (PostgreSQL-compatible)
+            metric.recorded_at  # Pass datetime directly
         )
 
         await self.db.execute(query, params)

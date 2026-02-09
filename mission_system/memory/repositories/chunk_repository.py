@@ -111,7 +111,7 @@ class ChunkRepository:
     """
     Repository for semantic chunk storage and retrieval.
 
-    Uses PostgreSQL with pgvector for native vector similarity search.
+    Uses vector storage for native similarity search.
     """
 
     # Embedding dimension (matches all-MiniLM-L6-v2)
@@ -269,7 +269,7 @@ class ChunkRepository:
         Search for similar chunks using cosine similarity.
 
         Note: This implementation uses Python-side computation for portability.
-        Production should use pgvector native operators for better performance.
+        Production should use vector native operators for better performance.
 
         Args:
             user_id: User to search for

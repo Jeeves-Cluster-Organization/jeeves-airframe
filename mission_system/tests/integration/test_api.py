@@ -45,8 +45,7 @@ class MockOrchestratorResult:
 async def test_app(test_db):
     """Create test app with lifespan context.
 
-    Uses PostgreSQL via testcontainers for test isolation.
-    Per PostgreSQL-only migration (2025-11-27).
+    Uses database via testcontainers for test isolation.
     """
     from jeeves_infra.settings import reload_settings, get_settings
     from jeeves_infra.database.factory import reset_factory
@@ -58,8 +57,8 @@ async def test_app(test_db):
         "LLM_PROVIDER": os.environ.get("LLM_PROVIDER"),
     }
 
-    # Set environment for testing with PostgreSQL
-    os.environ["DATABASE_BACKEND"] = "postgres"
+    # Set environment for testing with database
+    os.environ.setdefault("DATABASE_BACKEND", "postgres")
     os.environ["MOCK_MODE"] = "true"
     os.environ["LLM_PROVIDER"] = "mock"
 
@@ -69,11 +68,10 @@ async def test_app(test_db):
 
     # Directly set settings attributes for proper isolation
     settings = get_settings()
-    # Note: database_backend is now a read-only property always returning "postgres"
     settings.llm_provider = "mock"
     settings.memory_enabled = False
 
-    # Inject PostgreSQL database into app state
+    # Inject database into app state
     app_state.db = test_db
 
     try:

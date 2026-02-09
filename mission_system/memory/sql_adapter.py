@@ -86,25 +86,17 @@ class SQLAdapter:
         Returns:
             Message ID (as string)
         """
-        # PostgreSQL messages table uses SERIAL for message_id (auto-generated)
-        # Use RETURNING to get the generated ID
-        query = """
-            INSERT INTO messages (session_id, role, content, created_at)
-            VALUES (?, ?, ?, ?)
-            RETURNING message_id
-        """
-
-        params = (
-            session_id,
-            data.get('role', 'user'),
-            data.get('content', ''),
-            datetime.now(timezone.utc)
-        )
+        message_id = str(uuid4())
+        message_data = {
+            "message_id": message_id,
+            "session_id": session_id,
+            "role": data.get('role', 'user'),
+            "content": data.get('content', ''),
+            "created_at": datetime.now(timezone.utc),
+        }
 
         try:
-            # Use commit=True for INSERT...RETURNING to persist the insert
-            result = await self.db.fetch_one(query, params, commit=True)
-            message_id = str(result['message_id']) if result else str(uuid4())
+            await self.db.insert("messages", message_data)
             self._logger.info("message_written", message_id=message_id, session_id=session_id)
             return message_id
         except Exception as e:

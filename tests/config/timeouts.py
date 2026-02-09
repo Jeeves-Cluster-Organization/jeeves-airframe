@@ -21,8 +21,8 @@ Constitutional Compliance:
 # Time to wait for API server to start
 TEST_SERVER_STARTUP_TIMEOUT = 30
 
-# Time to wait for PostgreSQL container to be ready
-TEST_POSTGRES_STARTUP_TIMEOUT = 30
+# Time to wait for database container to be ready
+TEST_DB_STARTUP_TIMEOUT = 30
 
 # Time to wait for llama-server to respond
 TEST_LLAMASERVER_STARTUP_TIMEOUT = 10

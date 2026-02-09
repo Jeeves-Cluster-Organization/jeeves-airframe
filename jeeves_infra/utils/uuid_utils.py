@@ -1,7 +1,7 @@
 """UUID utility functions for consistent UUID handling across the codebase.
 
 This module provides utilities for converting between different UUID formats,
-ensuring consistency when working with PostgreSQL UUID columns and test fixtures.
+ensuring consistency when working with database UUID columns and test fixtures.
 
 Includes:
 - uuid_str(): Universal UUID converter
@@ -55,7 +55,7 @@ def uuid_str(identifier: Union[str, UUID, None]) -> Optional[str]:
         identifier: Any UUID-like value (UUID object, string, or None)
 
     Returns:
-        Valid UUID string for PostgreSQL, or None if input was None
+        Valid UUID string for database, or None if input was None
 
     Examples:
         # Simple test IDs
@@ -107,7 +107,7 @@ def uuid_str(identifier: Union[str, UUID, None]) -> Optional[str]:
 def convert_uuids_to_strings(data: Dict[str, Any]) -> Dict[str, Any]:
     """Convert UUID objects to strings in a dictionary.
 
-    PostgreSQL returns UUID objects for UUID columns, but the rest of the
+    Database may return UUID objects for UUID columns, but the rest of the
     codebase expects string IDs for consistency.
 
     Args:

@@ -294,7 +294,7 @@ def create_graph_storage(persistence: PersistenceProtocol) -> Any:
     Create graph storage for entity relationships.
 
     Returns InMemoryGraphStorage as default. Capabilities may register
-    their own graph storage backends (e.g. PostgresGraphAdapter).
+    their own graph storage backends (e.g. graph storage adapter).
 
     Args:
         persistence: Database client
@@ -304,24 +304,6 @@ def create_graph_storage(persistence: PersistenceProtocol) -> Any:
     """
     from mission_system.memory.repositories.graph_stub import InMemoryGraphStorage
     return InMemoryGraphStorage()
-
-
-def create_code_indexer(persistence: PersistenceProtocol, embedding_service: Any) -> Any:
-    """
-    Create RAG-based code indexer.
-
-    Args:
-        persistence: Database client
-        embedding_service: Embedding service instance
-
-    Returns:
-        CodeIndexer instance
-    """
-    from mission_system.memory.services.code_indexer import CodeIndexer
-    return CodeIndexer(
-        postgres_client=persistence,
-        embedding_service=embedding_service,
-    )
 
 
 def create_tool_health_service(persistence: PersistenceProtocol) -> Any:
@@ -421,7 +403,6 @@ __all__ = [
     # Memory layer factories
     "create_event_emitter",
     "create_graph_storage",
-    "create_code_indexer",
     "create_tool_health_service",
     # NLI service factory (Decision 3:A)
     "create_nli_service",

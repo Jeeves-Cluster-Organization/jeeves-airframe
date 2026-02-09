@@ -7,7 +7,7 @@ This module provides fixtures for memory infrastructure services:
 - ToolHealthService (L7 tool metrics)
 - ToolRegistry (tool registration)
 
-All fixtures use real PostgreSQL database (no SQLite).
+All fixtures use real database.
 
 NOTE: This is a code analysis fork - only read-only code analysis tools.
 

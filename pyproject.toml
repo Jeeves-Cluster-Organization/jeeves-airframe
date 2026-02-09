@@ -43,9 +43,6 @@ gateway = [
     "websockets>=12.0",
     "sse-starlette>=1.6.0",
 ]
-database = [
-    "sqlalchemy[asyncio]>=2.0.0",
-]
 redis = [
     "redis>=5.0.0",
 ]
@@ -67,7 +64,7 @@ dev = [
     "mypy>=1.0.0",
 ]
 all = [
-    "jeeves-infra[gateway,database,redis,embeddings,llm]",
+    "jeeves-infra[gateway,redis,embeddings,llm]",
 ]
 
 [project.urls]

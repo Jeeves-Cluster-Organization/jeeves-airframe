@@ -116,8 +116,8 @@ class SessionStateRepository:
     Uses upsert semantics for state updates.
     """
 
-    # Note: This SQL should match postgres_schema.sql
-    # The authoritative schema is in postgres_schema.sql
+    # Note: This SQL should match the schema file
+    # The authoritative schema is in the capability schema files
     CREATE_TABLE_SQL = """
         CREATE TABLE IF NOT EXISTS session_state (
             session_id UUID PRIMARY KEY,
@@ -142,7 +142,7 @@ class SessionStateRepository:
         Initialize repository.
 
         Args:
-            db: Database client instance (DatabaseClient or PostgreSQLClient)
+            db: Database client instance (DatabaseClientProtocol)
             logger: Optional logger instance
         """
         self._logger = get_component_logger("SessionStateRepository", logger)
@@ -399,7 +399,7 @@ class SessionStateRepository:
         created_at = parse_datetime(row.get("created_at"))
         updated_at = parse_datetime(row.get("updated_at"))
 
-        # Convert UUID objects to strings (PostgreSQL returns native UUID objects)
+        # Convert UUID objects to strings (database may return native UUID objects)
         session_id = row["session_id"]
         if isinstance(session_id, UUID):
             session_id = str(session_id)

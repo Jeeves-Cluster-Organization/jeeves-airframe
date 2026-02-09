@@ -10,7 +10,7 @@ LLAMASERVER_ALWAYS Policy:
 Test Configuration:
 - Centralized in tests/config/ package
 - Fixtures in tests/fixtures/ package
-- PostgreSQL-only testing
+- Database testing
 
 Constitutional Compliance:
 - Constitution R7: register_capability() called at test setup for integration tests

@@ -13,9 +13,8 @@ Infrastructure Services:
 - EventEmitter: L2 event log
 - TraceRecorder: Agent trace recording
 - ToolHealthService: L7 tool metrics
-- CodeIndexer: Code indexing for semantic search
-
 EmbeddingService is owned by capabilities (concrete DB concern).
+CodeIndexer has moved to jeeves_capability_hello_world.database.services.code_indexer.
 """
 
 from mission_system.memory.services.nli_service import NLIService, get_nli_service
@@ -26,7 +25,6 @@ from mission_system.memory.services.session_state_service import SessionStateSer
 from mission_system.memory.services.session_state_adapter import SessionStateAdapter
 from mission_system.memory.services.chunk_service import ChunkService
 from mission_system.memory.services.tool_health_service import ToolHealthService
-from mission_system.memory.services.code_indexer import CodeIndexer
 
 __all__ = [
     # Protocol Adapters (implements Core protocols)
@@ -40,5 +38,4 @@ __all__ = [
     "SessionStateService",
     "ChunkService",
     "ToolHealthService",
-    "CodeIndexer",
 ]

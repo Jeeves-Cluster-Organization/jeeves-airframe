@@ -21,7 +21,7 @@ from mission_system.memory.services.event_emitter import (
 )
 
 # All tests in this file are pure in-memory (no database fixtures).
-# Removed incorrect requires_postgres marker (RCA: all 15 tests use
+# Removed incorrect requires_database marker (RCA: all 15 tests use
 # SessionDedupCache/EventEmitter with mocks, no test_db).
 
 

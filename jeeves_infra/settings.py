@@ -3,7 +3,7 @@
 Constitutional Reference:
     - Avionics R3: No Domain Logic - infrastructure provides transport, not business logic
     - Avionics R2: Configuration Over Code - all behavior is configurable
-    - docs/CONSTITUTION.md: PostgreSQL with pgvector is the ONLY supported backend
+    - docs/CONSTITUTION.md: Database configuration via backend registry
 
 Per-Agent Configuration:
     Agent-specific LLM settings (model, temperature, server_url) are now owned by
@@ -126,7 +126,7 @@ class Settings(BaseSettings):
     memory_auto_crossref: bool = True
 
     # =========================================================================
-    # VECTOR DB CONFIGURATION (pgvector only)
+    # VECTOR DB CONFIGURATION
     # =========================================================================
     vector_db_enabled: bool = True
     embedding_model: str = "all-MiniLM-L6-v2"
@@ -186,20 +186,21 @@ class Settings(BaseSettings):
     chat_enabled: bool = True
 
     # =========================================================================
-    # POSTGRESQL CONFIGURATION (the ONLY supported backend)
+    # DATABASE CONFIGURATION
     # =========================================================================
-    postgres_host: str = "localhost"
-    postgres_port: int = Field(default=5432, ge=1, le=65535)
-    postgres_database: str = "assistant"
-    postgres_user: str = "assistant"
-    postgres_password: str = ""
-    postgres_pool_size: int = Field(default=20, ge=1, le=100)
-    postgres_max_overflow: int = Field(default=10, ge=0, le=100)
-    postgres_pool_timeout: int = Field(default=30, ge=1, le=300)
-    postgres_pool_recycle: int = Field(default=3600, ge=60, le=86400)
+    db_host: str = "localhost"
+    db_port: int = Field(default=5432, ge=1, le=65535)
+    db_name: str = "assistant"
+    db_user: str = "assistant"
+    db_password: str = ""
+    db_pool_size: int = Field(default=20, ge=1, le=100)
+    db_max_overflow: int = Field(default=10, ge=0, le=100)
+    db_pool_timeout: int = Field(default=30, ge=1, le=300)
+    db_pool_recycle: int = Field(default=3600, ge=60, le=86400)
 
-    # pgvector dimension
-    pgvector_dimension: int = Field(default=384, ge=1, le=4096)
+    # Backend identifiers (set by capability via env: DATABASE_BACKEND, VECTOR_BACKEND)
+    database_backend: str = "sqlite"
+    vector_backend: str = ""
 
     # =========================================================================
     # REDIS CONFIGURATION (for distributed mode)
@@ -273,31 +274,6 @@ class Settings(BaseSettings):
         """Get feature flags instance."""
         from jeeves_infra.feature_flags import get_feature_flags
         return get_feature_flags()
-
-    def get_postgres_url(self) -> str:
-        """Build PostgreSQL connection URL for asyncpg."""
-        return (
-            f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}"
-            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_database}"
-        )
-
-    def get_database_url(self) -> str:
-        """Get the database URL."""
-        return self.get_postgres_url()
-
-    def is_postgres(self) -> bool:
-        return True
-
-    def is_pgvector_enabled(self) -> bool:
-        return True
-
-    @property
-    def database_backend(self) -> str:
-        return "postgres"
-
-    @property
-    def vector_backend(self) -> str:
-        return "pgvector"
 
     def log_llm_config(self, logger: "LoggerProtocol") -> None:
         """Log current LLM configuration.

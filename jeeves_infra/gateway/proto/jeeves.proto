@@ -208,7 +208,7 @@ message MemoryLayerInfo {
   string name = 1;
   string description = 2;
   string status = 3;          // active, degraded, inactive
-  string backend = 4;         // postgres, pgvector
+  string backend = 4;         // relational, vector, none
   string layer_id = 5;        // L1, L2, L3, L4, L5, L7
 }
 

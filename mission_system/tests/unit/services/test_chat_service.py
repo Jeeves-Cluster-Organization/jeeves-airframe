@@ -126,7 +126,7 @@ class TestChatService:
         session = await chat_service.create_session(user_id="test-user")
         session_id = str(session["session_id"])  # Ensure string for SQL
 
-        # Insert test message then fetch the generated ID (avoids PostgreSQL-only RETURNING)
+        # Insert test message then fetch the generated ID (avoids RETURNING)
         await test_db.insert("messages", {
             "session_id": session_id,
             "role": "user",

@@ -9,7 +9,7 @@ Repositories:
 - ToolMetricsRepository: L7 tool health metrics
 - InMemorySkillStorage: L6 skills stub for development
 
-Concrete vector storage (PgVectorRepository) is owned by capabilities.
+Concrete vector storage is owned by capabilities.
 
 Constitutional Reference:
 - Memory Module CONSTITUTION: L5 Graph, L6 Skills (extensible)

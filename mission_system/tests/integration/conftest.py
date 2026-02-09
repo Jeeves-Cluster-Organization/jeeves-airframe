@@ -1,7 +1,7 @@
 """Pytest configuration and fixtures for integration tests.
 
-PostgreSQL-Only Testing (SQLite deprecated as of 2025-11-27):
-- All integration tests use PostgreSQL via testcontainers
+Database Testing:
+- All integration tests use database via testcontainers
 - Test isolation via function-scoped database fixtures
 - Proper cleanup for CI environments
 
@@ -31,7 +31,7 @@ if str(_project_root) not in sys.path:
 import pytest
 from fastapi.testclient import TestClient
 
-from jeeves_infra.utils.testing import parse_postgres_url
+from jeeves_infra.utils.testing import parse_database_url
 from mission_system.app_server import app, app_state
 
 # CI detection constants
@@ -75,12 +75,12 @@ def pytest_configure(config):
 
 
 # ============================================================
-# PostgreSQL Test Client Fixtures
+# Database Test Client Fixtures
 # ============================================================
 
 @pytest.fixture(scope="function")
 def sync_client(test_db):
-    """Synchronous test client backed by PostgreSQL.
+    """Synchronous test client backed by database.
 
     For sync tests (TestClient), we set the database URL in environment
     and let the lifespan create its own connection in the correct event loop.
@@ -89,10 +89,10 @@ def sync_client(test_db):
     an async database connection across different event loops.
 
     Args:
-        test_db: PostgreSQL database fixture (used to get URL)
+        test_db: Database fixture (used to get URL)
 
     Yields:
-        TestClient: FastAPI test client with PostgreSQL backend
+        TestClient: FastAPI test client with database backend
     """
     # NOTE: Mission system integration tests access jeeves_infra directly for test utilities.
     # This is acceptable because mission_system IS the wiring layer, and these are
@@ -101,25 +101,25 @@ def sync_client(test_db):
     from jeeves_infra.database.factory import reset_factory
 
     # Parse the test database URL into environment variables
-    db_env = parse_postgres_url(test_db.database_url)
+    db_env = parse_database_url(test_db.database_url)
 
     # Save original environment values for cleanup
     original_env = {
         "DATABASE_BACKEND": os.environ.get("DATABASE_BACKEND"),
         "MOCK_MODE": os.environ.get("MOCK_MODE"),
         "LLM_PROVIDER": os.environ.get("LLM_PROVIDER"),
-        "POSTGRES_HOST": os.environ.get("POSTGRES_HOST"),
-        "POSTGRES_PORT": os.environ.get("POSTGRES_PORT"),
-        "POSTGRES_DATABASE": os.environ.get("POSTGRES_DATABASE"),
-        "POSTGRES_USER": os.environ.get("POSTGRES_USER"),
-        "POSTGRES_PASSWORD": os.environ.get("POSTGRES_PASSWORD"),
+        "DB_HOST": os.environ.get("DB_HOST"),
+        "DB_PORT": os.environ.get("DB_PORT"),
+        "DB_NAME": os.environ.get("DB_NAME"),
+        "DB_USER": os.environ.get("DB_USER"),
+        "DB_PASSWORD": os.environ.get("DB_PASSWORD"),
     }
 
     # Reset factory state
     reset_factory()
 
-    # Configure environment for PostgreSQL testing
-    os.environ["DATABASE_BACKEND"] = "postgres"
+    # Configure environment for database testing
+    os.environ.setdefault("DATABASE_BACKEND", "postgres")
     os.environ["MOCK_MODE"] = "true"
     os.environ["LLM_PROVIDER"] = "mock"
 

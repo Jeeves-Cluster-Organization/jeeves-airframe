@@ -18,7 +18,7 @@ Marker Reference:
 - @pytest.mark.requires_llamaserver - Tests requiring llama-server
 - @pytest.mark.requires_azure - Tests requiring Azure OpenAI SDK
 - @pytest.mark.requires_services - Tests requiring full Docker stack
-- @pytest.mark.requires_postgres - Tests requiring PostgreSQL only
+- @pytest.mark.requires_database - Tests requiring database
 - @pytest.mark.requires_full_app - Tests using TestClient with lifespan
 - @pytest.mark.requires_llm_quality - Tests requiring capable LLM (7B+) for nuanced NLP
 - @pytest.mark.websocket - WebSocket tests (skip if services unavailable)
@@ -40,7 +40,7 @@ from mission_system.tests.config.llm_config import (
     get_llm_provider_type,
 )
 from mission_system.tests.config.services import (
-    is_postgres_available,
+    is_database_available,
     is_llama_server_available,
     are_all_services_available,
     get_cached_service_status,
@@ -110,10 +110,10 @@ def configure_markers(config) -> None:
 
     # Service/Infrastructure markers
     config.addinivalue_line(
-        "markers", "requires_services: Tests requiring full Docker stack (postgres + llama-server)"
+        "markers", "requires_services: Tests requiring full Docker stack (database + llama-server)"
     )
     config.addinivalue_line(
-        "markers", "requires_postgres: Tests requiring PostgreSQL database"
+        "markers", "requires_database: Tests requiring database"
     )
     config.addinivalue_line(
         "markers", "requires_full_app: Tests using TestClient with full app lifespan"
@@ -176,13 +176,13 @@ def apply_skip_markers(config, items) -> None:
 
     # Get cached service status (expensive checks done once)
     service_status = get_cached_service_status()
-    postgres_available = service_status["postgres"]
+    database_available = service_status["database"]
     llama_available = service_status["llama_server"]
     all_services = service_status["all_services"]
 
     # Skip reasons - descriptive messages for each scenario
-    skip_postgres_unavailable = pytest.mark.skip(
-        reason="PostgreSQL not available - run: docker compose up -d postgres"
+    skip_database_unavailable = pytest.mark.skip(
+        reason="Database not available - run: docker compose up -d"
     )
     skip_llamaserver_unavailable = pytest.mark.skip(
         reason="llama-server not available - run: docker compose up -d llama-server"
@@ -210,10 +210,10 @@ def apply_skip_markers(config, items) -> None:
     llm_capable = is_capable_llm_model()
 
     for item in items:
-        # Skip @pytest.mark.requires_postgres if PostgreSQL not available
-        if item.get_closest_marker("requires_postgres"):
-            if not postgres_available:
-                item.add_marker(skip_postgres_unavailable)
+        # Skip @pytest.mark.requires_database if database not available
+        if item.get_closest_marker("requires_database"):
+            if not database_available:
+                item.add_marker(skip_database_unavailable)
 
         # Skip @pytest.mark.requires_llamaserver if llama-server not available
         if item.get_closest_marker("requires_llamaserver"):

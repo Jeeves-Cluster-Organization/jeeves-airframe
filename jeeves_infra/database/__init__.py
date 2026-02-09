@@ -1,6 +1,6 @@
 """Database infrastructure - protocols and factory.
 
-Concrete implementations (PostgreSQLClient, etc.) are owned by capabilities
+Concrete implementations are owned by capabilities
 and registered via the backend registry at startup.
 
 This module provides:

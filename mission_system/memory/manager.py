@@ -48,7 +48,7 @@ class MemoryManager:
 
         Args:
             sql_adapter: SQL database adapter
-            vector_adapter: Vector database adapter (pgvector)
+            vector_adapter: Vector database adapter
             xref_manager: Cross-reference manager
             logger: Optional logger instance (ADR-001 DI)
         """

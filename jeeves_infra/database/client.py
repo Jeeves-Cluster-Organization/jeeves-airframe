@@ -1,13 +1,13 @@
 """Database client module.
 
 Provides protocol-based database access via registry pattern.
-PostgreSQL is the default backend (Constitution v3.0).
+Database client protocol re-exports.
 
 Constitutional Reference:
 - CommBus: DatabaseClientProtocol definition
 - Avionics R4: Swappable Implementations
 - Avionics R6: Database Backend Registry
-- PostgreSQL Decoupling Audit (Option B)
+- Database Decoupling Audit (Option B)
 
 Usage:
     from avionics.database.client import (

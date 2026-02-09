@@ -2,7 +2,7 @@
 
 Provides a simple in-memory implementation of GraphStorageProtocol
 for development and testing. Production implementations should use
-a proper graph database (Neo4j, etc.) or PostgreSQL with recursive CTEs.
+a proper graph database (Neo4j, etc.) or database with recursive CTEs.
 
 Constitutional Reference:
 - Memory Module CONSTITUTION: L5 Graph - Entity relationships

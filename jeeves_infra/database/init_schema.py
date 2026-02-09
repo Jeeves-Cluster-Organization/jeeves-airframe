@@ -53,7 +53,7 @@ async def main():
     """Standalone schema init using registry and factory.
 
     Requires a registered database backend (via capability wiring)
-    and POSTGRES_URL or POSTGRES_* environment variables.
+    and DB_* environment variables.
     """
     _logger = get_current_logger()
 

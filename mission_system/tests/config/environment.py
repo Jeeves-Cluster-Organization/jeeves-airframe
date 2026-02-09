@@ -6,7 +6,7 @@ availability checking at runtime.
 
 Configuration:
 - CI environment detection (explicit env vars only)
-- Database backend configuration (PostgreSQL-only)
+- Database backend configuration
 - Feature test flags
 - Performance settings
 - Logging configuration
@@ -36,31 +36,31 @@ def is_running_in_ci() -> bool:
 # Database Backend Configuration
 # ============================================================
 
-# PostgreSQL-only after migration (SQLite deprecated for tests)
-TEST_DATABASE_BACKEND: Literal["postgres"] = "postgres"
+# Database backend
+TEST_DATABASE_BACKEND: str = os.getenv("TEST_DATABASE_BACKEND", "postgres")
 
-# PostgreSQL connection with sensible defaults
-# Override via env vars: POSTGRES_HOST, POSTGRES_PORT, etc.
-TEST_POSTGRES_HOST = os.getenv("POSTGRES_HOST") or os.getenv("TEST_POSTGRES_HOST", "localhost")
-TEST_POSTGRES_PORT = int(os.getenv("POSTGRES_PORT") or os.getenv("TEST_POSTGRES_PORT", "5432"))
-TEST_POSTGRES_USER = os.getenv("POSTGRES_USER") or os.getenv("TEST_POSTGRES_USER", "assistant")
-TEST_POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD") or os.getenv("TEST_POSTGRES_PASSWORD", "dev_password_change_in_production")
-TEST_POSTGRES_DATABASE = os.getenv("POSTGRES_DATABASE") or os.getenv("TEST_POSTGRES_DATABASE", "assistant")
+# Database connection with sensible defaults
+# Override via env vars: DB_HOST, DB_PORT, etc.
+TEST_DB_HOST = os.getenv("DB_HOST") or os.getenv("TEST_DB_HOST", "localhost")
+TEST_DB_PORT = int(os.getenv("DB_PORT") or os.getenv("TEST_DB_PORT", "5432"))
+TEST_DB_USER = os.getenv("DB_USER") or os.getenv("TEST_DB_USER", "assistant")
+TEST_DB_PASSWORD = os.getenv("DB_PASSWORD") or os.getenv("TEST_DB_PASSWORD", "dev_password_change_in_production")
+TEST_DB_NAME = os.getenv("DB_NAME") or os.getenv("TEST_DB_NAME", "assistant")
 
 
-def get_test_postgres_url(database: str | None = None) -> str:
-    """Generate PostgreSQL connection URL for tests.
+def get_test_database_url(database: str | None = None) -> str:
+    """Generate database connection URL for tests.
 
     Args:
-        database: Database name (default: TEST_POSTGRES_DATABASE)
+        database: Database name (default: TEST_DB_NAME)
 
     Returns:
-        PostgreSQL connection URL
+        Database connection URL
     """
-    db = database or TEST_POSTGRES_DATABASE
+    db = database or TEST_DB_NAME
     return (
-        f"postgresql://{TEST_POSTGRES_USER}:{TEST_POSTGRES_PASSWORD}"
-        f"@{TEST_POSTGRES_HOST}:{TEST_POSTGRES_PORT}/{db}"
+        f"postgresql://{TEST_DB_USER}:{TEST_DB_PASSWORD}"
+        f"@{TEST_DB_HOST}:{TEST_DB_PORT}/{db}"
     )
 
 
@@ -85,8 +85,8 @@ CONTRACT_TESTS_ENABLED = os.getenv("CONTRACT_TESTS_ENABLED", "1") == "1"
 # Maximum test execution time (seconds)
 TEST_TIMEOUT = int(os.getenv("TEST_TIMEOUT", "300"))  # 5 minutes default
 
-# PostgreSQL container startup timeout (seconds)
-POSTGRES_CONTAINER_TIMEOUT = int(os.getenv("POSTGRES_CONTAINER_TIMEOUT", "30"))
+# Database container startup timeout (seconds)
+DB_CONTAINER_TIMEOUT = int(os.getenv("DB_CONTAINER_TIMEOUT", "30"))
 
 # Test isolation level
 # - "function": Fresh database per test (slower, better isolation)

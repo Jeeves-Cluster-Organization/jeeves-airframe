@@ -156,13 +156,13 @@ class TestCreateMemoryManager:
     """Tests for create_memory_manager async factory."""
 
     @pytest.mark.asyncio
-    async def test_returns_none_without_postgres(self):
-        """Test that None is returned when postgres_client is not provided."""
+    async def test_returns_none_without_db(self):
+        """Test that None is returned when db_client is not provided."""
         from mission_system.bootstrap import create_app_context, create_memory_manager
 
         with patch.dict("os.environ", {}, clear=True):
             context = create_app_context()
-            manager = await create_memory_manager(context, postgres_client=None)
+            manager = await create_memory_manager(context, db_client=None)
 
             assert manager is None
 
@@ -171,10 +171,10 @@ class TestCreateMemoryManager:
         """Test that MemoryManager is created when dependencies are provided."""
         from mission_system.bootstrap import create_app_context, create_memory_manager
 
-        mock_postgres = Mock()
-        mock_postgres.execute = AsyncMock()
-        mock_postgres.fetch_one = AsyncMock()
-        mock_postgres.fetch_all = AsyncMock()
+        mock_db = Mock()
+        mock_db.execute = AsyncMock()
+        mock_db.fetch_one = AsyncMock()
+        mock_db.fetch_all = AsyncMock()
 
         mock_vector = Mock()
         mock_vector.upsert = AsyncMock()
@@ -185,7 +185,7 @@ class TestCreateMemoryManager:
             context = create_app_context()
             manager = await create_memory_manager(
                 context,
-                postgres_client=mock_postgres,
+                db_client=mock_db,
                 vector_adapter=mock_vector,
             )
 

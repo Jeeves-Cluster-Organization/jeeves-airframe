@@ -63,7 +63,7 @@ class TestM1Canonical:
         )
         assert result is not None
         assert result["source_type"] == "fact"
-        # PostgreSQL returns UUID objects; convert for comparison with string
+        # Database returns UUID objects; convert for comparison with string
         assert str(result["source_id"]) == fact_id, \
             "M1 violation: Embedding does not reference canonical source"
 
@@ -232,7 +232,7 @@ class TestM1Canonical:
         assert len(results) == 3, "M1 violation: Not all embeddings traceable"
         for result in results:
             assert result["source_type"] == "fact"
-            # PostgreSQL returns UUID objects; convert for comparison with string
+            # Database returns UUID objects; convert for comparison with string
             assert str(result["source_id"]) == fact_id
 
 
@@ -282,7 +282,7 @@ class TestM1Canonical:
                 (chunk_id,)
             )
             assert result is not None
-            # PostgreSQL returns UUID objects; convert for comparison with string
+            # Database returns UUID objects; convert for comparison with string
             assert str(result["source_id"]) == new_fact_id, \
                 "M1 violation: Embedding not updated after fact_id change (ON UPDATE CASCADE not configured)"
 
@@ -295,6 +295,6 @@ class TestM1Canonical:
                 (chunk_id,)
             )
             assert result is not None
-            # PostgreSQL returns UUID objects; convert for comparison with string
+            # Database returns UUID objects; convert for comparison with string
             assert str(result["source_id"]) == old_fact_id, \
                 "M1 violation: Embedding corrupted after failed fact_id update"

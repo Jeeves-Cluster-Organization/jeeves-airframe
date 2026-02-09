@@ -39,7 +39,7 @@ tests/
 │   └── test_evidence_chain.py     # P1 citation requirement tests
 ├── fixtures/                      # Test fixtures
 │   ├── agents.py                  # Envelope fixtures (from contracts)
-│   ├── database.py                # PostgreSQL fixtures
+│   ├── database.py                # Database fixtures
 │   ├── llm.py                     # LLM fixtures (real llamaserver)
 │   ├── services.py                # Service fixtures
 │   └── mocks/
@@ -74,7 +74,7 @@ pip install pytest pytest-asyncio pydantic structlog
 pip install fastapi httpx websockets
 
 # Database
-pip install testcontainers psycopg2-binary pgvector
+pip install testcontainers psycopg2-binary
 ```
 
 ### E2E Tests (Full Stack)
@@ -87,7 +87,7 @@ pip install testcontainers psycopg2-binary pgvector
 pip install sentence-transformers  # 1.5GB+ download
 
 # Start services
-docker compose up -d postgres llama-server
+docker compose up -d database llama-server
 ```
 
 ---
@@ -107,7 +107,7 @@ pytest mission_system/tests/contract -v
 
 ```bash
 # Run unit tests with mocked dependencies
-pytest mission_system/tests/unit -m "not requires_llamaserver and not requires_postgres"
+pytest mission_system/tests/unit -m "not requires_llamaserver and not requires_database"
 
 # Expected: Orchestrator logic, confirmation manager tests pass
 ```
@@ -116,7 +116,7 @@ pytest mission_system/tests/unit -m "not requires_llamaserver and not requires_p
 
 ```bash
 # Start services
-docker compose up -d postgres llama-server
+docker compose up -d database llama-server
 
 # Run integration tests
 pytest mission_system/tests/integration -v
@@ -148,7 +148,7 @@ pytest mission_system/tests/contract -v
 **Tier 2: Unit Tests (Mock LLM)**
 ```bash
 pytest mission_system/tests/unit \
-  -m "not requires_llamaserver and not requires_postgres" \
+  -m "not requires_llamaserver and not requires_database" \
   -v
 # Orchestrator, rate limiter, confirmation manager
 # Runtime: < 10 seconds
@@ -157,7 +157,7 @@ pytest mission_system/tests/unit \
 **Tier 3: Integration Tests (Real Services)**
 ```bash
 pytest mission_system/tests/integration \
-  -m "requires_postgres or requires_llamaserver" \
+  -m "requires_database or requires_llamaserver" \
   -v
 # API endpoints, gateway, multi-stage pipeline
 # Runtime: 30-60 seconds
@@ -184,8 +184,8 @@ Mission System uses comprehensive markers defined in `tests/config/markers.py`:
 - **`@pytest.mark.requires_llm_quality`** - Tests requiring capable LLM (7B+) for nuanced NLP
 
 ### Infrastructure Markers
-- **`@pytest.mark.requires_services`** - Tests requiring full Docker stack (postgres + llama-server)
-- **`@pytest.mark.requires_postgres`** - Tests requiring PostgreSQL only
+- **`@pytest.mark.requires_services`** - Tests requiring full Docker stack (database + llama-server)
+- **`@pytest.mark.requires_database`** - Tests requiring database only
 - **`@pytest.mark.requires_docker`** - Tests requiring Docker/testcontainers
 - **`@pytest.mark.requires_full_app`** - Tests using TestClient with full app lifespan
 - **`@pytest.mark.websocket`** - WebSocket tests (requires services)
@@ -257,7 +257,7 @@ async def test_llm_generation(llm_provider):
 
 ### Database Fixtures
 
-- **`postgres_container`** - PostgreSQL testcontainer
+- **`database_container`** - Database testcontainer
 - **`test_db`** - Fresh database per test
 - **`create_test_prerequisites`** - Creates test schema
 - **`create_session_only`** - Creates sessions table only
@@ -325,7 +325,7 @@ async def test_confirmation_manager():
 
 **Files**: `integration/test_api.py`, `test_gateway.py`, `test_multistage_pipeline.py`
 
-**Requires**: PostgreSQL, llamaserver
+**Requires**: Database, llamaserver
 
 **What's Tested**:
 - API endpoints (`POST /api/v1/chat/messages`, etc.)
@@ -448,7 +448,7 @@ jobs:
           pytest mission_system/tests/contract -v
           # Unit tests (no services)
           pytest mission_system/tests/unit \
-            -m "not requires_llamaserver and not requires_postgres" \
+            -m "not requires_llamaserver and not requires_database" \
             -v
 ```
 
@@ -462,7 +462,7 @@ jobs:
   test-mission-integration:
     runs-on: ubuntu-latest
     services:
-      postgres:
+      database:
         image: pgvector/pgvector:pg16
       llama-server:
         image: ghcr.io/ggerganov/llama.cpp:server
@@ -526,7 +526,7 @@ pytest-watch mission_system/tests/unit
 
 ```bash
 # Start services
-docker compose up -d postgres llama-server
+docker compose up -d database llama-server
 
 # Run integration tests
 pytest mission_system/tests/integration -v
@@ -555,15 +555,15 @@ docker compose up -d llama-server
 curl http://localhost:8080/health
 ```
 
-### Issue 2: PostgreSQL Not Available
+### Issue 2: Database Not Available
 
-**Error**: `PostgreSQL not available - run: docker compose up -d postgres`
+**Error**: `Database not available - run: docker compose up -d database`
 
 **Solution**:
 ```bash
-docker compose up -d postgres
+docker compose up -d database
 # Verify connection
-docker compose ps postgres
+docker compose ps database
 ```
 
 ### Issue 3: Flaky Test Failures

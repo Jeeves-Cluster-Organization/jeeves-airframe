@@ -1,8 +1,8 @@
 """Jeeves Infrastructure Layer - Adapters above the kernel.
 
 This package provides infrastructure abstractions and protocol-based plumbing
-for the jeeves-core microkernel. Concrete database implementations (PostgreSQL,
-pgvector) are owned by capabilities and registered via the backend registry.
+for the jeeves-core microkernel. Concrete database implementations
+are owned by capabilities and registered via the backend registry.
 
 - gateway/   - HTTP/WebSocket/gRPC translation (FastAPI)
 - llm/       - LLM providers (LiteLLM, OpenAI, Mock)

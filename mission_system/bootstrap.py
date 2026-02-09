@@ -403,7 +403,7 @@ def create_tool_executor_with_access(
 
 async def create_memory_manager(
     app_context: AppContext,
-    postgres_client: Optional[Any] = None,
+    db_client: Optional[Any] = None,
     vector_adapter: Optional[Any] = None,
 ) -> Optional[Any]:
     """Create MemoryManager facade for unified memory operations.
@@ -413,16 +413,16 @@ async def create_memory_manager(
 
     Args:
         app_context: AppContext with logger and settings
-        postgres_client: PostgreSQL client for SQL operations
-        vector_adapter: Vector storage adapter (pgvector) for semantic search
+        db_client: Database client for SQL operations
+        vector_adapter: Vector storage adapter for semantic search
 
     Returns:
         MemoryManager instance, or None if dependencies unavailable
     """
-    if postgres_client is None:
+    if db_client is None:
         app_context.logger.warning(
             "memory_manager_skipped",
-            message="No postgres_client provided - MemoryManager requires database",
+            message="No db_client provided - MemoryManager requires database",
         )
         return None
 
@@ -434,11 +434,8 @@ async def create_memory_manager(
 
         memory_logger = create_logger("memory_manager")
 
-        # Create SQL adapter wrapping the postgres client
-        sql_adapter = SQLAdapter(db_client=postgres_client, logger=memory_logger)
-
-        # Create cross-reference manager
-        xref_manager = CrossRefManager(db_client=postgres_client, logger=memory_logger)
+        sql_adapter = SQLAdapter(db_client=db_client, logger=memory_logger)
+        xref_manager = CrossRefManager(db_client=db_client, logger=memory_logger)
 
         # Create MemoryManager facade
         memory_manager = MemoryManager(

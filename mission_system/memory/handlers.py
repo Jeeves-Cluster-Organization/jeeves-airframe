@@ -108,14 +108,14 @@ def register_memory_handlers(
         """Handle SearchMemory query.
 
         Note: This is a placeholder. Full semantic search requires
-        PgVectorRepository and EmbeddingService which are optional.
+        VectorRepository and EmbeddingService which are optional.
         """
         # For now, return empty results - semantic search requires more setup
         return {
             "results": [],
             "total": 0,
             "query": query.query,
-            "note": "Semantic search requires PgVectorRepository configuration",
+            "note": "Semantic search requires VectorRepository configuration",
         }
 
     async def handle_get_clarification_context(query: GetClarificationContext) -> Any:
