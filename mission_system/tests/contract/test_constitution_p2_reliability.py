@@ -15,66 +15,46 @@ Reference: JEEVES_CORE_CONSTITUTION.md, Principle 2
 import pytest
 from uuid import uuid4
 
-# Requires PostgreSQL database
-pytestmark = [pytest.mark.requires_postgres, pytest.mark.contract]
+pytestmark = pytest.mark.contract
 
 
 @pytest.mark.contract
 class TestP2Reliability:
     """Validate P2: Reliability > Cleverness."""
 
-    async def test_write_operations_are_transactional(self, pg_test_db):
-        """Write operations must be all-or-nothing (ACID compliance).
-
-        P2 Requirement: "If a write fails, rollback"
-
-        Test Strategy:
-        1. Start transaction
-        2. Insert multiple records using transaction session
-        3. Force failure on one record
-        4. Verify all inserts were rolled back
-
-        Note: Uses knowledge_facts table (tasks table removed in v3.0 pivot)
-        """
-        from sqlalchemy import text
-        from jeeves_infra.utils.uuid_utils import uuid_str
-
+    async def test_write_operations_are_transactional(self, test_db):
+        """Write operations must be all-or-nothing (ACID compliance)."""
         fact_id_1 = str(uuid4())
         fact_id_2 = str(uuid4())
         user_id = f"test_user_{uuid4().hex[:8]}"
 
-        # Begin transaction - insert two facts then try duplicate
         try:
-            async with pg_test_db.transaction() as session:
-                # Insert first record (should succeed)
-                await session.execute(
-                    text("INSERT INTO knowledge_facts (fact_id, user_id, domain, key, value) VALUES (:fact_id, :user_id, :domain, :key, :value)"),
-                    {"fact_id": uuid_str(fact_id_1), "user_id": user_id, "domain": "test", "key": "key1", "value": "value1"}
-                )
-
-                # Insert second record (should succeed)
-                await session.execute(
-                    text("INSERT INTO knowledge_facts (fact_id, user_id, domain, key, value) VALUES (:fact_id, :user_id, :domain, :key, :value)"),
-                    {"fact_id": uuid_str(fact_id_2), "user_id": user_id, "domain": "test", "key": "key2", "value": "value2"}
-                )
-
+            async with test_db.transaction() as txn:
+                await txn.insert("knowledge_facts", {
+                    "fact_id": fact_id_1, "user_id": user_id,
+                    "domain": "test", "key": "key1", "value": "value1"
+                })
+                await txn.insert("knowledge_facts", {
+                    "fact_id": fact_id_2, "user_id": user_id,
+                    "domain": "test", "key": "key2", "value": "value2"
+                })
                 # Force failure by violating constraint (duplicate fact_id)
-                await session.execute(
-                    text("INSERT INTO knowledge_facts (fact_id, user_id, domain, key, value) VALUES (:fact_id, :user_id, :domain, :key, :value)"),
-                    {"fact_id": uuid_str(fact_id_1), "user_id": user_id, "domain": "test", "key": "key3", "value": "value3"}
-                )
+                await txn.insert("knowledge_facts", {
+                    "fact_id": fact_id_1, "user_id": user_id,
+                    "domain": "test", "key": "key3", "value": "value3"
+                })
         except Exception:
             pass  # Expected - duplicate key violation
 
         # Verify rollback: No facts should exist for this user
-        facts = await pg_test_db.fetch_all(
+        facts = await test_db.fetch_all(
             "SELECT * FROM knowledge_facts WHERE user_id = ?",
             (user_id,)
         )
         assert len(facts) == 0, "P2 violation: Partial writes persisted after transaction rollback"
 
 
-    async def test_database_errors_propagate_loudly(self, pg_test_db):
+    async def test_database_errors_propagate_loudly(self, test_db):
         """Database errors must propagate without silent fallbacks.
 
         P2 Requirement: "Fail loudly. No silent fallbacks."
@@ -86,7 +66,7 @@ class TestP2Reliability:
         """
         # Attempt to insert into non-existent table
         with pytest.raises(Exception) as exc_info:
-            await pg_test_db.execute(
+            await test_db.execute(
                 "INSERT INTO nonexistent_table (id, value) VALUES (?, ?)",
                 (str(uuid4()), "test_value")
             )
@@ -97,7 +77,7 @@ class TestP2Reliability:
             "P2 violation: Error message not descriptive"
 
 
-    async def test_constraint_violations_fail_loudly(self, pg_test_db):
+    async def test_constraint_violations_fail_loudly(self, test_db):
         """Constraint violations must fail loudly with clear error messages.
 
         P2 Requirement: "Report exactly what broke"
@@ -111,7 +91,7 @@ class TestP2Reliability:
         """
         # Attempt to insert fact without required value (NOT NULL)
         with pytest.raises(Exception) as exc_info:
-            await pg_test_db.insert("knowledge_facts", {
+            await test_db.insert("knowledge_facts", {
                 "fact_id": str(uuid4()),
                 "user_id": "test_user",
                 "domain": "test",
@@ -125,7 +105,7 @@ class TestP2Reliability:
             "P2 violation: Constraint violation error not descriptive"
 
 
-    async def test_foreign_key_violations_fail_loudly(self, pg_test_db):
+    async def test_foreign_key_violations_fail_loudly(self, test_db):
         """Foreign key violations must fail loudly.
 
         P2 Requirement: "Fail loudly"
@@ -138,7 +118,7 @@ class TestP2Reliability:
         # Attempt to insert request referencing non-existent session
         # requests.session_id has FK constraint to sessions
         with pytest.raises(Exception) as exc_info:
-            await pg_test_db.insert("requests", {
+            await test_db.insert("requests", {
                 "request_id": str(uuid4()),
                 "user_id": "test_user",
                 "session_id": str(uuid4()),  # Non-existent session - FK violation
@@ -152,7 +132,7 @@ class TestP2Reliability:
             "P2 violation: Foreign key violation error not descriptive"
 
 
-    async def test_no_silent_data_truncation(self, pg_test_db):
+    async def test_no_silent_data_truncation(self, test_db):
         """Data truncation must fail loudly, not silently truncate.
 
         P2 Requirement: "No guessing"
@@ -171,7 +151,7 @@ class TestP2Reliability:
         fact_id = str(uuid4())
 
         # PostgreSQL TEXT columns have no length limit, so this should succeed
-        await pg_test_db.insert("knowledge_facts", {
+        await test_db.insert("knowledge_facts", {
             "fact_id": fact_id,
             "user_id": "test_user",
             "domain": "test",
@@ -180,7 +160,7 @@ class TestP2Reliability:
         })
 
         # Verify data was stored in full (not truncated)
-        result = await pg_test_db.fetch_one(
+        result = await test_db.fetch_one(
             "SELECT value FROM knowledge_facts WHERE fact_id = ?",
             (fact_id,)
         )
@@ -189,7 +169,7 @@ class TestP2Reliability:
             "P2 violation: Data was silently truncated"
 
 
-    async def test_concurrent_write_conflicts_handled_correctly(self, pg_test_db):
+    async def test_concurrent_write_conflicts_handled_correctly(self, test_db):
         """Concurrent write conflicts must be handled deterministically.
 
         P2 Requirement: "Fail loudly"
@@ -203,7 +183,7 @@ class TestP2Reliability:
         """
         # Insert initial fact
         fact_id = str(uuid4())
-        await pg_test_db.insert("knowledge_facts", {
+        await test_db.insert("knowledge_facts", {
             "fact_id": fact_id,
             "user_id": "test_user",
             "domain": "test",
@@ -212,7 +192,7 @@ class TestP2Reliability:
         })
 
         # Update fact (simulating first transaction)
-        await pg_test_db.update(
+        await test_db.update(
             "knowledge_facts",
             {"value": "Updated by TX1"},
             "fact_id = ?",
@@ -220,7 +200,7 @@ class TestP2Reliability:
         )
 
         # Verify update succeeded
-        result = await pg_test_db.fetch_one(
+        result = await test_db.fetch_one(
             "SELECT value FROM knowledge_facts WHERE fact_id = ?",
             (fact_id,)
         )
@@ -233,7 +213,7 @@ class TestP2Reliability:
 class TestP2ToolReliability:
     """Validate P2 for tool execution failures."""
 
-    async def test_tool_execution_failures_recorded(self, pg_test_db):
+    async def test_tool_execution_failures_recorded(self, test_db):
         """Tool execution failures must be recorded in tool_executions table.
 
         P2 Requirement: "Report exactly what broke"
@@ -249,12 +229,12 @@ class TestP2ToolReliability:
         plan_id = str(uuid4())
         execution_id = str(uuid4())
 
-        await pg_test_db.insert("sessions", {
+        await test_db.insert("sessions", {
             "session_id": session_id,
             "user_id": "test_user"
         })
 
-        await pg_test_db.insert("requests", {
+        await test_db.insert("requests", {
             "request_id": request_id,
             "user_id": "test_user",
             "session_id": session_id,
@@ -262,7 +242,7 @@ class TestP2ToolReliability:
             "status": "processing"
         })
 
-        await pg_test_db.insert("execution_plans", {
+        await test_db.insert("execution_plans", {
             "plan_id": plan_id,
             "request_id": request_id,
             "intent": "test",
@@ -271,7 +251,7 @@ class TestP2ToolReliability:
         })
 
         # Insert tool execution record with failure
-        await pg_test_db.insert("tool_executions", {
+        await test_db.insert("tool_executions", {
             "execution_id": execution_id,
             "request_id": request_id,
             "plan_id": plan_id,
@@ -283,54 +263,35 @@ class TestP2ToolReliability:
         })
 
         # Verify failure was recorded
-        result = await pg_test_db.fetch_one(
+        result = await test_db.fetch_one(
             "SELECT status, error_details FROM tool_executions WHERE execution_id = ?",
             (execution_id,)
         )
         assert result is not None
         assert result["status"] == "error"
-        error_details = pg_test_db.from_json(result["error_details"]) if isinstance(result["error_details"], str) else result["error_details"]
+        error_details = test_db.from_json(result["error_details"]) if isinstance(result["error_details"], str) else result["error_details"]
         assert "connection timeout" in error_details.get("message", ""), \
             "P2 violation: Error message not descriptive"
 
 
-    async def test_rollback_on_tool_failure_prevents_partial_state(self, pg_test_db):
-        """Tool failures must rollback any partial database changes.
-
-        P2 Requirement: "If a write fails, rollback"
-
-        Test Strategy:
-        1. Start transaction
-        2. Create fact using transaction session
-        3. Execute tool (simulate failure)
-        4. Rollback transaction
-        5. Verify fact was not persisted
-
-        Note: Uses knowledge_facts table (tasks table removed in v3.0 pivot)
-        """
-        from sqlalchemy import text
-        from jeeves_infra.utils.uuid_utils import uuid_str
-
+    async def test_rollback_on_tool_failure_prevents_partial_state(self, test_db):
+        """Tool failures must rollback any partial database changes."""
         fact_id = str(uuid4())
 
-        # Begin transaction
         try:
-            async with pg_test_db.transaction() as session:
-                # Create fact as part of tool execution
-                await session.execute(
-                    text("INSERT INTO knowledge_facts (fact_id, user_id, domain, key, value) VALUES (:fact_id, :user_id, :domain, :key, :value)"),
-                    {"fact_id": uuid_str(fact_id), "user_id": "test_user", "domain": "test", "key": "tool_key", "value": "from tool"}
-                )
-
+            async with test_db.transaction() as txn:
+                await txn.insert("knowledge_facts", {
+                    "fact_id": fact_id, "user_id": "test_user",
+                    "domain": "test", "key": "tool_key", "value": "from tool"
+                })
                 # Simulate tool failure
                 raise Exception("Tool execution failed")
         except Exception:
             pass  # Expected exception
 
         # Verify fact was rolled back
-        result = await pg_test_db.fetch_one(
+        result = await test_db.fetch_one(
             "SELECT * FROM knowledge_facts WHERE fact_id = ?",
             (fact_id,)
         )
-        assert result is None, \
-            "P2 violation: Partial state persisted after tool failure"
+        assert result is None, "P2 violation: Partial state persisted after tool failure"

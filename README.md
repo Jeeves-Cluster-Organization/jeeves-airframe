@@ -60,7 +60,7 @@ from jeeves_infra.runtime import Agent, PipelineRunner
 from jeeves_infra.kernel_client import get_kernel_client
 
 # Use protocols for type safety
-from jeeves_infra.postgres import PostgreSQLClient
+from jeeves_infra.database import create_database_client
 from jeeves_infra.gateway import create_gateway_app
 ```
 

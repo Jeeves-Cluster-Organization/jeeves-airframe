@@ -114,8 +114,7 @@ def pytest_runtest_setup(item):
 
 # Database fixtures
 from mission_system.tests.fixtures.database import (
-    postgres_container,
-    pg_test_db,
+    test_db,
     create_test_prerequisites,
     create_session_only,
 )
@@ -165,8 +164,7 @@ def anyio_backend():
 # Re-export for pytest discovery
 __all__ = [
     # Database
-    "postgres_container",
-    "pg_test_db",
+    "test_db",
     "create_test_prerequisites",
     "create_session_only",
     # LLM

@@ -258,7 +258,7 @@ async def test_llm_generation(llm_provider):
 ### Database Fixtures
 
 - **`postgres_container`** - PostgreSQL testcontainer
-- **`pg_test_db`** - Fresh database per test
+- **`test_db`** - Fresh database per test
 - **`create_test_prerequisites`** - Creates test schema
 - **`create_session_only`** - Creates sessions table only
 
@@ -397,7 +397,7 @@ Per audit findings: "Tests in mission_system are a bit more flakey"
 3. **Database Race Conditions**
    - Concurrent test execution may conflict
    - Shared session state between tests
-   - **Fix**: Use `pg_test_db` fixture for isolated database per test
+   - **Fix**: Use `test_db` fixture for isolated database per test
 
 4. **Async Timing Issues**
    - WebSocket connection timing

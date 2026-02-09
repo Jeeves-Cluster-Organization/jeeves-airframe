@@ -133,20 +133,24 @@ class HealthChecker:
         try:
             # Simple query to verify database is responsive
             async with asyncio.timeout(self.database_timeout):
-                # Test a basic query - check if requests table exists
-                # Use PostgreSQL-compatible query (information_schema)
-                result = await self.db.fetch_one(
-                    """SELECT table_name FROM information_schema.tables
-                       WHERE table_schema = 'public' AND table_name = 'requests'"""
-                )
-
-                if result is None:
-                    return ComponentHealth(
-                        status=ComponentStatus.DOWN,
-                        message="Database schema not initialized",
-                        latency_ms=(monotonic() - start) * 1000,
-                        last_check=datetime.now(timezone.utc),
+                # Backend-agnostic: query a known table directly
+                # If the table doesn't exist, fetch_one raises — schema missing
+                # If the table is empty, fetch_one returns None — that's fine
+                try:
+                    await self.db.fetch_one(
+                        "SELECT 1 FROM requests LIMIT 1"
                     )
+                except Exception as schema_exc:
+                    # Check if this is a missing-table error vs connection error
+                    err = str(schema_exc).lower()
+                    if any(p in err for p in ("no such table", "does not exist", "relation")):
+                        return ComponentHealth(
+                            status=ComponentStatus.DOWN,
+                            message="Database schema not initialized",
+                            latency_ms=(monotonic() - start) * 1000,
+                            last_check=datetime.now(timezone.utc),
+                        )
+                    raise  # Re-raise connection errors for outer handler
 
                 latency_ms = (monotonic() - start) * 1000
 

@@ -1,10 +1,7 @@
 """Database infrastructure - protocols and factory.
 
-Implementations (PostgreSQLClient, RedisClient, PostgresGraphAdapter) live in
-jeeves-infra package. Import from there:
-
-    from jeeves_infra.postgres import PostgreSQLClient, PostgresGraphAdapter
-    from jeeves_infra.redis import RedisClient
+Concrete implementations (PostgreSQLClient, etc.) are owned by capabilities
+and registered via the backend registry at startup.
 
 This module provides:
 - DatabaseClientProtocol (interface)

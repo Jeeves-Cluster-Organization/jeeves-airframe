@@ -42,7 +42,7 @@ class MockOrchestratorResult:
 
 
 @pytest.fixture
-async def test_app(pg_test_db):
+async def test_app(test_db):
     """Create test app with lifespan context.
 
     Uses PostgreSQL via testcontainers for test isolation.
@@ -74,7 +74,7 @@ async def test_app(pg_test_db):
     settings.memory_enabled = False
 
     # Inject PostgreSQL database into app state
-    app_state.db = pg_test_db
+    app_state.db = test_db
 
     try:
         # Manually trigger the lifespan context to initialize app_state

@@ -118,10 +118,7 @@ class AppState:
     """
 
     def __init__(self) -> None:
-        from typing import Union
-        from jeeves_infra.database.client import DatabaseClientProtocol
-        from jeeves_infra.postgres.client import PostgreSQLClient
-        self.db: Optional[Union[DatabaseClientProtocol, PostgreSQLClient]] = None
+        self.db: Optional[DatabaseClientProtocol] = None
         self.tool_catalog = None  # Tool catalog (single source of truth)
 
         # Kernel client (replaces deleted control_tower - Session 14)
@@ -216,6 +213,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     init_tracing(service_name, jaeger_endpoint)
     _logger.info("tracing_initialized", service=service_name, jaeger=jaeger_endpoint)
 
+    # Wire capabilities BEFORE database — backends are registered during wiring
+    _logger.info("wiring_capabilities")
+    wire_capabilities()
+
     # Database initialization with clear ownership
     db = None
     db_owned_by_lifespan = False
@@ -246,10 +247,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # Initialize event manager (needed for real-time updates)
     event_manager = WebSocketEventManager()
-
-    # Wire capabilities before querying registry
-    _logger.info("wiring_capabilities")
-    wire_capabilities()
 
     # Initialize app context and kernel client
     _logger.info("initializing_app_context")

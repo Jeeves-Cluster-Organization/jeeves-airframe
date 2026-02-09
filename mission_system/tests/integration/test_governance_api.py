@@ -20,13 +20,13 @@ from mission_system.memory.repositories.tool_metrics_repository import ToolMetri
 
 
 @pytest.fixture
-async def db(pg_test_db):
+async def db(test_db):
     """PostgreSQL test database with schema.
 
-    Uses pg_test_db fixture from conftest.py for PostgreSQL-only testing.
+    Uses test_db fixture from conftest.py for PostgreSQL-only testing.
     All tests now use PostgreSQL instead of SQLite (as of 2025-11-27).
     """
-    return pg_test_db
+    return test_db
 
 
 @pytest.fixture
@@ -38,7 +38,7 @@ async def tool_health_service(db):
 
 
 @pytest.fixture
-def governance_client(pg_test_db):
+def governance_client(test_db):
     """Create test client with properly configured PostgreSQL connection.
 
     For sync tests (TestClient), we set the database URL in environment
@@ -49,7 +49,7 @@ def governance_client(pg_test_db):
     from jeeves_infra.database.factory import reset_factory
 
     # Parse the test database URL into environment variables
-    db_env = parse_postgres_url(pg_test_db.database_url)
+    db_env = parse_postgres_url(test_db.database_url)
 
     # Save original environment values for cleanup
     original_env = {

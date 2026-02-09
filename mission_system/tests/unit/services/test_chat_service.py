@@ -1,24 +1,21 @@
 """Unit tests for ChatService.
 
-PostgreSQL-only as of 2025-11-27 (Amendment V).
-Tests use pg_test_db fixture from conftest.py.
+Uses test_db fixture (in-memory SQLite).
+Tests use test_db fixture from conftest.py.
 """
 
 import pytest
 from datetime import datetime, timezone
 from mission_system.services.chat_service import ChatService
 
-# Requires PostgreSQL database
-pytestmark = pytest.mark.requires_postgres
-
 
 class TestChatService:
     """Test suite for ChatService."""
 
     @pytest.fixture
-    def chat_service(self, pg_test_db):
+    def chat_service(self, test_db):
         """Create a ChatService instance."""
-        return ChatService(pg_test_db, event_manager=None)
+        return ChatService(test_db, event_manager=None)
 
     @pytest.mark.asyncio
     async def test_create_session(self, chat_service):
@@ -95,18 +92,18 @@ class TestChatService:
         assert updated["title"] == "New Title"
 
     @pytest.mark.asyncio
-    async def test_list_messages(self, chat_service, pg_test_db):
+    async def test_list_messages(self, chat_service, test_db):
         """Test listing messages in a session."""
         session = await chat_service.create_session(user_id="test-user")
 
         # Insert test messages directly
-        await pg_test_db.insert("messages", {
+        await test_db.insert("messages", {
             "session_id": session["session_id"],
             "role": "user",
             "content": "Hello",
             "created_at": datetime.now(timezone.utc)
         })
-        await pg_test_db.insert("messages", {
+        await test_db.insert("messages", {
             "session_id": session["session_id"],
             "role": "assistant",
             "content": "Hi there!",
@@ -124,28 +121,23 @@ class TestChatService:
         assert messages[1]["role"] == "assistant"
 
     @pytest.mark.asyncio
-    async def test_delete_message(self, chat_service, pg_test_db):
+    async def test_delete_message(self, chat_service, test_db):
         """Test deleting a message."""
         session = await chat_service.create_session(user_id="test-user")
         session_id = str(session["session_id"])  # Ensure string for SQL
 
-        # Insert test message and get ID using RETURNING (PostgreSQL feature)
-        # commit=True required for INSERT...RETURNING per HANDOFF.md Fix #4
-        insert_result = await pg_test_db.fetch_one(
-            """
-            INSERT INTO messages (session_id, role, content, created_at)
-            VALUES (:session_id, :role, :content, :created_at)
-            RETURNING message_id
-            """,
-            {
-                "session_id": session_id,
-                "role": "user",
-                "content": "Test message for deletion",
-                "created_at": datetime.now(timezone.utc)
-            },
-            commit=True
+        # Insert test message then fetch the generated ID (avoids PostgreSQL-only RETURNING)
+        await test_db.insert("messages", {
+            "session_id": session_id,
+            "role": "user",
+            "content": "Test message for deletion",
+            "created_at": datetime.now(timezone.utc)
+        })
+        result = await test_db.fetch_one(
+            "SELECT message_id FROM messages WHERE session_id = :sid ORDER BY message_id DESC LIMIT 1",
+            {"sid": session_id}
         )
-        message_id = insert_result["message_id"]
+        message_id = result["message_id"]
 
         # Delete message
         result = await chat_service.delete_message(
@@ -164,7 +156,7 @@ class TestChatService:
         assert len(messages) == 0
 
     @pytest.mark.asyncio
-    async def test_export_session_json(self, chat_service, pg_test_db):
+    async def test_export_session_json(self, chat_service, test_db):
         """Test exporting a session to JSON."""
         session = await chat_service.create_session(
             user_id="test-user",
@@ -172,7 +164,7 @@ class TestChatService:
         )
 
         # Insert test messages
-        await pg_test_db.insert("messages", {
+        await test_db.insert("messages", {
             "session_id": session["session_id"],
             "role": "user",
             "content": "Test",

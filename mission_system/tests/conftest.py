@@ -10,12 +10,11 @@ LLAMASERVER_ALWAYS Policy:
 Test Configuration:
 - Centralized in tests/config/ package
 - Fixtures in tests/fixtures/ package
-- PostgreSQL-only testing
+- In-memory SQLite for fast, isolated tests
 
 Constitutional Compliance:
-- Constitution R7: register_capability() called at test setup for integration tests
-- App-specific agent fixtures are in the app layer's own test fixtures
-- See: jeeves-capability-code-analyser/tests/fixtures/agents.py
+- Airframe tests are self-contained (no capability imports)
+- Capability registration happens in the capability layer's own conftest
 
 Usage:
     @pytest.mark.e2e           # Full production flow
@@ -31,18 +30,10 @@ from pathlib import Path
 
 import pytest
 
-# Project root setup
-project_root = Path(__file__).parent.parent
+# Project root setup (jeeves-airframe/ — 3 levels up from mission_system/tests/conftest.py)
+project_root = Path(__file__).parent.parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
-
-# App layer setup (for mission system code that imports from app layer)
-# NOTE: This is needed because mission system code imports from app layer
-# (e.g., prompts.registry). Ideally this dependency should be inverted.
-# IMPORTANT: Append (not insert) so mission_system paths take precedence
-app_dir = project_root.parent / "jeeves-capability-code-analyser"
-if app_dir.exists() and str(app_dir) not in sys.path:
-    sys.path.append(str(app_dir))
 
 # Import config for environment setup
 from mission_system.tests.config.llm_config import LLAMASERVER_HOST, DEFAULT_MODEL
@@ -56,37 +47,6 @@ from mission_system.tests.config.markers import (
 os.environ.setdefault("LLAMASERVER_HOST", LLAMASERVER_HOST)
 os.environ.setdefault("DEFAULT_MODEL", DEFAULT_MODEL)
 os.environ["DISABLE_TEMPERATURE"] = "false"
-
-
-# ============================================================
-# Capability Registration Fixture (Constitution R7)
-# ============================================================
-
-@pytest.fixture(autouse=True, scope="session")
-def setup_capability_registration():
-    """Register capability resources per Constitution R7.
-
-    This ensures the CapabilityResourceRegistry is populated with
-    capability resources for tests that exercise the full stack.
-    """
-    from jeeves_infra.protocols import reset_capability_resource_registry
-
-    # Start with clean registry
-    reset_capability_resource_registry()
-
-    # Register capability (Constitution R7)
-    try:
-        from jeeves_capability_code_analyser import register_capability
-        register_capability()
-    except ImportError:
-        # Capability not available, skip registration
-        # Unit tests that don't need capability will pass
-        pass
-
-    yield
-
-    # Clean up for test isolation
-    reset_capability_resource_registry()
 
 
 # ============================================================
@@ -114,8 +74,7 @@ def pytest_runtest_setup(item):
 
 # Database fixtures
 from mission_system.tests.fixtures.database import (
-    postgres_container,
-    pg_test_db,
+    test_db,
     create_test_prerequisites,
     create_session_only,
 )
@@ -165,8 +124,7 @@ def anyio_backend():
 # Re-export for pytest discovery
 __all__ = [
     # Database
-    "postgres_container",
-    "pg_test_db",
+    "test_db",
     "create_test_prerequisites",
     "create_session_only",
     # LLM

@@ -80,11 +80,7 @@ class ChatService:
         self.event_manager = event_manager
         self.lock = ChatMutationLock()
         self.logger = self._logger.bind(component="chat_service")
-        try:
-            from jeeves_infra.postgres.client import PostgreSQLClient
-            self.is_postgres = isinstance(db, PostgreSQLClient)
-        except Exception:
-            self.is_postgres = hasattr(db, "database_url")
+        self.is_postgres = getattr(db, "backend", None) == "postgres"
 
     # =========================================================================
     # SESSION OPERATIONS

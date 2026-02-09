@@ -1,12 +1,11 @@
-"""Pytest configuration for avionics tests.
+"""Pytest configuration for jeeves-infra tests.
 
-This conftest.py provides fixtures and configuration for the avionics
-test suite. Avionics tests may use database containers but should mock
-core engine protocols when testing in isolation.
+This conftest.py provides fixtures and configuration for the
+infrastructure test suite.
 
 Key Principles:
-- Use testcontainers for PostgreSQL
-- Mock jeeves_core_engine protocols when needed
+- Use in-memory SQLite for fast, isolated tests
+- Mock protocols when testing in isolation
 - Each test gets a fresh database
 """
 
@@ -35,8 +34,7 @@ if str(tests_root) not in sys.path:
 
 try:
     from fixtures.database import (
-        postgres_container,
-        pg_test_db,
+        test_db,
         create_test_prerequisites,
         create_session_only,
     )

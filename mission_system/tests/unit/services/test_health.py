@@ -1,7 +1,7 @@
 """Unit tests for health check functionality.
 
-PostgreSQL-only as of 2025-11-27 (Amendment V).
-Tests use pg_test_db fixture from conftest.py.
+Uses test_db fixture (in-memory SQLite).
+Tests use test_db fixture from conftest.py.
 """
 
 from __future__ import annotations
@@ -20,14 +20,11 @@ from mission_system.health import (
 )
 from mission_system.config.constants import PLATFORM_VERSION
 
-# Requires PostgreSQL database
-pytestmark = pytest.mark.requires_postgres
-
 
 @pytest.fixture
-def health_checker(pg_test_db):
+def health_checker(test_db):
     """Create health checker instance."""
-    return HealthChecker(pg_test_db)
+    return HealthChecker(test_db)
 
 
 @pytest.mark.asyncio
@@ -45,7 +42,12 @@ async def test_liveness_check(health_checker):
 @pytest.mark.asyncio
 async def test_readiness_check_healthy(health_checker):
     """Test readiness check with healthy database."""
-    result = await health_checker.check_readiness()
+    mock_models = ComponentHealth(
+        status=ComponentStatus.UP,
+        message="Mock LLM provider",
+    )
+    with patch.object(health_checker, "_check_models", return_value=mock_models):
+        result = await health_checker.check_readiness()
 
     assert result.status == HealthStatus.HEALTHY
     assert result.uptime_seconds >= 0
@@ -60,13 +62,17 @@ async def test_readiness_check_healthy(health_checker):
 @pytest.mark.asyncio
 async def test_readiness_check_database_timeout(health_checker):
     """Test readiness check when database times out."""
-    # Mock database query to timeout
     async def mock_timeout(*args, **kwargs):
         import asyncio
 
         await asyncio.sleep(10)  # Exceed timeout
 
-    with patch.object(health_checker.db, "fetch_one", side_effect=mock_timeout):
+    mock_models = ComponentHealth(
+        status=ComponentStatus.UP,
+        message="Mock LLM provider",
+    )
+    with patch.object(health_checker.db, "fetch_one", side_effect=mock_timeout), \
+         patch.object(health_checker, "_check_models", return_value=mock_models):
         result = await health_checker.check_readiness()
 
         assert result.status == HealthStatus.UNHEALTHY
@@ -78,10 +84,13 @@ async def test_readiness_check_database_timeout(health_checker):
 @pytest.mark.asyncio
 async def test_readiness_check_database_error(health_checker):
     """Test readiness check when database raises error."""
-    # Mock database query to raise error
+    mock_models = ComponentHealth(
+        status=ComponentStatus.UP,
+        message="Mock LLM provider",
+    )
     with patch.object(
         health_checker.db, "fetch_one", side_effect=Exception("Connection failed")
-    ):
+    ), patch.object(health_checker, "_check_models", return_value=mock_models):
         result = await health_checker.check_readiness()
 
         assert result.status == HealthStatus.UNHEALTHY
@@ -91,91 +100,41 @@ async def test_readiness_check_database_error(health_checker):
 
 
 @pytest.mark.asyncio
-async def test_readiness_check_database_missing_schema(postgres_container):
-    """Test readiness check when database schema not initialized.
+async def test_readiness_check_database_missing_schema(health_checker):
+    """Test readiness check when database schema not initialized."""
+    async def mock_missing_table(*args, **kwargs):
+        raise Exception('relation "requests" does not exist')
 
-    Creates a fresh PostgreSQL database without schema to test health checker
-    detection of missing schema. Uses the session-scoped postgres_container
-    to create a temporary database.
-
-    Import Boundary Note: Mission system tests can access avionics
-    directly for database infrastructure (mission_system IS the wiring layer).
-    """
-    # Mission system is the wiring layer - avionics imports acceptable
-    from jeeves_infra.postgres.client import PostgreSQLClient
-    import urllib.parse
-    import uuid
-
-    # Create unique database name for this test
-    db_name = f"test_no_schema_{uuid.uuid4().hex[:8]}"
-    admin_url = postgres_container.get_connection_url()
-
-    # Create empty database (no schema) using AUTOCOMMIT
-    # (CREATE DATABASE cannot run inside a transaction block)
-    from sqlalchemy import text
-
-    admin_client = PostgreSQLClient(admin_url)
-    await admin_client.connect()
-
-    try:
-        async with admin_client.engine.connect() as conn:
-            # AsyncConnection.execution_options() is async in SQLAlchemy 2.0
-            conn_with_autocommit = await conn.execution_options(isolation_level="AUTOCOMMIT")
-            await conn_with_autocommit.execute(text(f"CREATE DATABASE {db_name}"))
-    finally:
-        await admin_client.disconnect()
-
-    # Connect to empty database
-    # Replace database name in URL - handle any database name by replacing last path segment
-    parsed = urllib.parse.urlparse(admin_url)
-    new_path = parsed.path.rsplit('/', 1)[0] + f'/{db_name}'
-    test_url = parsed._replace(path=new_path).geturl()
-    db_empty = PostgreSQLClient(test_url)
-    await db_empty.connect()  # Connected but no schema initialized
-
-    # Create health checker with database that lacks schema
-    health_checker = HealthChecker(db_empty)
-
-    try:
+    mock_models = ComponentHealth(
+        status=ComponentStatus.UP,
+        message="Mock LLM provider",
+    )
+    with patch.object(health_checker.db, "fetch_one", side_effect=mock_missing_table), \
+         patch.object(health_checker, "_check_models", return_value=mock_models):
         result = await health_checker.check_readiness()
 
         assert result.status == HealthStatus.UNHEALTHY
         assert "database" in result.components
         assert result.components["database"].status == ComponentStatus.DOWN
-        # The error message should indicate schema/table issue
         msg = result.components["database"].message.lower()
         assert "schema" in msg or "not" in msg or "table" in msg or "relation" in msg
-    finally:
-        # Cleanup
-        await db_empty.disconnect()
-
-        # Drop test database using AUTOCOMMIT
-        # (DROP DATABASE cannot run inside a transaction block)
-        admin_client = PostgreSQLClient(admin_url)
-        await admin_client.connect()
-        try:
-            async with admin_client.engine.connect() as conn:
-                # AsyncConnection.execution_options() is async in SQLAlchemy 2.0
-                conn_with_autocommit = await conn.execution_options(isolation_level="AUTOCOMMIT")
-                await conn_with_autocommit.execute(
-                    text(f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{db_name}'")
-                )
-                await conn_with_autocommit.execute(text(f"DROP DATABASE IF EXISTS {db_name}"))
-        finally:
-            await admin_client.disconnect()
 
 
 @pytest.mark.asyncio
 async def test_readiness_check_database_degraded(health_checker):
     """Test readiness check when database is slow but responding."""
-    # Mock database query to be slow
     async def mock_slow(*args, **kwargs):
         import asyncio
 
         await asyncio.sleep(1.5)  # Slow but not timeout
         return ("requests",)
 
-    with patch.object(health_checker.db, "fetch_one", side_effect=mock_slow):
+    mock_models = ComponentHealth(
+        status=ComponentStatus.UP,
+        message="Mock LLM provider",
+    )
+    with patch.object(health_checker.db, "fetch_one", side_effect=mock_slow), \
+         patch.object(health_checker, "_check_models", return_value=mock_models):
         result = await health_checker.check_readiness()
 
         assert result.status == HealthStatus.DEGRADED
@@ -187,9 +146,11 @@ async def test_readiness_check_database_degraded(health_checker):
 @pytest.mark.asyncio
 async def test_check_models_mock_provider(health_checker):
     """Test that model check returns UP for mock provider."""
-    result = await health_checker._check_models()
+    mock_settings = AsyncMock()
+    mock_settings.llm_provider = "mock"
+    with patch("mission_system.adapters.get_settings", return_value=mock_settings):
+        result = await health_checker._check_models()
 
-    # Mock provider returns UP status
     assert result.status == ComponentStatus.UP
     assert "mock" in result.message.lower()
 

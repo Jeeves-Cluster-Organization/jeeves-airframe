@@ -115,13 +115,35 @@ class PersistenceProtocol(Protocol):
 
 @runtime_checkable
 class DatabaseClientProtocol(Protocol):
-    """Database client interface."""
+    """Database client interface.
 
+    Lifecycle: connect/disconnect
+    Query: execute/fetch_one/fetch_all (raw SQL)
+    Data: insert/update (structured), initialize_schema (DDL from file)
+    Transaction: transaction() context manager (ACID)
+    Identity: backend property
+    """
+
+    # Lifecycle
     async def connect(self) -> None: ...
     async def disconnect(self) -> None: ...
+
+    # Query
     async def execute(self, query: str, params: Optional[Dict[str, Any]] = None) -> None: ...
     async def fetch_one(self, query: str, params: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]: ...
     async def fetch_all(self, query: str, params: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]: ...
+
+    # Data
+    async def insert(self, table: str, data: Dict[str, Any]) -> None: ...
+    async def update(self, table: str, data: Dict[str, Any], where_clause: str, where_params: Optional[Any] = None) -> int: ...
+    async def initialize_schema(self, schema_path: str) -> None: ...
+
+    # Transaction
+    def transaction(self): ...
+
+    # Identity
+    @property
+    def backend(self) -> str: ...
 
 
 @runtime_checkable

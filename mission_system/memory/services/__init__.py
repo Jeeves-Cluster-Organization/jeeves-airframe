@@ -6,7 +6,6 @@ Core's protocols define the "what" - the contracts these services must satisfy.
 
 Protocol Implementations:
 - SessionStateAdapter: Implements Core's SessionStateProtocol
-- EmbeddingService: Infrastructure for semantic search (partial SemanticSearchProtocol)
 
 Infrastructure Services:
 - ChunkService: L3 semantic memory chunking
@@ -16,14 +15,10 @@ Infrastructure Services:
 - ToolHealthService: L7 tool metrics
 - CodeIndexer: Code indexing for semantic search
 
-Memory Module Audit (2025-12-09):
-- Moved from avionics/memory/services/
+EmbeddingService is owned by capabilities (concrete DB concern).
 """
 
 from mission_system.memory.services.nli_service import NLIService, get_nli_service
-
-# Lazy import: EmbeddingService requires sentence-transformers (1.5GB+ ML dep)
-# Import directly when needed: from mission_system.memory.services.embedding_service import EmbeddingService
 from mission_system.memory.services.xref_manager import CrossRefManager
 from mission_system.memory.services.event_emitter import EventEmitter
 from mission_system.memory.services.trace_recorder import TraceRecorder

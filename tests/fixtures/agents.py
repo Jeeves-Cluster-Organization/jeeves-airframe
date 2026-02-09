@@ -19,7 +19,7 @@ from mission_system.contracts_core import (
     create_envelope,
 )
 from jeeves_infra.protocols import RequestContext
-from mission_system.tests.fixtures.mocks import (
+from tests.fixtures.mocks import (
     MockDatabaseClient,
     MockLLMAdapter,
 )

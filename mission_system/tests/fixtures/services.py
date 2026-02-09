@@ -24,33 +24,33 @@ import pytest
 
 
 @pytest.fixture
-async def session_service(pg_test_db):
+async def session_service(test_db):
     """SessionStateService fixture.
 
     Provides L4 working memory functionality for tests.
     """
     from mission_system.memory.services.session_state_service import SessionStateService
 
-    service = SessionStateService(pg_test_db)
+    service = SessionStateService(test_db)
     await service.ensure_initialized()
     return service
 
 
 @pytest.fixture
-async def tool_health_service(pg_test_db):
+async def tool_health_service(test_db):
     """ToolHealthService fixture.
 
     Provides L7 tool health metrics functionality for tests.
     """
     from mission_system.memory.services.tool_health_service import ToolHealthService
 
-    service = ToolHealthService(pg_test_db)
+    service = ToolHealthService(test_db)
     await service.ensure_initialized()
     return service
 
 
 @pytest.fixture
-def tool_registry(pg_test_db):
+def tool_registry(test_db):
     """Mock tool registry implementing ToolRegistryProtocol.
 
     Constitutional compliance: Mission system tests must not import from

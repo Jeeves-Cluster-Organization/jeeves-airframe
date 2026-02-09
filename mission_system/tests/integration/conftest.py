@@ -6,7 +6,7 @@ PostgreSQL-Only Testing (SQLite deprecated as of 2025-11-27):
 - Proper cleanup for CI environments
 
 Database Lifecycle:
-- Async tests (AsyncClient): Can inject pg_test_db directly into app_state.db
+- Async tests (AsyncClient): Can inject test_db directly into app_state.db
 - Sync tests (TestClient): Set database URL in environment, let lifespan create connection
   This avoids event loop mismatch issues with TestClient's separate thread.
 
@@ -79,7 +79,7 @@ def pytest_configure(config):
 # ============================================================
 
 @pytest.fixture(scope="function")
-def sync_client(pg_test_db):
+def sync_client(test_db):
     """Synchronous test client backed by PostgreSQL.
 
     For sync tests (TestClient), we set the database URL in environment
@@ -89,7 +89,7 @@ def sync_client(pg_test_db):
     an async database connection across different event loops.
 
     Args:
-        pg_test_db: PostgreSQL database fixture (used to get URL)
+        test_db: PostgreSQL database fixture (used to get URL)
 
     Yields:
         TestClient: FastAPI test client with PostgreSQL backend
@@ -101,7 +101,7 @@ def sync_client(pg_test_db):
     from jeeves_infra.database.factory import reset_factory
 
     # Parse the test database URL into environment variables
-    db_env = parse_postgres_url(pg_test_db.database_url)
+    db_env = parse_postgres_url(test_db.database_url)
 
     # Save original environment values for cleanup
     original_env = {

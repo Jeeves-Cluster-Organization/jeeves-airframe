@@ -291,46 +291,33 @@ def create_event_emitter(persistence: PersistenceProtocol) -> Any:
 
 def create_graph_storage(persistence: PersistenceProtocol) -> Any:
     """
-    Create L5 graph storage for entity relationships.
+    Create graph storage for entity relationships.
 
-    Uses PostgresGraphAdapter from avionics for production.
-    For testing, use InMemoryGraphStorage from memory_module.
+    Returns InMemoryGraphStorage as default. Capabilities may register
+    their own graph storage backends (e.g. PostgresGraphAdapter).
 
     Args:
         persistence: Database client
 
     Returns:
-        PostgresGraphAdapter instance implementing GraphStorageProtocol
+        GraphStorageProtocol implementation
     """
-    from jeeves_infra.postgres.graph import PostgresGraphAdapter
-    return PostgresGraphAdapter(persistence)
+    from mission_system.memory.repositories.graph_stub import InMemoryGraphStorage
+    return InMemoryGraphStorage()
 
 
-def create_embedding_service() -> Any:
-    """
-    Create embedding service for semantic search.
-
-    Returns:
-        EmbeddingService instance
-    """
-    from mission_system.memory.services.embedding_service import EmbeddingService
-    return EmbeddingService()
-
-
-def create_code_indexer(persistence: PersistenceProtocol, embedding_service: Any = None) -> Any:
+def create_code_indexer(persistence: PersistenceProtocol, embedding_service: Any) -> Any:
     """
     Create RAG-based code indexer.
 
     Args:
         persistence: Database client
-        embedding_service: Optional embedding service (creates one if None)
+        embedding_service: Embedding service instance
 
     Returns:
         CodeIndexer instance
     """
     from mission_system.memory.services.code_indexer import CodeIndexer
-    if embedding_service is None:
-        embedding_service = create_embedding_service()
     return CodeIndexer(
         postgres_client=persistence,
         embedding_service=embedding_service,
@@ -419,66 +406,6 @@ def create_nli_service(
     return NLIService(model_name=model_name, enabled=enabled)
 
 
-async def create_vector_adapter(
-    settings: Optional[SettingsProtocol] = None,
-    embedding_service: Any = None,
-) -> Any:
-    """
-    Create and initialize pgvector adapter.
-
-    Creates a new adapter instance - does not cache. Caller owns the lifecycle.
-
-    Moved from avionics.database.factory to respect layer boundaries
-    (mission_system can import from memory_module, avionics cannot).
-
-    Args:
-        settings: Application settings (uses global if None)
-        embedding_service: Embedding service instance (creates one if None)
-
-    Returns:
-        PgVectorRepository instance
-
-    Constitutional compliance:
-        Apps access infrastructure via adapters, not direct avionics imports.
-    """
-    from jeeves_infra.postgres.client import PostgreSQLClient
-    from mission_system.memory.repositories.pgvector_repository import PgVectorRepository
-
-    if settings is None:
-        settings = get_settings()
-
-    if embedding_service is None:
-        embedding_service = create_embedding_service()
-
-    logger = get_logger()
-    logger.info(
-        "creating_vector_adapter",
-        backend="pgvector",
-        dimension=settings.pgvector_dimension
-    )
-
-    postgres_client = PostgreSQLClient(
-        database_url=settings.get_postgres_url(),
-        pool_size=settings.postgres_pool_size,
-        max_overflow=settings.postgres_max_overflow,
-        pool_timeout=settings.postgres_pool_timeout,
-        pool_recycle=settings.postgres_pool_recycle,
-        logger=logger,
-    )
-
-    await postgres_client.connect()
-
-    adapter = PgVectorRepository(
-        postgres_client=postgres_client,
-        embedding_service=embedding_service,
-        dimension=settings.pgvector_dimension,
-        logger=logger,
-    )
-
-    logger.info("vector_adapter_ready")
-    return adapter
-
-
 __all__ = [
     "SettingsProtocol",
     "MissionSystemAdapters",
@@ -494,11 +421,8 @@ __all__ = [
     # Memory layer factories
     "create_event_emitter",
     "create_graph_storage",
-    "create_embedding_service",
     "create_code_indexer",
     "create_tool_health_service",
     # NLI service factory (Decision 3:A)
     "create_nli_service",
-    # Vector adapter (moved from avionics for layer compliance)
-    "create_vector_adapter",
 ]

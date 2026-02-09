@@ -10,9 +10,9 @@ Constitutional Reference:
 - PostgreSQL Decoupling Audit (Option B)
 
 Usage:
-    # In capability/application startup:
-    from avionics.database.registry import register_backend
-    from jeeves_infra.postgres.client import PostgreSQLClient
+    # In capability startup (e.g. register_capability()):
+    from jeeves_infra.database.registry import register_backend, postgres_config_builder
+    from my_capability.database.postgres.client import PostgreSQLClient
 
     register_backend("postgres", PostgreSQLClient, postgres_config_builder)
 
@@ -163,8 +163,8 @@ def postgres_config_builder(settings: 'Settings', logger: LoggerProtocol) -> Dic
 
     This is a helper function that can be used when registering the postgres backend:
 
-        from jeeves_infra.postgres.client import PostgreSQLClient
-        from avionics.database.registry import register_backend, postgres_config_builder
+        from my_capability.database.postgres.client import PostgreSQLClient
+        from jeeves_infra.database.registry import register_backend, postgres_config_builder
 
         register_backend("postgres", PostgreSQLClient, postgres_config_builder)
     """

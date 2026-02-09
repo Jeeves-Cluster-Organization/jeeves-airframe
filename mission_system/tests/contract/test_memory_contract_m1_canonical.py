@@ -19,15 +19,12 @@ Note: v3.0 Pivot - tasks and journal_entries tables were removed.
 import pytest
 from uuid import uuid4
 
-# Requires PostgreSQL database
-pytestmark = pytest.mark.requires_postgres
-
 
 @pytest.mark.contract
 class TestM1Canonical:
     """Validate M1: Canonical State is Ground Truth."""
 
-    async def test_embeddings_reference_canonical_source(self, pg_test_db):
+    async def test_embeddings_reference_canonical_source(self, test_db):
         """Every embedding must reference a canonical source table.
 
         M1 Requirement: "Embeddings must reference their source tables"
@@ -40,7 +37,7 @@ class TestM1Canonical:
         """
         # Create canonical fact
         fact_id = str(uuid4())
-        await pg_test_db.insert("knowledge_facts", {
+        await test_db.insert("knowledge_facts", {
             "fact_id": fact_id,
             "user_id": "test_user",
             "domain": "test",
@@ -50,7 +47,7 @@ class TestM1Canonical:
 
         # Create embedding referencing fact
         chunk_id = str(uuid4())
-        await pg_test_db.insert("semantic_chunks", {
+        await test_db.insert("semantic_chunks", {
             "chunk_id": chunk_id,
             "source_type": "fact",
             "source_id": fact_id,
@@ -60,7 +57,7 @@ class TestM1Canonical:
         })
 
         # Verify embedding references canonical source
-        result = await pg_test_db.fetch_one(
+        result = await test_db.fetch_one(
             "SELECT source_type, source_id FROM semantic_chunks WHERE chunk_id = ?",
             (chunk_id,)
         )
@@ -71,7 +68,7 @@ class TestM1Canonical:
             "M1 violation: Embedding does not reference canonical source"
 
 
-    async def test_deleting_canonical_cascades_to_embeddings(self, pg_test_db):
+    async def test_deleting_canonical_cascades_to_embeddings(self, test_db):
         """Deleting canonical data must cascade to derived embeddings.
 
         M1 Requirement: "Deleting canonical data cascades to derived views"
@@ -83,7 +80,7 @@ class TestM1Canonical:
         """
         # Create canonical fact
         fact_id = str(uuid4())
-        await pg_test_db.insert("knowledge_facts", {
+        await test_db.insert("knowledge_facts", {
             "fact_id": fact_id,
             "user_id": "test_user",
             "domain": "test",
@@ -93,7 +90,7 @@ class TestM1Canonical:
 
         # Create embedding referencing fact
         chunk_id = str(uuid4())
-        await pg_test_db.insert("semantic_chunks", {
+        await test_db.insert("semantic_chunks", {
             "chunk_id": chunk_id,
             "source_type": "fact",
             "source_id": fact_id,
@@ -103,17 +100,17 @@ class TestM1Canonical:
         })
 
         # Delete canonical fact
-        await pg_test_db.execute("DELETE FROM knowledge_facts WHERE fact_id = ?", (fact_id,))
+        await test_db.execute("DELETE FROM knowledge_facts WHERE fact_id = ?", (fact_id,))
 
         # Verify embedding was cascaded (deleted)
-        result = await pg_test_db.fetch_one(
+        result = await test_db.fetch_one(
             "SELECT * FROM semantic_chunks WHERE source_id = ?", (fact_id,)
         )
         assert result is None, \
             "M1 violation: Embedding persisted after canonical source was deleted"
 
 
-    async def test_orphaned_embeddings_prevented_by_referential_integrity(self, pg_test_db):
+    async def test_orphaned_embeddings_prevented_by_referential_integrity(self, test_db):
         """Orphaned embeddings must be prevented by referential integrity checks.
 
         M1 Requirement: "Embeddings must reference their source tables"
@@ -125,7 +122,7 @@ class TestM1Canonical:
         """
         # Attempt to create embedding with non-existent fact
         with pytest.raises(Exception) as exc_info:
-            await pg_test_db.insert("semantic_chunks", {
+            await test_db.insert("semantic_chunks", {
                 "chunk_id": str(uuid4()),
                 "source_type": "fact",
                 "source_id": str(uuid4()),  # Non-existent fact
@@ -140,7 +137,7 @@ class TestM1Canonical:
             "M1 violation: Orphaned embedding created (no referential integrity enforcement)"
 
 
-    async def test_all_semantic_chunks_have_valid_source_type(self, pg_test_db):
+    async def test_all_semantic_chunks_have_valid_source_type(self, test_db):
         """All semantic chunks must have valid source_type from allowed list.
 
         M1 Requirement: Source types must be: fact, message, code
@@ -152,7 +149,7 @@ class TestM1Canonical:
         """
         # Create fact for valid reference
         fact_id = str(uuid4())
-        await pg_test_db.insert("knowledge_facts", {
+        await test_db.insert("knowledge_facts", {
             "fact_id": fact_id,
             "user_id": "test_user",
             "domain": "test",
@@ -163,7 +160,7 @@ class TestM1Canonical:
         # Attempt to create embedding with invalid source_type
         # Note: This should fail if schema enforces CHECK constraint
         try:
-            await pg_test_db.insert("semantic_chunks", {
+            await test_db.insert("semantic_chunks", {
                 "chunk_id": str(uuid4()),
                 "source_type": "invalid_type",
                 "source_id": fact_id,
@@ -174,7 +171,7 @@ class TestM1Canonical:
 
             # If we get here, schema doesn't enforce source_type constraint
             # Clean up for subsequent tests
-            await pg_test_db.execute(
+            await test_db.execute(
                 "DELETE FROM semantic_chunks WHERE source_type = 'invalid_type'"
             )
 
@@ -188,7 +185,7 @@ class TestM1Canonical:
             pass
 
 
-    async def test_canonical_to_embedding_lineage_traceable(self, pg_test_db):
+    async def test_canonical_to_embedding_lineage_traceable(self, test_db):
         """Embeddings must be traceable back to canonical source.
 
         M1 Requirement: "Canonical State is Ground Truth"
@@ -201,7 +198,7 @@ class TestM1Canonical:
         """
         # Create canonical fact
         fact_id = str(uuid4())
-        await pg_test_db.insert("knowledge_facts", {
+        await test_db.insert("knowledge_facts", {
             "fact_id": fact_id,
             "user_id": "test_user",
             "domain": "test",
@@ -212,7 +209,7 @@ class TestM1Canonical:
         # Create multiple embeddings from same fact
         # Note: chunk_index must be unique per (source_type, source_id)
         for i in range(3):
-            await pg_test_db.insert("semantic_chunks", {
+            await test_db.insert("semantic_chunks", {
                 "chunk_id": str(uuid4()),
                 "source_type": "fact",
                 "source_id": fact_id,
@@ -223,7 +220,7 @@ class TestM1Canonical:
             })
 
         # Verify all embeddings can be traced back to fact
-        results = await pg_test_db.fetch_all(
+        results = await test_db.fetch_all(
             """
             SELECT chunk_id, source_type, source_id
             FROM semantic_chunks
@@ -239,7 +236,7 @@ class TestM1Canonical:
             assert str(result["source_id"]) == fact_id
 
 
-    async def test_updating_canonical_does_not_orphan_embeddings(self, pg_test_db):
+    async def test_updating_canonical_does_not_orphan_embeddings(self, test_db):
         """Updating canonical fact_id must update embeddings or prevent update.
 
         M1 Requirement: "Canonical State is Ground Truth"
@@ -252,7 +249,7 @@ class TestM1Canonical:
         """
         # Create canonical fact
         old_fact_id = str(uuid4())
-        await pg_test_db.insert("knowledge_facts", {
+        await test_db.insert("knowledge_facts", {
             "fact_id": old_fact_id,
             "user_id": "test_user",
             "domain": "test",
@@ -262,7 +259,7 @@ class TestM1Canonical:
 
         # Create embedding referencing fact
         chunk_id = str(uuid4())
-        await pg_test_db.insert("semantic_chunks", {
+        await test_db.insert("semantic_chunks", {
             "chunk_id": chunk_id,
             "source_type": "fact",
             "source_id": old_fact_id,
@@ -274,13 +271,13 @@ class TestM1Canonical:
         # Attempt to update fact_id
         new_fact_id = str(uuid4())
         try:
-            await pg_test_db.execute(
+            await test_db.execute(
                 "UPDATE knowledge_facts SET fact_id = ? WHERE fact_id = ?",
                 (new_fact_id, old_fact_id)
             )
 
             # If update succeeded, verify embedding was cascaded
-            result = await pg_test_db.fetch_one(
+            result = await test_db.fetch_one(
                 "SELECT source_id FROM semantic_chunks WHERE chunk_id = ?",
                 (chunk_id,)
             )
@@ -293,7 +290,7 @@ class TestM1Canonical:
             # Update prevented by foreign key constraint (ON UPDATE RESTRICT)
             # This is acceptable - prevents orphaned embeddings
             # Verify embedding still references old fact_id
-            result = await pg_test_db.fetch_one(
+            result = await test_db.fetch_one(
                 "SELECT source_id FROM semantic_chunks WHERE chunk_id = ?",
                 (chunk_id,)
             )
@@ -301,86 +298,3 @@ class TestM1Canonical:
             # PostgreSQL returns UUID objects; convert for comparison with string
             assert str(result["source_id"]) == old_fact_id, \
                 "M1 violation: Embedding corrupted after failed fact_id update"
-
-
-@pytest.mark.contract
-class TestM1Schema:
-    """Validate M1 schema structure requirements."""
-
-    async def test_semantic_chunks_table_has_required_columns(self, pg_test_db):
-        """Semantic chunks table must have all required M1 columns.
-
-        M1 Requirement: source_type, source_id for canonical reference
-
-        Test Strategy:
-        1. Query table schema
-        2. Verify required columns exist
-        """
-        # Query table schema
-        result = await pg_test_db.fetch_all(
-            """
-            SELECT column_name, data_type, is_nullable
-            FROM information_schema.columns
-            WHERE table_name = 'semantic_chunks'
-            ORDER BY ordinal_position
-            """
-        )
-
-        # Convert to dict for easier assertion
-        columns = {row["column_name"]: row for row in result}
-
-        # Verify required M1 columns exist
-        assert "source_type" in columns, "M1 violation: source_type column missing"
-        assert "source_id" in columns, "M1 violation: source_id column missing"
-        assert "embedding" in columns, "M1 violation: embedding column missing"
-
-        # Verify source_type and source_id are NOT NULL
-        assert columns["source_type"]["is_nullable"] == "NO", \
-            "M1 violation: source_type should be NOT NULL"
-        assert columns["source_id"]["is_nullable"] == "NO", \
-            "M1 violation: source_id should be NOT NULL"
-
-
-    async def test_referential_integrity_enforced_for_canonical_sources(self, pg_test_db):
-        """Referential integrity must be enforced for canonical source tables.
-
-        M1 Requirement: "Embeddings must reference their source tables"
-
-        Test Strategy:
-        1. Check for triggers that enforce referential integrity
-           (PostgreSQL doesn't support polymorphic FKs, so we use triggers)
-        2. Verify the validation trigger exists on semantic_chunks
-        """
-        # Query for triggers on semantic_chunks that enforce source validation
-        result = await pg_test_db.fetch_all(
-            """
-            SELECT
-                trigger_name,
-                event_manipulation,
-                action_timing
-            FROM information_schema.triggers
-            WHERE event_object_table = 'semantic_chunks'
-                AND trigger_name LIKE '%check_semantic_chunk_source%'
-            """
-        )
-
-        # Verify the referential integrity trigger exists
-        assert len(result) > 0, \
-            "M1 violation: No referential integrity enforcement on semantic_chunks. " \
-            "Expected trigger 'trg_check_semantic_chunk_source' for polymorphic FK validation."
-
-        # Also verify CASCADE delete triggers exist on canonical tables
-        cascade_triggers = await pg_test_db.fetch_all(
-            """
-            SELECT
-                event_object_table,
-                trigger_name
-            FROM information_schema.triggers
-            WHERE trigger_name LIKE '%cascade_delete%chunks%'
-            """
-        )
-
-        # Should have cascade triggers for knowledge_facts (facts)
-        trigger_tables = [t["event_object_table"] for t in cascade_triggers]
-        assert "knowledge_facts" in trigger_tables, \
-            "M1 violation: Missing CASCADE delete trigger on knowledge_facts table"

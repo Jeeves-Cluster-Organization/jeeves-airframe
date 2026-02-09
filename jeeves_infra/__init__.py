@@ -1,18 +1,19 @@
 """Jeeves Infrastructure Layer - Adapters above the kernel.
 
-This package provides infrastructure implementations for the jeeves-core
-microkernel. It contains the "drivers" that implement kernel protocols:
+This package provides infrastructure abstractions and protocol-based plumbing
+for the jeeves-core microkernel. Concrete database implementations (PostgreSQL,
+pgvector) are owned by capabilities and registered via the backend registry.
 
 - gateway/   - HTTP/WebSocket/gRPC translation (FastAPI)
 - llm/       - LLM providers (LiteLLM, OpenAI, Mock)
-- postgres/  - PostgreSQL + pgvector implementations
+- database/  - Protocol-based database factory and registry
 - redis/     - Distributed state backend
 - memory/    - Memory service implementations (repositories, services)
 - runtime/   - Python agent/pipeline execution (LLM calls, tool execution)
 - utils/     - JSON repair, string helpers, datetime utilities
 
 Architecture:
-    Capabilities (User Space)
+    Capabilities (User Space) — own concrete DB implementations
            │
            ↓
     jeeves-infra (Kernel Modules / Drivers)  <- THIS PACKAGE
@@ -21,7 +22,7 @@ Architecture:
     jeeves-core (Microkernel - Rust)
 
 Usage:
-    from jeeves_infra.postgres import PostgreSQLClient
+    from jeeves_infra.database import create_database_client
     from jeeves_infra.llm import OpenAIHTTPProvider
     from jeeves_infra.gateway import create_gateway_app
     from jeeves_infra.runtime import PipelineRunner, Agent
