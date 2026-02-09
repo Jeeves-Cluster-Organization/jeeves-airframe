@@ -496,12 +496,12 @@ def test_import_boundaries():
    - `Agent`, `Runtime`, `create_pipeline_runner`
    - `Envelope`, `ProcessingRecord`, `create_envelope`
    - All protocols from protocols (LoggerProtocol, ToolExecutorProtocol, etc.)
-   - `AgentProfile`, `LLMProfile`, `ThresholdProfile` (generic per-agent config)
+   - `AgentProfile`, `AgentLLMConfig`, `ThresholdProfile` (generic per-agent config)
    - **NOTE:** `ToolId` and `ToolCatalog` are NOT exported - these are capability-owned
 
 2. **config/** — Generic config mechanisms
    - `ConfigRegistry`, `ConfigKeys` — Config injection pattern
-   - `AgentProfile`, `LLMProfile`, `ThresholdProfile` — Generic agent config types
+   - `AgentProfile`, `AgentLLMConfig`, `ThresholdProfile` — Generic agent config types
    - Operational constants (timeouts, retry limits, fuzzy match thresholds)
 
 3. **adapters.py** — Wraps avionics for capabilities
@@ -546,7 +546,7 @@ Envelope, ProcessingRecord, create_envelope
 TerminalReason, LoopVerdict, RiskApproval
 
 # Generic config types (defined in mission_system)
-AgentProfile, LLMProfile, ThresholdProfile
+AgentProfile, AgentLLMConfig, ThresholdProfile
 ConfigRegistry, ConfigKeys
 ```
 
@@ -613,18 +613,18 @@ from mission_system.config.domain_config import DomainConfig  # WRONG
 | Module | Content | Purpose |
 |--------|---------|---------|
 | `registry.py` | ConfigRegistry, ConfigKeys | Generic config injection |
-| `agent_profiles.py` | AgentProfile, LLMProfile, ThresholdProfile | Per-agent config types |
+| `agent_profiles.py` | AgentProfile, AgentLLMConfig, ThresholdProfile | Per-agent config types |
 | `constants.py` | Operational constants | Timeouts, retry limits |
 
 ### AgentProfile (Canonical Per-Agent Config)
 
 ```python
-from mission_system.config import AgentProfile, LLMProfile, ThresholdProfile
+from mission_system.config import AgentProfile, AgentLLMConfig, ThresholdProfile
 
 AGENT_PROFILES = {
     "planner": AgentProfile(
         role="planner",
-        llm=LLMProfile(temperature=0.3, max_tokens=2500),
+        llm=AgentLLMConfig(agent_name="planner", model="default", temperature=0.3, max_tokens=2500),
         thresholds=ThresholdProfile(clarification_threshold=0.7),
         latency_budget_ms=45000,
     ),
