@@ -85,13 +85,6 @@ from mission_system.tests.fixtures.llm import (
     schema_path,
 )
 
-# Service fixtures
-from mission_system.tests.fixtures.services import (
-    session_service,
-    tool_health_service,
-    tool_registry,
-)
-
 # Envelope and mock fixtures (mission system level - no app imports)
 from mission_system.tests.fixtures.agents import (
     # Envelope fixtures
@@ -130,10 +123,6 @@ __all__ = [
     # LLM
     "llm_provider",
     "schema_path",
-    # Services
-    "session_service",
-    "tool_health_service",
-    "tool_registry",
     # Envelope fixtures
     "envelope_factory",
     "sample_envelope",

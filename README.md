@@ -18,13 +18,12 @@ This package provides infrastructure implementations for the jeeves-core microke
 
 - **gateway/** - HTTP/WebSocket/gRPC translation (FastAPI)
 - **llm/** - LLM providers (LiteLLM, OpenAI HTTP, Mock)
-- **database/** - Database backend implementations
+- **database/** - Database backend registry and factory
 - **redis/** - Distributed state backend
-- **memory/** - Memory service implementations (repositories, services)
 - **runtime/** - Python agent/pipeline execution
 - **protocols/** - Type definitions and interfaces
 - **observability/** - Metrics and tracing
-- **tools/** - Tool executor
+- **tools/** - Tool catalog and executor
 
 ## Installation
 
@@ -34,9 +33,7 @@ pip install jeeves-infra
 
 # With specific features
 pip install jeeves-infra[gateway]    # FastAPI, WebSocket
-pip install jeeves-infra[database]   # Database backends
 pip install jeeves-infra[redis]      # Redis client
-pip install jeeves-infra[embeddings] # Sentence transformers
 pip install jeeves-infra[llm]        # LiteLLM, tiktoken
 
 # All features
@@ -89,9 +86,7 @@ Capability-agnostic orchestration infrastructure:
 | Extra | Description |
 |-------|-------------|
 | `gateway` | FastAPI, uvicorn, websockets, SSE |
-| `database` | asyncpg, SQLAlchemy |
 | `redis` | Redis client |
-| `embeddings` | Sentence transformers, numpy |
 | `llm` | LiteLLM, tiktoken |
 | `dev` | pytest, black, ruff, mypy |
 | `all` | All optional dependencies |

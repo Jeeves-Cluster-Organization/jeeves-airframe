@@ -2,10 +2,9 @@
 
 Tests the wiring added in Phase 2:
 - OTEL spans when enable_tracing=true
-- LLMGateway cost tracking with per-request PID context
+- LLMGateway cost tracking
 - Provider streaming support
-- Bootstrap resource tracking with ContextVar
-- Distributed infrastructure wiring
+- PID context tracking via ContextVar
 
 These tests verify the fixes implemented in the unwired audit.
 """
@@ -220,84 +219,6 @@ class TestResourceTrackingPIDContext:
 
         clear_request_pid()
 
-    def test_llm_gateway_resource_callback_uses_pid_context(self, mock_logger):
-        """Test that LLMGateway callback uses request PID context."""
-        from jeeves_infra.llm.gateway import LLMGateway, LLMResponse
-        try:
-            from control_tower.resources.tracker import ResourceTracker
-            from control_tower.types import ResourceQuota
-        except ImportError:
-            pytest.skip("control_tower package not available")
-        from mission_system.bootstrap import (
-            set_request_pid,
-            get_request_pid,
-            clear_request_pid,
-        )
-
-        # Create resource tracker
-        tracker = ResourceTracker(
-            logger=mock_logger,
-            default_quota=ResourceQuota(max_llm_calls=10),
-        )
-
-        # Create callback that uses PID context
-        def track_resources(tokens_in: int, tokens_out: int):
-            pid = get_request_pid()
-            if pid is None:
-                return None
-            tracker.record_usage(
-                pid,
-                llm_calls=1,
-                tokens_in=tokens_in,
-                tokens_out=tokens_out,
-            )
-            return tracker.check_quota(pid)
-
-        # Allocate resources for test PID
-        tracker.allocate("test-request-1", ResourceQuota(max_llm_calls=5))
-
-        # Create gateway with callback
-        mock_settings = MagicMock()
-        mock_settings.llm_provider = "llamaserver"
-        mock_settings.default_model = "test-model"
-
-        gateway = LLMGateway(
-            settings=mock_settings,
-            logger=mock_logger,
-            resource_callback=track_resources,
-        )
-
-        # Set PID context
-        set_request_pid("test-request-1")
-
-        # Create mock response and update stats
-        response = LLMResponse(
-            text="Test response",
-            tool_calls=[],
-            tokens_used=150,
-            prompt_tokens=100,
-            completion_tokens=50,
-            latency_ms=100.0,
-            provider="llamaserver",
-            model="test-model",
-            cost_usd=0.001,
-            timestamp=datetime.now(timezone.utc),
-            metadata={},
-        )
-
-        result = gateway._update_stats(response)
-
-        # Should be within quota
-        assert result is None
-
-        # Verify usage was recorded
-        usage = tracker.get_usage("test-request-1")
-        assert usage.llm_calls == 1
-        assert usage.tokens_in == 100
-        assert usage.tokens_out == 50
-
-        clear_request_pid()
-
     def test_callback_returns_none_without_pid_context(self, mock_logger):
         """Test that callback allows requests when no PID is set."""
         from jeeves_infra.llm.gateway import LLMGateway, LLMResponse
@@ -504,73 +425,3 @@ class TestProviderStreaming:
         assert data["provider"] == "llamaserver"
         assert data["cumulative_tokens"] == 5
         assert "timestamp" in data
-
-
-# =============================================================================
-# Bootstrap Integration Tests
-# =============================================================================
-
-
-class TestBootstrapIntegration:
-    """Test bootstrap wiring integration."""
-
-    def test_create_avionics_dependencies_with_gateway(self, mock_logger):
-        """Test that avionics dependencies creates gateway when enabled."""
-        from jeeves_infra.feature_flags import FeatureFlags
-        from jeeves_infra.context import AppContext, SystemClock
-
-        flags = FeatureFlags(use_llm_gateway=True)
-        mock_settings = MagicMock()
-        mock_settings.llm_provider = "llamaserver"
-
-        mock_control_tower = MagicMock()
-
-        context = AppContext(
-            settings=mock_settings,
-            feature_flags=flags,
-            logger=mock_logger,
-            clock=SystemClock(),
-            config_registry=None,
-            core_config=None,
-            orchestration_flags=None,
-            vertical_registry={},
-            control_tower=mock_control_tower,
-        )
-
-        from mission_system.bootstrap import create_avionics_dependencies
-
-        deps = create_avionics_dependencies(context)
-
-        assert deps["llm_gateway"] is not None
-        assert deps["llm_factory"] is not None
-
-    def test_create_avionics_dependencies_without_control_tower(self, mock_logger):
-        """Test that dependencies work without control_tower (kernel-driven model)."""
-        from jeeves_infra.feature_flags import FeatureFlags
-        from jeeves_infra.context import AppContext, SystemClock
-
-        flags = FeatureFlags(use_llm_gateway=True)
-        mock_settings = MagicMock()
-        mock_settings.llm_provider = "llamaserver"
-
-        context = AppContext(
-            settings=mock_settings,
-            feature_flags=flags,
-            logger=mock_logger,
-            clock=SystemClock(),
-            config_registry=None,
-            core_config=None,
-            orchestration_flags=None,
-            vertical_registry={},
-            control_tower=None,  # Kernel-driven: no control_tower
-        )
-
-        from mission_system.bootstrap import create_avionics_dependencies
-
-        deps = create_avionics_dependencies(context)
-        gateway = deps["llm_gateway"]
-
-        # Gateway works without resource tracking callback
-        assert gateway is not None
-
-

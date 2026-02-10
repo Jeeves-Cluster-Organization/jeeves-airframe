@@ -1,8 +1,8 @@
 # Jeeves Mission System Architecture Diagram
 
 **Companion to:** [CONSTITUTION.md](CONSTITUTION.md)
-**Version:** 2.2
-**Last Updated:** 2025-12-16
+**Version:** 2.3
+**Last Updated:** 2026-02-10
 
 ---
 
@@ -10,9 +10,7 @@
 
 This document provides architectural views for **Jeeves Mission System**—the application layer that provides orchestration framework, API endpoints, and the foundation for capabilities.
 
-**Key Principle:** Mission System provides **orchestration infrastructure** using services from Avionics and abstractions from Core Engine. Domain-specific logic belongs in capability layers.
-
-**Control Tower Integration:** Mission System services register with Control Tower at startup and receive requests via `control_tower.submit_request()`. All requests flow through the Control Tower kernel for lifecycle management, resource tracking, and event aggregation.
+**Key Principle:** Mission System provides **orchestration infrastructure** using services from `jeeves_infra`. Domain-specific logic belongs in capability layers.
 
 ---
 
@@ -412,7 +410,7 @@ Capabilities define and register their own tools. The runtime provides a `ToolRe
 
 ---
 
-## Inter-Level: Using Avionics and Core Engine
+## Inter-Level: Using jeeves_infra
 
 ### Agent Implementation Pattern
 
@@ -420,8 +418,8 @@ Capabilities define and register their own tools. The runtime provides a `ToolRe
 ┌───────────────────────────────────────────────────────────────┐
 │  Mission System Agent (Concrete Implementation)              │
 │                                                               │
-│  from jeeves_core_engine import Agent, AgentResult, StateDelta│
-│  from avionics import LLMProtocol                      │
+│  from jeeves_infra.protocols import AgentConfig              │
+│  from jeeves_infra.protocols import LLMProviderProtocol      │
 │                                                               │
 │  class IntentAgent(Agent):                                    │
 │      stage = AgentStage.INTENT                                │
@@ -439,8 +437,8 @@ Capabilities define and register their own tools. The runtime provides a `ToolRe
 │          # 2. Build prompt                                    │
 │          prompt = self.build_prompt(perception.normalized_query)│
 │                                                               │
-│          # 3. Call LLM (via Avionics adapter)                 │
-│          response = await context.llm.generate(  # ← Avionics │
+│          # 3. Call LLM (via jeeves_infra adapter)             │
+│          response = await context.llm.generate(               │
 │              prompt=prompt,                                   │
 │              model=context.config.intent_model,               │
 │          )                                                    │
@@ -461,14 +459,14 @@ Capabilities define and register their own tools. The runtime provides a `ToolRe
 ```
 
 **Dependencies:**
-- **Core Engine:** Agent contract, CoreEnvelope, AgentResult, StateDelta
-- **Avionics:** LLMProtocol implementation (via context.llm)
+- **jeeves_infra.protocols:** Agent contract, Envelope, AgentConfig
+- **jeeves_infra.llm:** LLMProviderProtocol implementation (via context.llm)
 
 ---
 
 ## Inter-Level: API Layer
 
-### HTTP API to Orchestrator Flow (via Control Tower)
+### HTTP API to Orchestrator Flow
 
 ```
 ┌───────────────────────────────────────────────────────────────┐
@@ -483,38 +481,24 @@ Capabilities define and register their own tools. The runtime provides a `ToolRe
                             │ HTTP/JSON
                             ↓
 ┌───────────────────────────────────────────────────────────────┐
-│  API LAYER (mission_system/api/)                       │
+│  API LAYER (mission_system/api/)                              │
 │  ┌─────────────────────────────────────────────────────────┐ │
 │  │  FastAPI Router (chat.py)                                │ │
 │  │  1. Validate request (Pydantic)                          │ │
-│  │  2. Get dependencies (DI):                               │ │
-│  │     - control_tower                                      │ │
-│  │     - memory_service (from Avionics)                     │ │
-│  │  3. Submit to Control Tower                              │ │
-│  └─────────────────────────────────────────────────────────┘ │
-└───────────────────────────┬───────────────────────────────────┘
-                            │
-                            ↓
-┌───────────────────────────────────────────────────────────────┐
-│  CONTROL TOWER (control_tower/)                        │
-│  ┌─────────────────────────────────────────────────────────┐ │
-│  │  control_tower.submit_request(envelope)                  │ │
-│  │  1. LifecycleManager: Create ProcessControlBlock         │ │
-│  │  2. ResourceTracker: Check/allocate quotas               │ │
-│  │  3. CommBusCoordinator: Dispatch to registered service   │ │
-│  │  4. EventAggregator: Stream events back to Gateway       │ │
+│  │  2. Get dependencies (DI)                                │ │
+│  │  3. Dispatch to orchestrator                             │ │
 │  └─────────────────────────────────────────────────────────┘ │
 └───────────────────────────┬───────────────────────────────────┘
                             │ dispatches
                             ↓
 ┌───────────────────────────────────────────────────────────────┐
-│  ORCHESTRATOR (mission_system/orchestrator/)           │
+│  ORCHESTRATOR (mission_system/orchestrator/)                  │
 │  ┌─────────────────────────────────────────────────────────┐ │
-│  │  FlowService (registered with Control Tower)             │ │
-│  │  1. Create CoreEnvelope (Core Engine)                    │ │
+│  │  FlowService                                             │ │
+│  │  1. Create Envelope                                      │ │
 │  │  2. Convert to JeevesState (LangGraph)                   │ │
 │  │  3. Execute LangGraph pipeline                           │ │
-│  │  4. Stream agent events (SSE via EventAggregator)        │ │
+│  │  4. Stream agent events (SSE)                            │ │
 │  │  5. Return final response                                │ │
 │  └─────────────────────────────────────────────────────────┘ │
 └───────────────────────────┬───────────────────────────────────┘
@@ -527,9 +511,8 @@ Capabilities define and register their own tools. The runtime provides a `ToolRe
 │  │  Perception → Intent → Planner → ... → Integration      │ │
 │  │                                                          │ │
 │  │  Uses:                                                   │ │
-│  │  • Core Engine (Agent, Envelope, StateDelta)     │ │
-│  │  • Avionics (LLM, Database, Memory via context)         │ │
-│  │  • Mission System (Tools, ToolRegistry)                 │ │
+│  │  • jeeves_infra (LLM, Database, Memory via context)     │ │
+│  │  • mission_system (Tools, ToolRegistry)                 │ │
 │  └─────────────────────────────────────────────────────────┘ │
 └───────────────────────────┬───────────────────────────────────┘
                             │ returns
@@ -741,12 +724,9 @@ Capabilities define and register their own tools. The runtime provides a `ToolRe
 ## Cross-References
 
 - **Constitution:** [CONSTITUTION.md](CONSTITUTION.md)
-- **Control Tower:** [../control_tower/](../control_tower/) - Kernel layer (request routing)
+- **Airframe Constitution:** [../CONSTITUTION.md](../CONSTITUTION.md)
 - **Index:** [INDEX.md](INDEX.md)
-- **Related Diagrams:**
-  - [../control_tower/CONSTITUTION.md](../control_tower/CONSTITUTION.md)
-  - [../avionics/ARCHITECTURE_DIAGRAM.md](../avionics/ARCHITECTURE_DIAGRAM.md)
 
 ---
 
-*This architecture diagram shows the internal structure of the Mission System (intra-level) and how it uses Core Engine abstractions and Avionics infrastructure (inter-level) to provide orchestration for capabilities with strict evidence chain integrity.*
+*This architecture diagram shows the internal structure of the Mission System and how it uses `jeeves_infra` infrastructure to provide orchestration for capabilities with strict evidence chain integrity.*

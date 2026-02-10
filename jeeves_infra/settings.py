@@ -1,16 +1,16 @@
-"""Infrastructure settings for Jeeves Avionics.
+"""Infrastructure settings for Jeeves Airframe.
 
 Constitutional Reference:
-    - Avionics R3: No Domain Logic - infrastructure provides transport, not business logic
-    - Avionics R2: Configuration Over Code - all behavior is configurable
-    - docs/CONSTITUTION.md: Database configuration via backend registry
+    - CONSTITUTION.md Section 0: Airframe is capability-agnostic
+    - CONSTITUTION.md Section 1: Ownership boundaries
+    - CONSTITUTION.md Section 6: Adapter contract
 
 Per-Agent Configuration:
     Agent-specific LLM settings (model, temperature, server_url) are now owned by
     capabilities and registered via DomainLLMRegistry. This file contains
     only generic infrastructure configuration.
 
-    See: avionics/capability_registry.py
+    See: jeeves_infra/capability_registry.py
     See: jeeves-capability-*/config/llm_config.py (for capability registration)
 """
 
@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     LLM settings are owned by capabilities via DomainLLMRegistry.
 
     Constitutional Reference:
-        - Avionics R3: No Domain Logic
+        - Airframe CONSTITUTION.md Section 0: Capability-agnostic
         - Capability Constitution R6: Domain Config Ownership
     """
 
@@ -122,29 +122,6 @@ class Settings(BaseSettings):
     # MEMORY CONFIGURATION
     # =========================================================================
     memory_enabled: bool = True
-    memory_intent_classification: bool = True
-    memory_auto_crossref: bool = True
-
-    # =========================================================================
-    # VECTOR DB CONFIGURATION
-    # =========================================================================
-    vector_db_enabled: bool = True
-    embedding_model: str = "all-MiniLM-L6-v2"
-    embedding_batch_size: int = 32
-    embedding_cache_size: int = 1000
-
-    # =========================================================================
-    # SEARCH CONFIGURATION
-    # =========================================================================
-    search_default_limit: int = 10
-    search_semantic_weight: float = 0.6
-    search_min_similarity: float = 0.5
-
-    # =========================================================================
-    # CROSS-REFERENCE CONFIGURATION
-    # =========================================================================
-    crossref_auto_extract: bool = True
-    crossref_min_confidence: float = 0.7
 
     # =========================================================================
     # API CONFIGURATION
@@ -173,14 +150,6 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     # =========================================================================
-    # CONFIRMATION FEATURE
-    # =========================================================================
-    enable_confirmations: bool = False
-    confirmation_timeout_seconds: int = Field(default=300, ge=10, le=3600)
-    confirmation_required_operations: Optional[List[str]] = None
-    skip_confirmation_for_single_item: bool = False
-
-    # =========================================================================
     # CHAT UI INTEGRATION
     # =========================================================================
     chat_enabled: bool = True
@@ -207,13 +176,6 @@ class Settings(BaseSettings):
     # =========================================================================
     redis_url: str = "redis://localhost:6379"
     redis_pool_size: int = Field(default=10, ge=1, le=100)
-
-    # =========================================================================
-    # CHECKPOINT CONFIGURATION (Amendment XXIII)
-    # =========================================================================
-    checkpoint_enabled: bool = True
-    checkpoint_retention_days: int = Field(default=7, ge=1, le=365)
-    checkpoint_max_per_envelope: int = Field(default=100, ge=1, le=1000)
 
     # =========================================================================
     # DISTRIBUTED CONFIGURATION (Amendment XXIV)

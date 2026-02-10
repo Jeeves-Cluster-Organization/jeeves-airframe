@@ -1,7 +1,7 @@
 # Jeeves Mission System - Application Layer Index
 
-**Parent:** [Capability Contract](../CONTRACT.md)
-**Updated:** 2025-12-16
+**Parent:** [Airframe Constitution](../CONSTITUTION.md)
+**Updated:** 2026-02-10
 
 ---
 
@@ -11,17 +11,13 @@ This directory contains the **application layer** of the Jeeves runtime. It impl
 
 **Position in Architecture:**
 ```
-Capability Layer (external)       →  Domain-specific capabilities (e.g., code analysis)
+Capability Layer (external)       →  Domain-specific capabilities (e.g., hello-world)
         ↓
 mission_system/            →  Application layer (THIS)
         ↓
-avionics/                  →  Infrastructure (database, LLM, gateway)
+jeeves_infra/              →  Infrastructure (LLM adapters, protocols, gateway)
         ↓
-control_tower/             →  Kernel layer (lifecycle, resources, IPC)
-        ↓
-protocols/, shared/ →  Foundation (L0)
-        ↓
-commbus/, coreengine/             →  Go core
+jeeves-core-rs/            →  Rust microkernel (gRPC)
 ```
 
 **Key Principle:** This layer provides application-specific orchestration and the framework for capabilities to build on.
@@ -79,28 +75,23 @@ commbus/, coreengine/             →  Go core
 ## Import Boundary Rules
 
 **Mission System may import:**
-- ✅ `protocols` - Protocol definitions, types
-- ✅ `shared` - Shared utilities (logging, serialization, UUID)
-- ✅ `avionics` - Infrastructure layer
-- ✅ `control_tower` - Kernel layer
+- ✅ `jeeves_infra.protocols` - Protocol definitions, types
+- ✅ `jeeves_infra` - Infrastructure layer (LLM, gateway, database, observability)
 
 **Mission System must NOT:**
-- ❌ Be imported by `coreengine` (core is standalone Go)
-- ❌ Be imported by `avionics` (one-way dependency)
-- ❌ Be imported by `control_tower` (one-way dependency)
+- ❌ Be imported by `jeeves_infra` (one-way dependency)
+- ❌ Import from capability layers (capabilities import from mission_system)
 
 **Example:**
 ```python
 # ALLOWED
-from protocols import Envelope, InterruptKind
-from shared import get_component_logger, parse_datetime
+from jeeves_infra.protocols import Envelope, InterruptKind
 from jeeves_infra.llm import LLMClient
-from avionics.database import DatabaseClient
+from jeeves_infra.database import DatabaseClient
 
-# NOT ALLOWED (these layers cannot import mission system)
-# coreengine importing mission_system.*
-# avionics importing mission_system.*
-# control_tower importing mission_system.*
+# NOT ALLOWED
+# jeeves_infra importing mission_system.*
+# mission_system importing jeeves_capability_*
 ```
 
 ---
@@ -120,23 +111,17 @@ The mission system provides framework primitives for capabilities:
 - Capabilities import FROM mission system API (constitutional)
 
 **API Gateway:**
-- Contains: Minimal web layer (handled by avionics/gateway/)
-- Entry point: `avionics.gateway.main`
+- Contains: Minimal web layer (handled by `jeeves_infra.gateway`)
 - Protocol: HTTP/REST on port 8000
-
-See [Dockerfile](../Dockerfile) and [docker-compose.yml](../docker-compose.yml) for build configuration.
 
 ---
 
 ## Related
 
-- [coreengine/](../coreengine/) - Core runtime (Go)
-- [protocols/](../protocols/) - Python protocols
-- [shared/](../shared/) - Shared utilities (logging, serialization, UUID)
-- [avionics/](../avionics/) - Infrastructure layer
-- [control_tower/](../control_tower/) - Control Tower (kernel layer)
+- [jeeves_infra/](../jeeves_infra/) - Infrastructure layer (LLM, gateway, protocols)
+- [CONSTITUTION.md](../CONSTITUTION.md) - Airframe constitution
 - [bootstrap.py](bootstrap.py) - Application bootstrap
 
 ---
 
-*This directory represents the application layer in the three-component split (Amendment XXII).*
+*This directory represents the application layer in the two-package split (`jeeves_infra` + `mission_system`).*
