@@ -1,14 +1,15 @@
 """
-Infrastructure Wiring - Tool Execution and LLM Provider Factory
+Infrastructure Wiring - Tool Execution
 
-This module provides infrastructure primitives for tool execution and
-LLM provider creation.
+This module provides infrastructure primitives for tool execution.
 
 **Key exports:**
 - ToolExecutor: Protocol-compliant tool executor with access control
 - AgentContext: Context for tool execution with agent identity
 - create_tool_executor(): Factory for creating ToolExecutor
-- create_llm_provider_factory(): Factory for creating LLM providers
+
+Note: LLM provider factory is accessed via AppContext.llm_provider_factory
+(eagerly provisioned by bootstrap.create_app_context()).
 
 **Usage:**
     ```python
@@ -37,20 +38,6 @@ from jeeves_infra.protocols import (
 from jeeves_infra.logging import create_logger
 from jeeves_infra.settings import Settings, get_settings
 from jeeves_infra.database.client import DatabaseClientProtocol
-
-# LLM provider factory - must be injected by capability/application
-# The kernel does not import from jeeves-infra; capabilities register providers at startup
-_llm_provider_factory: Optional[Callable[['Settings', str], 'LLMProviderProtocol']] = None
-
-
-def set_llm_provider_factory(factory: Callable[['Settings', str], 'LLMProviderProtocol']) -> None:
-    """Register the LLM provider factory (called by capability at startup).
-
-    Args:
-        factory: Function that takes (settings, agent_name) and returns LLMProviderProtocol
-    """
-    global _llm_provider_factory
-    _llm_provider_factory = factory
 
 
 # =============================================================================
@@ -314,43 +301,6 @@ def create_tool_executor(
         ToolExecutor implementing ToolExecutorProtocol
     """
     return ToolExecutor(registry)
-
-
-def create_llm_provider_factory(
-    settings: Optional[Settings] = None,
-) -> Callable[[str], LLMProviderProtocol]:
-    """Create an LLM provider factory function.
-
-    Returns a factory that creates LLM providers for each agent role.
-    The factory is injected into capability flow services.
-
-    NOTE: Requires LLM provider factory to be registered at startup via
-    set_llm_provider_factory(). This is typically done by the capability
-    bootstrap code which imports from jeeves-infra.
-
-    Args:
-        settings: Application settings. If None, uses get_settings().
-
-    Returns:
-        Factory function: (agent_role: str) -> LLMProviderProtocol
-
-    Raises:
-        RuntimeError: If LLM provider factory not registered
-    """
-    if _llm_provider_factory is None:
-        raise RuntimeError(
-            "LLM provider factory not registered. Call set_llm_provider_factory() "
-            "at application startup. This is typically done in capability bootstrap."
-        )
-
-    if settings is None:
-        settings = get_settings()
-
-    def factory(agent_role: str) -> LLMProviderProtocol:
-        """Create an LLM provider for the given agent role."""
-        return _llm_provider_factory(settings, agent_role)
-
-    return factory
 
 
 async def get_database_client(settings: Optional[Settings] = None) -> DatabaseClientProtocol:

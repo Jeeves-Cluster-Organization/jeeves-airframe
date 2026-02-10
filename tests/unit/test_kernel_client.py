@@ -20,9 +20,6 @@ from jeeves_infra.kernel_client import (
     KernelClientError,
     QuotaCheckResult,
     ProcessInfo,
-    get_kernel_client,
-    close_kernel_client,
-    reset_kernel_client,
     DEFAULT_KERNEL_ADDRESS,
 )
 from jeeves_infra.protocols import engine_pb2 as pb2
@@ -645,48 +642,6 @@ class TestConvenienceMethods:
         result = await mock_kernel_client.record_agent_hop(pid="proc-1")
 
         assert result is None
-
-
-class TestGlobalClientManagement:
-    """Tests for global client management functions."""
-
-    @pytest.fixture(autouse=True)
-    def reset_global_client(self):
-        """Reset global client before and after each test."""
-        reset_kernel_client()
-        yield
-        reset_kernel_client()
-
-    @pytest.mark.asyncio
-    async def test_get_kernel_client_creates_singleton(self):
-        """Test get_kernel_client creates singleton."""
-        with patch("jeeves_infra.kernel_client.grpc_aio") as mock_grpc_aio:
-            mock_channel = MagicMock()
-            mock_grpc_aio.insecure_channel.return_value = mock_channel
-
-            client1 = await get_kernel_client("localhost:50051")
-            client2 = await get_kernel_client("localhost:50051")
-
-            assert client1 is client2
-            mock_grpc_aio.insecure_channel.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_close_kernel_client(self):
-        """Test close_kernel_client."""
-        with patch("jeeves_infra.kernel_client.grpc_aio") as mock_grpc_aio:
-            mock_channel = MagicMock()
-            mock_channel.close = AsyncMock()
-            mock_grpc_aio.insecure_channel.return_value = mock_channel
-
-            await get_kernel_client("localhost:50051")
-            await close_kernel_client()
-
-            mock_channel.close.assert_called_once()
-
-    def test_reset_kernel_client(self):
-        """Test reset_kernel_client."""
-        # Just verify it doesn't raise
-        reset_kernel_client()
 
 
 class TestPcbToInfo:

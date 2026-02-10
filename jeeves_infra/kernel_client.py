@@ -4,9 +4,9 @@ This module provides an async Python client that wraps the gRPC stubs
 for communicating with the Rust kernel (KernelService) and engine (EngineService).
 
 Usage:
-    from jeeves_infra.kernel_client import KernelClient, get_kernel_client
+    from jeeves_infra.kernel_client import KernelClient
 
-    # Create client with connection
+    # Create client with connection (or get from AppContext)
     async with KernelClient.connect("localhost:50051") as client:
         # Create and manage processes
         pcb = await client.create_process(
@@ -1036,53 +1036,6 @@ class KernelClientError(Exception):
     pass
 
 
-# =============================================================================
-# Global Client Management
-# =============================================================================
-
-_global_client: Optional[KernelClient] = None
-_client_lock = asyncio.Lock()
-
-
-async def get_kernel_client(
-    address: str = DEFAULT_KERNEL_ADDRESS,
-) -> KernelClient:
-    """Get the global kernel client, creating if needed.
-
-    This provides a singleton client for use across the application.
-    The client manages its own connection lifecycle.
-
-    Args:
-        address: Kernel gRPC address (used only on first call)
-
-    Returns:
-        Global KernelClient instance
-    """
-    global _global_client
-    async with _client_lock:
-        if _global_client is None:
-            channel = grpc_aio.insecure_channel(address)
-            _global_client = KernelClient(channel)
-            logger.info(f"Created global kernel client connected to {address}")
-        return _global_client
-
-
-async def close_kernel_client():
-    """Close the global kernel client."""
-    global _global_client
-    async with _client_lock:
-        if _global_client is not None:
-            await _global_client.close()
-            _global_client = None
-            logger.info("Closed global kernel client")
-
-
-def reset_kernel_client():
-    """Reset the global kernel client (for testing)."""
-    global _global_client
-    _global_client = None
-
-
 __all__ = [
     "KernelClient",
     "KernelClientError",
@@ -1091,8 +1044,5 @@ __all__ = [
     "AgentExecutionMetrics",
     "OrchestratorInstruction",
     "OrchestrationSessionState",
-    "get_kernel_client",
-    "close_kernel_client",
-    "reset_kernel_client",
     "DEFAULT_KERNEL_ADDRESS",
 ]

@@ -13,22 +13,15 @@ if TYPE_CHECKING:
 
 def register_memory_handlers(
     commbus: Any,
-    session_state_service: Optional[Any] = None,
-    db: Optional["DatabaseClientProtocol"] = None,
+    session_state_service: Any,
     logger: Optional["LoggerProtocol"] = None,
 ) -> None:
     """Register memory query and command handlers with CommBus.
 
-    This wires up the memory services to respond to CommBus queries.
-
     Args:
         commbus: The CommBus instance to register handlers with
-        session_state_service: Optional pre-created SessionStateService
-        db: Optional database client (used if session_state_service not provided)
+        session_state_service: SessionStateService instance (required)
         logger: Optional logger instance
-
-    Note:
-        Either session_state_service or db must be provided for full functionality.
     """
     from jeeves_infra.memory.messages import (
         GetSessionState,
@@ -46,7 +39,7 @@ def register_memory_handlers(
 
     async def handle_get_session_state(query: GetSessionState) -> Any:
         """Handle GetSessionState query."""
-        service = _get_session_service(session_state_service, db, logger)
+        service = session_state_service
         if service is None:
             return {"error": "SessionStateService not configured"}
 
@@ -71,7 +64,7 @@ def register_memory_handlers(
 
     async def handle_get_recent_entities(query: GetRecentEntities) -> Any:
         """Handle GetRecentEntities query."""
-        service = _get_session_service(session_state_service, db, logger)
+        service = session_state_service
         if service is None:
             return {"entities": []}
 
@@ -113,7 +106,7 @@ def register_memory_handlers(
 
     async def handle_clear_session(command: ClearSession) -> None:
         """Handle ClearSession command."""
-        service = _get_session_service(session_state_service, db, logger)
+        service = session_state_service
         if service is None:
             return
 
@@ -121,7 +114,7 @@ def register_memory_handlers(
 
     async def handle_update_focus(command: UpdateFocus) -> None:
         """Handle UpdateFocus command."""
-        service = _get_session_service(session_state_service, db, logger)
+        service = session_state_service
         if service is None:
             return
 
@@ -135,7 +128,7 @@ def register_memory_handlers(
 
     async def handle_add_entity_reference(command: AddEntityReference) -> None:
         """Handle AddEntityReference command."""
-        service = _get_session_service(session_state_service, db, logger)
+        service = session_state_service
         if service is None:
             return
 
@@ -163,41 +156,6 @@ def register_memory_handlers(
     commbus.register_handler("AddEntityReference", handle_add_entity_reference)
 
 
-# Cache for lazy-initialized service
-_cached_session_service: Optional[Any] = None
-
-
-def _get_session_service(
-    provided: Optional[Any],
-    db: Optional["DatabaseClientProtocol"],
-    logger: Optional["LoggerProtocol"],
-) -> Optional[Any]:
-    """Get or create SessionStateService via capability registry."""
-    global _cached_session_service
-
-    if provided is not None:
-        return provided
-
-    if _cached_session_service is not None:
-        return _cached_session_service
-
-    if db is not None:
-        from jeeves_infra.protocols import get_capability_resource_registry
-        factory = get_capability_resource_registry().get_memory_service_factory("session_state_service")
-        if factory:
-            _cached_session_service = factory(db)
-            return _cached_session_service
-
-    return None
-
-
-def reset_cached_services() -> None:
-    """Reset cached services (for testing)."""
-    global _cached_session_service
-    _cached_session_service = None
-
-
 __all__ = [
     "register_memory_handlers",
-    "reset_cached_services",
 ]

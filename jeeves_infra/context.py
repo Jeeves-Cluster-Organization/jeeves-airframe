@@ -22,13 +22,14 @@ Usage:
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
 from jeeves_infra.protocols import (
     AppContextProtocol,
     ClockProtocol,
     ConfigRegistryProtocol,
     FeatureFlagsProtocol,
+    LLMProviderProtocol,
     LoggerProtocol,
     SettingsProtocol,
 )
@@ -100,6 +101,10 @@ class AppContext:
     clock: ClockProtocol = field(default_factory=SystemClock)
     config_registry: Optional[ConfigRegistryProtocol] = None
 
+    # LLM Provider Factory - creates LLM providers per agent role
+    # Eagerly provisioned by bootstrap, like kubelet provisioning container runtime
+    llm_provider_factory: Optional[Callable[[str], LLMProviderProtocol]] = None
+
     # Core configuration (previously global state in protocols)
     core_config: ExecutionConfig = field(default_factory=ExecutionConfig)
     orchestration_flags: OrchestrationFlags = field(default_factory=OrchestrationFlags)
@@ -140,6 +145,7 @@ class AppContext:
             ),
             clock=self.clock,
             config_registry=self.config_registry,
+            llm_provider_factory=self.llm_provider_factory,
             core_config=self.core_config,
             orchestration_flags=self.orchestration_flags,
             vertical_registry=self.vertical_registry,

@@ -27,7 +27,7 @@ from pydantic import BaseModel, Field
 from jeeves_infra.gateway.websocket_manager import WebSocketEventManager
 from jeeves_infra.events.bridge import EventBridge
 from jeeves_infra.bootstrap import create_app_context
-from jeeves_infra.wiring import create_llm_provider_factory, create_tool_executor
+from jeeves_infra.wiring import create_tool_executor
 from jeeves_infra.health import HealthChecker, health_check_to_dict
 from jeeves_infra.settings import settings, get_settings
 from jeeves_infra.database.client import DatabaseClientProtocol
@@ -234,19 +234,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Initialize event manager (needed for real-time updates)
     event_manager = WebSocketEventManager()
 
-    # Initialize app context and kernel client
+    # Initialize app context (eagerly provisions kernel_client, llm_factory, config_registry)
     _logger.info("initializing_app_context")
     app_context = create_app_context()
-
-    # Try to connect kernel client (non-blocking -- works without Rust kernel)
-    kernel_client = None
-    try:
-        from jeeves_infra.kernel_client import get_kernel_client, DEFAULT_KERNEL_ADDRESS
-        kernel_client = await get_kernel_client(DEFAULT_KERNEL_ADDRESS)
-        _logger.info("kernel_client_connected", address=DEFAULT_KERNEL_ADDRESS)
-    except Exception as e:
-        _logger.warning("kernel_client_unavailable", error=str(e),
-                        message="Running without Rust kernel -- orchestrator-only mode")
+    kernel_client = app_context.kernel_client
 
     # Get capability registry for dynamic discovery (layer extraction support)
     capability_registry = get_capability_resource_registry()
@@ -275,7 +266,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # Initialize orchestrator via capability registry (no direct imports from capability)
     orchestrator_config = capability_registry.get_orchestrator()
-    llm_factory = create_llm_provider_factory(current_settings)
+    llm_factory = app_context.llm_provider_factory
 
     if orchestrator_config:
         _logger.info("initializing_orchestrator_from_registry")

@@ -63,15 +63,29 @@ Capabilities may import from these modules:
 | Module | Purpose |
 |--------|---------|
 | `jeeves_infra.protocols` | All type definitions, Envelope, AgentConfig, PipelineConfig |
-| `jeeves_infra.wiring` | Factory functions: create_llm_provider_factory, create_tool_executor |
-| `jeeves_infra.settings` | get_settings() |
-| `jeeves_infra.bootstrap` | create_app_context() |
-| `jeeves_infra.kernel_client` | KernelClient class |
+| `jeeves_infra.bootstrap` | `create_app_context()` — returns AppContext with `kernel_client`, `llm_provider_factory`, `config_registry` eagerly provisioned |
+| `jeeves_infra.wiring` | `create_tool_executor` (tool executor framework), `get_database_client` |
+| `jeeves_infra.settings` | `get_settings()` |
+| `jeeves_infra.kernel_client` | `KernelClient` class (instance provided via AppContext, no global accessor) |
 | `jeeves_infra.orchestrator` | EventOrchestrator, create_event_context |
 | `jeeves_infra.memory.messages` | CommBus message types |
 | `jeeves_infra.config.constants` | Platform constants |
 | `jeeves_infra.logging` | get_current_logger |
 | `jeeves_infra.feature_flags` | get_feature_flags |
+
+**Bootstrap pattern (K8s-style eager provisioning):**
+
+```python
+from jeeves_infra.bootstrap import create_app_context
+
+app_context = create_app_context()
+# app_context.kernel_client       — gRPC bridge (or None)
+# app_context.llm_provider_factory — creates LLM providers per agent role
+# app_context.config_registry     — configuration registry
+# app_context.settings            — application settings
+```
+
+**Apps MUST NOT** import `jeeves_infra.wiring`, `jeeves_infra.kernel_client`, or `jeeves_infra.llm` directly. Apps use the capability layer entry point (e.g., `create_hello_world_from_app_context(app_context)`).
 
 ## 4) Canonical Inference Contract
 

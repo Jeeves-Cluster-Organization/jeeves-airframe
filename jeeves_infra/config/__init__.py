@@ -44,9 +44,6 @@ from jeeves_infra.config.agent_profiles import (
 from jeeves_infra.config.registry import (
     ConfigRegistry,
     ConfigKeys,
-    get_config_registry,
-    set_config_registry,
-    reset_config_registry,
 )
 
 __all__ = [
@@ -85,7 +82,4 @@ __all__ = [
     # Config Registry
     "ConfigRegistry",
     "ConfigKeys",
-    "get_config_registry",
-    "set_config_registry",
-    "reset_config_registry",
 ]

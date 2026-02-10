@@ -33,9 +33,10 @@ from jeeves_infra.settings import Settings, get_settings
 from jeeves_infra.feature_flags import FeatureFlags, get_feature_flags
 from jeeves_infra.protocols import ExecutionConfig, ContextBounds, OrchestrationFlags
 from jeeves_infra.protocols import get_capability_resource_registry
+from jeeves_infra.config.registry import ConfigRegistry
 
 # KernelClient for Rust kernel integration
-from jeeves_infra.kernel_client import KernelClient, QuotaCheckResult
+from jeeves_infra.kernel_client import KernelClient, QuotaCheckResult, DEFAULT_KERNEL_ADDRESS
 
 # Type alias for LLMGateway (imported conditionally)
 LLMGatewayType = Any
@@ -236,25 +237,53 @@ def create_app_context(
             enabled=otel_adapter is not None and otel_adapter.enabled,
         )
 
+    # Eagerly provision config registry
+    config_registry = ConfigRegistry()
+
+    # Eagerly provision LLM provider factory
+    llm_provider_factory = None
+    try:
+        from jeeves_infra.llm.factory import create_llm_provider_factory as _create_llm_factory
+        llm_provider_factory = _create_llm_factory(settings)
+        root_logger.info("llm_provider_factory_provisioned", adapter=settings.llm_adapter)
+    except Exception as e:
+        root_logger.warning("llm_provider_factory_unavailable", error=str(e))
+
+    # Eagerly provision kernel client (graceful fallback to None)
+    kernel_client = None
+    try:
+        import grpc.aio as grpc_aio
+        kernel_address = os.getenv("JEEVES_KERNEL_ADDRESS", DEFAULT_KERNEL_ADDRESS)
+        channel = grpc_aio.insecure_channel(kernel_address)
+        kernel_client = KernelClient(channel)
+        root_logger.info("kernel_client_provisioned", address=kernel_address)
+    except Exception as e:
+        root_logger.warning(
+            "kernel_client_unavailable", error=str(e),
+            message="Running without Rust kernel — standalone mode",
+        )
+
     root_logger.info(
         "app_context_created",
         default_service=default_service,
         max_llm_calls=core_config.max_llm_calls,
         max_iterations=core_config.max_iterations,
         max_agent_hops=core_config.max_agent_hops,
+        has_kernel_client=kernel_client is not None,
+        has_llm_factory=llm_provider_factory is not None,
     )
 
-    # Note: kernel_client is None here - connect via connect_kernel_client() async
     return AppContext(
         settings=settings,
         feature_flags=feature_flags,
         logger=root_logger,
         clock=SystemClock(),
-        config_registry=None,
+        config_registry=config_registry,
+        llm_provider_factory=llm_provider_factory,
         core_config=core_config,
         orchestration_flags=orchestration_flags,
         vertical_registry={},
-        kernel_client=None,  # Set via connect_kernel_client() after event loop starts
+        kernel_client=kernel_client,
     )
 
 

@@ -34,16 +34,12 @@ Architecture:
 
 Usage:
     from jeeves_infra.protocols import PipelineConfig, AgentConfig, Envelope
-    from jeeves_infra.wiring import create_llm_provider_factory, create_tool_executor
     from jeeves_infra.bootstrap import create_app_context
-    from jeeves_infra.kernel_client import KernelClient
+    from jeeves_infra.wiring import create_tool_executor
     from jeeves_infra.settings import get_settings
+
+    # Bootstrap eagerly provisions: kernel_client, llm_provider_factory, config_registry
+    app_context = create_app_context()
 """
 
 __version__ = "1.0.0"
-
-# Lazy imports for kernel client
-def get_kernel_client():
-    """Get the global kernel client for communicating with Rust kernel."""
-    from jeeves_infra.kernel_client import get_kernel_client as _get
-    return _get()
