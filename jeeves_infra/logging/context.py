@@ -6,7 +6,7 @@ This module provides ContextVars-based context propagation for:
 - Current logger: Thread/async-safe logger access for tools
 
 Usage:
-    from avionics.logging.context import (
+    from jeeves_infra.logging.context import (
         request_scope,
         get_request_context,
         get_current_logger,

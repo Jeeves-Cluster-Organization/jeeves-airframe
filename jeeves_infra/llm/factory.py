@@ -7,7 +7,7 @@ Config via environment:
     JEEVES_LLM_API_KEY: API key (optional for local servers)
 
 Constitutional Reference:
-    - Avionics R3: No Domain Logic - infrastructure provides transport, not business logic
+    - Constitution R3: No Domain Logic - infrastructure provides transport, not business logic
 """
 
 from __future__ import annotations
@@ -93,7 +93,7 @@ def create_llm_provider(
         raise ImportError(
             f"LLM adapter '{adapter}' not available. "
             f"Installed adapters: {available}. "
-            f"Install with: pip install avionics[litellm]"
+            f"Install with: pip install jeeves-infra[litellm]"
         )
 
     # Build config from env vars or settings

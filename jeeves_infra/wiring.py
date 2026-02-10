@@ -17,7 +17,7 @@ LLM provider creation.
 
 **Usage:**
     ```python
-    from avionics.wiring import ToolExecutor, AgentContext
+    from jeeves_infra.wiring import ToolExecutor, AgentContext
 
     # Create executor with registry
     executor = ToolExecutor(registry=tool_registry, logger=logger)
@@ -414,7 +414,7 @@ class ToolExecutor:
         this delegates to the resilient tool registered in the registry.
 
         NOTE: Resilient tool implementations are registered by the capability layer.
-        This avionics layer only uses them via the protocol interface.
+        This infrastructure layer only uses them via the protocol interface.
 
         IMPORTANT: This method handles parameter name transformations when
         base tools and resilient tools use different parameter names.

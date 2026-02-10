@@ -1,7 +1,7 @@
-"""Memory CommBus Messages.
+"""Memory Messages.
 
 This module defines memory-specific events, queries, and commands
-for communication via jeeves_commbus.
+for communication via jeeves_infra event infrastructure.
 
 Memory Module Audit (2025-12-09):
 - Created as part of memory centralization

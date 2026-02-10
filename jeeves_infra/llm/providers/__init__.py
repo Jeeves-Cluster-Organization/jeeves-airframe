@@ -3,9 +3,9 @@
 Available adapters (loaded lazily via factory):
 - MockProvider: Testing (always available)
 - OpenAIHTTPProvider: Direct HTTP (always available)
-- LiteLLMProvider: LiteLLM (optional, pip install avionics[litellm])
+- LiteLLMProvider: LiteLLM (optional, pip install jeeves-infra[litellm])
 
-Use create_llm_provider() from avionics.llm.factory to get providers.
+Use create_llm_provider() from jeeves_infra.llm.factory to get providers.
 """
 
 from .base import LLMProvider, TokenChunk

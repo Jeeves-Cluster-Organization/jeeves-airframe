@@ -83,9 +83,7 @@ class TestAppContextCreation:
             assert context.feature_flags is not None
             assert context.logger is not None
             assert context.clock is not None
-            # control_tower is deprecated (replaced by kernel_client)
-            # Both are None without a running Rust kernel, which is correct
-            assert context.control_tower is None or context.kernel_client is not None
+            assert context.kernel_client is None  # None without a running Rust kernel
 
     def test_respects_injected_dependencies(self):
         """Test that injected dependencies are used."""

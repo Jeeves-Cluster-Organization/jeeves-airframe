@@ -5,13 +5,13 @@ Base logging functionality comes from jeeves_infra.utils.logging.
 Real OpenTelemetry tracing is provided by jeeves_infra.observability.
 
 Constitutional Compliance:
-- Avionics owns OTEL configuration flag
+- Infrastructure owns OTEL configuration flag
 - Base logging utilities come from shared (L0)
 - Real OTEL spans are managed by observability/otel_adapter.py
 - Other layers only use injected LoggerProtocol
 
 Usage:
-    from avionics.logging import create_logger, configure_logging
+    from jeeves_infra.logging import create_logger, configure_logging
 
     # At application startup (once)
     configure_logging(level="INFO", json_output=True, enable_otel=True)
@@ -79,7 +79,7 @@ def configure_logging(
     This should be called ONCE at application startup.
     All subsequent logging uses the configuration set here.
 
-    For actual OpenTelemetry tracing, use avionics.observability.
+    For actual OpenTelemetry tracing, use jeeves_infra.observability.
 
     Args:
         level: Default log level (DEBUG, INFO, WARNING, ERROR)

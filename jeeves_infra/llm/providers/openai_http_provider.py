@@ -6,7 +6,7 @@ Direct HTTP adapter for OpenAI-compatible endpoints:
 - SGLang
 - Any OpenAI API-compatible server
 
-No external dependencies beyond httpx (already in avionics deps).
+No external dependencies beyond httpx (already in jeeves_infra deps).
 """
 
 from typing import AsyncIterator, Dict, Any, Optional

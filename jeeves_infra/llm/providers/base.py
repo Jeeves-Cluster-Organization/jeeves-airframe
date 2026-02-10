@@ -1,7 +1,7 @@
 """LLM Provider Base Class.
 
 Split from provider.py per Module Bloat Audit (2025-12-09).
-Constitutional Reference: Avionics R1 (Adapter Pattern)
+Constitutional Reference: Constitution R1 (Adapter Pattern)
 """
 
 from abc import ABC, abstractmethod

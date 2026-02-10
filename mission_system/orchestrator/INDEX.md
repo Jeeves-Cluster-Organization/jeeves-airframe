@@ -41,7 +41,7 @@ class FlowService:
 ```
 
 ### Event Context (`event_context.py`)
-Unified event emission (target for commbus migration):
+Unified event emission:
 ```python
 class EventContext:
     async def emit_agent_started(self, agent_name: str, **payload)

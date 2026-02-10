@@ -4,7 +4,7 @@ Provides protocol-based database access via registry pattern.
 Database client protocol re-exports.
 
 Constitutional Reference:
-- CommBus: DatabaseClientProtocol definition
+- jeeves_infra.protocols: DatabaseClientProtocol definition
 - Constitution R4: Swappable Implementations
 - Constitution R6: Database Backend Registry
 - Database Decoupling Audit (Option B)
@@ -47,7 +47,7 @@ from jeeves_infra.utils.serialization import (
 
 
 __all__ = [
-    # Protocols (from commbus)
+    # Protocols (from jeeves_infra.protocols)
     "DatabaseClientProtocol",
     "VectorStorageProtocol",
     # Factory (from registry)

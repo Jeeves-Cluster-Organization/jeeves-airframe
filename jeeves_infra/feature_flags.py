@@ -224,7 +224,7 @@ class FeatureFlags(BaseSettings):
     When enabled:
     - Agent reasoning text is emitted as observable events
     - Truncated to max 500 chars for streaming efficiency
-    - Lives entirely in mission/avionics layer (no core changes)
+    - Lives entirely in mission/infrastructure layer (no core changes)
 
     Constitutional compliance: P2 (Code Context Priority)
     - Provides visibility into agent decision-making

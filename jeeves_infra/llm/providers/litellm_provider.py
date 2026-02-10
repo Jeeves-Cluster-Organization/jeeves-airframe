@@ -3,7 +3,7 @@ LiteLLM provider - unified provider for 100+ LLM backends.
 
 Replaces all airframe adapters with direct LiteLLM calls.
 LiteLLM handles: HTTP, retries, streaming, provider quirks.
-This provider adds: cost tracking, logging, Avionics API translation.
+This provider adds: cost tracking, logging, Infrastructure API translation.
 
 Supports:
 - OpenAI, Azure OpenAI, Anthropic, Cohere, etc. (cloud)

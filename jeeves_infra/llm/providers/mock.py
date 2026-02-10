@@ -1,7 +1,7 @@
 """Mock LLM Provider for testing.
 
 Split from provider.py per Module Bloat Audit (2025-12-09).
-Constitutional Reference: Avionics R4 (Swappable Implementations)
+Constitutional Reference: Constitution R4 (Swappable Implementations)
 """
 
 import json

@@ -9,7 +9,7 @@ Architecture:
 - Returns standard HTTP 429 responses with Retry-After header
 
 Usage with FastAPI:
-    from avionics.middleware import RateLimitMiddleware
+    from jeeves_infra.middleware import RateLimitMiddleware
 
     app = FastAPI()
     rate_limiter = RateLimiter(logger)

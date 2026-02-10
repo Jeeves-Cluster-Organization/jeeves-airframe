@@ -5,7 +5,7 @@ This module provides the StructlogAdapter that implements LoggerProtocol,
 enabling dependency injection of logging throughout the system.
 
 Usage:
-    from avionics.logging.adapter import StructlogAdapter
+    from jeeves_infra.logging.adapter import StructlogAdapter
     import structlog
 
     # Create adapter for injection

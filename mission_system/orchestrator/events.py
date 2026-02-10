@@ -4,7 +4,7 @@ Unified Event Orchestrator - Single entry point for all event emission.
 Phase 7 Constitutional Compliance:
 - Mission System R7: Single Responsibility Per Component
 - Consolidates event_context + agent_events + event_emitter into unified facade
-- CommBus P3: Protocol-First Design
+- Constitution P3: Protocol-First Design
 
 This module provides:
 - EventOrchestrator: Unified facade combining all event systems
