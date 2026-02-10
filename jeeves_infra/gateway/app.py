@@ -391,7 +391,7 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(
-        "gateway.main:app",
+        "jeeves_infra.gateway.app:app",
         host=config.api_host,
         port=config.api_port,
         reload=config.debug,

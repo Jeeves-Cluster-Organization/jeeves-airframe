@@ -330,7 +330,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # P6: Observable - Log successful startup
     _logger.info(
         "server_startup_complete",
-        tools_registered=len(catalog.get_all_tool_ids()) if catalog else 0,
+        tools_registered=len(catalog.list_tools()) if catalog else 0,
         status="READY"
     )
 

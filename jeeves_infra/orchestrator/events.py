@@ -74,7 +74,7 @@ class EventOrchestrator:
     - EventContext (unified emission context)
     - EventEmitter (domain event persistence)
 
-    This is the ONLY entry point for event emission in the mission system.
+    This is the ONLY entry point for event emission in the orchestrator.
 
     Event Flow Architecture:
     - Orchestrator emits to EventEmitter (in-memory queue)
@@ -191,6 +191,7 @@ class EventOrchestrator:
     async def emit_tool_started(
         self,
         tool_name: str,
+        agent_name: str,
         params: Optional[Dict[str, Any]] = None,
         step_number: Optional[int] = None,
         total_steps: Optional[int] = None,
@@ -200,6 +201,7 @@ class EventOrchestrator:
         self._ensure_initialized()
         await self._context.emit_tool_started(
             tool_name=tool_name,
+            agent_name=agent_name,
             params=params,
             step_number=step_number,
             total_steps=total_steps,
@@ -209,6 +211,7 @@ class EventOrchestrator:
     async def emit_tool_completed(
         self,
         tool_name: str,
+        agent_name: str,
         status: str = "success",
         execution_time_ms: Optional[int] = None,
         error: Optional[str] = None,
@@ -218,6 +221,7 @@ class EventOrchestrator:
         self._ensure_initialized()
         return await self._context.emit_tool_completed(
             tool_name=tool_name,
+            agent_name=agent_name,
             status=status,
             execution_time_ms=execution_time_ms,
             error=error,
