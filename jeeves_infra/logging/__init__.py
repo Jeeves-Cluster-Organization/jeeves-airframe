@@ -2,7 +2,7 @@
 
 This module provides logging configuration with optional OTEL tracing support.
 Base logging functionality comes from jeeves_infra.utils.logging.
-Real OpenTelemetry tracing is provided by avionics.observability.
+Real OpenTelemetry tracing is provided by jeeves_infra.observability.
 
 Constitutional Compliance:
 - Avionics owns OTEL configuration flag

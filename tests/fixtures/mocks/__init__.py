@@ -4,7 +4,7 @@ Centralized Architecture (v4.0):
 - MockEnvelope replaces MockCoreEnvelope
 - No MockAgent (agents are config-driven)
 
-This package provides mocks for jeeves_core_engine and avionics
+This package provides mocks for jeeves_core_engine and jeeves_infra
 dependencies, allowing mission system tests to run in isolation.
 
 Usage:
@@ -19,7 +19,7 @@ from .infra_mocks import (
 )
 
 __all__ = [
-    # Avionics mocks
+    # Infrastructure mocks
     "MockLLMAdapter",
     "MockDatabaseClient",
     "MockMemoryService",

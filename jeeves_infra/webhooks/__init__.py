@@ -8,7 +8,7 @@ Components:
 - WebhookConfig: Configuration for webhook endpoints
 
 Usage:
-    from avionics.webhooks import WebhookService, WebhookConfig
+    from jeeves_infra.webhooks import WebhookService, WebhookConfig
 
     # Register a webhook
     config = WebhookConfig(
@@ -20,7 +20,7 @@ Usage:
 
     # Webhook will be called when matching events occur
 
-Constitutional Reference: Infrastructure layer (avionics)
+Constitutional Reference: Infrastructure layer (jeeves_infra)
 """
 
 from jeeves_infra.webhooks.service import (

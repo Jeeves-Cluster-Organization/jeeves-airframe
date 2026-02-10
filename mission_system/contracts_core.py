@@ -137,7 +137,7 @@ __all__ = [
     "WorkingMemory",
     "Finding",
 
-    # ─── Canonical Protocols (from jeeves_commbus) ───
+    # ─── Canonical Protocols (from jeeves_infra) ───
     "SettingsProtocol",
     "FeatureFlagsProtocol",
     "AppContextProtocol",

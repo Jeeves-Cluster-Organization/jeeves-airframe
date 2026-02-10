@@ -1,1 +1,1 @@
-"""Unit tests for avionics."""
+"""Unit tests for jeeves_infra."""

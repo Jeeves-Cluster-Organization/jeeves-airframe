@@ -5,12 +5,12 @@ Database client protocol re-exports.
 
 Constitutional Reference:
 - CommBus: DatabaseClientProtocol definition
-- Avionics R4: Swappable Implementations
-- Avionics R6: Database Backend Registry
+- Constitution R4: Swappable Implementations
+- Constitution R6: Database Backend Registry
 - Database Decoupling Audit (Option B)
 
 Usage:
-    from avionics.database.client import (
+    from jeeves_infra.database.client import (
         DatabaseClientProtocol,
         create_database_client,
     )

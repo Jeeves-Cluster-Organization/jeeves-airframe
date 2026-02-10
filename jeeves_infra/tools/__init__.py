@@ -1,5 +1,5 @@
 """
-Avionics Tools Module - Canonical Tool Infrastructure.
+Infrastructure Tools Module - Canonical Tool Infrastructure.
 
 Decision 1:A Implementation:
 - ToolId: Typed enum for all tool identifiers
@@ -11,7 +11,7 @@ Capability-specific tool implementations are in the capability layer
 (e.g., jeeves-capability-*/tools/).
 
 Usage:
-    from avionics.tools import (
+    from jeeves_infra.tools import (
         ToolId,
         ToolCatalog,
         ToolCategory,

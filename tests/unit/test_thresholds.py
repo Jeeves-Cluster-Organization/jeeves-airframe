@@ -1,6 +1,6 @@
 """Unit tests for thresholds.py - operational thresholds.
 
-Per Avionics Constitution: thresholds.py provides operational thresholds
+Per Airframe Constitution: thresholds.py provides operational thresholds
 for confirmations, retries, and L7 governance.
 """
 

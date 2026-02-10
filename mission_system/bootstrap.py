@@ -207,11 +207,11 @@ def create_app_context(
         enable_otel=feature_flags.enable_tracing,
     )
 
-    # Build root logger (avionics provides structlog wrapper)
+    # Build root logger (jeeves_infra provides structlog wrapper)
     from jeeves_infra.logging import create_logger
     root_logger = create_logger("jeeves")
 
-    # Get default service from capability registry (layer extraction support, Avionics R4)
+    # Get default service from capability registry (layer extraction support, Constitution R4)
     capability_registry = get_capability_resource_registry()
     default_service = capability_registry.get_default_service() or "jeeves"
 
@@ -258,15 +258,15 @@ def create_app_context(
     )
 
 
-def create_avionics_dependencies(
+def create_infra_dependencies(
     app_context: AppContext,
     language_config: Optional["LanguageConfigProtocol"] = None,
     node_profiles: Optional["InferenceEndpointsProtocol"] = None,
     access_checker: Optional["AgentToolAccessProtocol"] = None,
 ):
-    """Create and inject dependencies into avionics layer.
+    """Create and inject dependencies into infrastructure layer.
 
-    This function sets up the dependency injection for avionics
+    This function sets up the dependency injection for infrastructure
     components that need capability-owned implementations.
 
     ADR-001 Decision 1: Layer Violation Resolution via Protocol Injection
@@ -363,7 +363,7 @@ def create_tool_executor_with_access(
 
 __all__ = [
     "create_app_context",
-    "create_avionics_dependencies",
+    "create_infra_dependencies",
     "create_tool_executor_with_access",
     "create_core_config_from_env",
     "create_orchestration_flags_from_env",

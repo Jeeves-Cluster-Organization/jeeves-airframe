@@ -1,6 +1,6 @@
 """Mock implementations for jeeves_core_engine protocols.
 
-These mocks allow avionics tests to run in isolation without
+These mocks allow infrastructure tests to run in isolation without
 depending on the actual core engine implementation.
 
 Centralized Architecture (v4.0):
@@ -15,9 +15,9 @@ from typing import Any, Dict, List, Optional
 
 @dataclass
 class MockEnvelope:
-    """Mock Envelope for testing avionics components.
+    """Mock Envelope for testing infrastructure components.
 
-    This provides a minimal envelope interface that avionics
+    This provides a minimal envelope interface that infrastructure
     components may depend on, without requiring the full
     jeeves_core_engine implementation.
 

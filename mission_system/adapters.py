@@ -1,22 +1,22 @@
 """
-Mission System Adapters - Avionics Service Wrappers.
+Mission System Adapters - Infrastructure Service Wrappers.
 
-This module provides convenience wrappers for avionics services.
-Apps/verticals should use these instead of importing avionics directly.
+This module provides convenience wrappers for infrastructure services.
+Apps/verticals should use these instead of importing jeeves_infra directly.
 
 Architecture enforcement:
-    apps/verticals → mission_system (adapters) → avionics
+    apps/verticals → mission_system (adapters) → jeeves_infra
 
 Purpose: Single access point for infrastructure services.
 
 Constitutional Compliance:
 - Apps MUST use these adapters for infrastructure access
-- Apps MUST NOT import from avionics directly
+- Apps MUST NOT import from jeeves_infra directly
 - All infrastructure dependencies are injected, not imported as globals
 """
 
 from typing import Any, Optional, Callable
-# Phase 1.5: Import canonical protocols directly from jeeves_commbus
+# Phase 1.5: Import canonical protocols directly from jeeves_infra
 from jeeves_infra.protocols import (
     PersistenceProtocol,
     LLMProviderProtocol,
@@ -28,7 +28,7 @@ from mission_system.contracts import ContextBounds
 
 class MissionSystemAdapters:
     """
-    Collection of avionics adapters for apps/verticals.
+    Collection of infrastructure adapters for apps/verticals.
 
     Provides unified access to:
     - Database/persistence services
@@ -188,13 +188,13 @@ def get_logger():
     """
     Get logger instance for apps.
 
-    Apps should use this instead of importing from avionics.logging directly.
+    Apps should use this instead of importing from jeeves_infra.logging directly.
 
     Returns:
         Logger instance (Logger)
 
     Constitutional compliance:
-        Apps access infrastructure via adapters, not direct avionics imports.
+        Apps access infrastructure via adapters, not direct jeeves_infra imports.
 
     Example:
         from mission_system.adapters import get_logger
@@ -206,7 +206,7 @@ def get_logger():
 
 
 # =============================================================================
-# Factory Functions - Access points for avionics services
+# Factory Functions - Access points for infrastructure services
 # =============================================================================
 
 def create_database_client(
@@ -215,7 +215,7 @@ def create_database_client(
     """
     Create a database client.
 
-    Apps should use this instead of importing from avionics directly.
+    Apps should use this instead of importing from jeeves_infra directly.
 
     Args:
         settings: Optional settings (uses global if None)
@@ -224,7 +224,7 @@ def create_database_client(
         Database client implementing PersistenceProtocol
 
     Constitutional compliance:
-        Apps access infrastructure via adapters, not direct avionics imports.
+        Apps access infrastructure via adapters, not direct jeeves_infra imports.
     """
     from jeeves_infra.database.factory import create_database_client as _create_db
     if settings is None:
@@ -237,13 +237,13 @@ def get_settings() -> SettingsProtocol:
     """
     Get application settings.
 
-    Apps should use this instead of importing from avionics directly.
+    Apps should use this instead of importing from jeeves_infra directly.
 
     Returns:
         Settings instance implementing SettingsProtocol
 
     Constitutional compliance:
-        Apps access infrastructure via adapters, not direct avionics imports.
+        Apps access infrastructure via adapters, not direct jeeves_infra imports.
     """
     from jeeves_infra.settings import get_settings as _get_settings
     return _get_settings()
@@ -253,13 +253,13 @@ def get_feature_flags() -> Any:
     """
     Get feature flags.
 
-    Apps should use this instead of importing from avionics directly.
+    Apps should use this instead of importing from jeeves_infra directly.
 
     Returns:
         FeatureFlags instance
 
     Constitutional compliance:
-        Apps access infrastructure via adapters, not direct avionics imports.
+        Apps access infrastructure via adapters, not direct jeeves_infra imports.
     """
     from jeeves_infra.feature_flags import get_feature_flags as _get_flags
     return _get_flags()
@@ -325,8 +325,8 @@ def create_tool_executor(registry: Optional[ToolRegistryProtocol] = None) -> Any
     """
     Create tool executor with access control.
 
-    Wrapper for avionics.wiring.create_tool_executor.
-    Apps should use this instead of importing from avionics directly.
+    Wrapper for jeeves_infra.wiring.create_tool_executor.
+    Apps should use this instead of importing from jeeves_infra directly.
 
     Args:
         registry: Optional tool registry (uses global if None)
@@ -335,8 +335,8 @@ def create_tool_executor(registry: Optional[ToolRegistryProtocol] = None) -> Any
         ToolExecutor instance implementing ToolExecutorProtocol
 
     Constitutional compliance:
-        Apps access infrastructure via adapters, not direct avionics imports.
-        Layer boundary: Capability → Mission System (adapters) → Avionics
+        Apps access infrastructure via adapters, not direct jeeves_infra imports.
+        Layer boundary: Capability → Mission System (adapters) → jeeves_infra
     """
     from jeeves_infra.wiring import create_tool_executor as _create_executor
     return _create_executor(registry)
@@ -346,8 +346,8 @@ def create_llm_provider_factory(settings: Optional[SettingsProtocol] = None) -> 
     """
     Create LLM provider factory.
 
-    Wrapper for avionics.wiring.create_llm_provider_factory.
-    Apps should use this instead of importing from avionics directly.
+    Wrapper for jeeves_infra.wiring.create_llm_provider_factory.
+    Apps should use this instead of importing from jeeves_infra directly.
 
     Args:
         settings: Optional settings (uses global if None)
@@ -356,8 +356,8 @@ def create_llm_provider_factory(settings: Optional[SettingsProtocol] = None) -> 
         Factory function that creates LLM providers
 
     Constitutional compliance:
-        Apps access infrastructure via adapters, not direct avionics imports.
-        Layer boundary: Capability → Mission System (adapters) → Avionics
+        Apps access infrastructure via adapters, not direct jeeves_infra imports.
+        Layer boundary: Capability → Mission System (adapters) → jeeves_infra
     """
     from jeeves_infra.wiring import create_llm_provider_factory as _create_factory
     return _create_factory(settings)
@@ -372,7 +372,7 @@ __all__ = [
     "create_database_client",
     "get_settings",
     "get_feature_flags",
-    # Tool and LLM factories (wrappers for avionics)
+    # Tool and LLM factories (wrappers for jeeves_infra)
     "create_tool_executor",
     "create_llm_provider_factory",
     # Memory layer factories

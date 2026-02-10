@@ -2,14 +2,14 @@
 Configuration constants for Jeeves Mission System.
 
 Centralizes operational constants. Product identity is capability-specific
-and should be queried from CapabilityResourceRegistry (Avionics R4).
+and should be queried from CapabilityResourceRegistry (Constitution R4).
 
 NOTE: LLM parameters and agent thresholds have been moved to:
 - mission_system/config/agent_profiles.py (AgentProfile, AgentLLMConfig, ThresholdProfile)
-- avionics/thresholds.py (operational thresholds)
+- jeeves_infra/thresholds.py (operational thresholds)
 """
 
-# Import operational thresholds from canonical source (Avionics Constitution)
+# Import operational thresholds from canonical source (Constitution)
 from jeeves_infra.thresholds import (
     MAX_RETRY_ATTEMPTS,
 )
@@ -73,7 +73,7 @@ METRICS_RETENTION_DAYS = 30
 # ERROR HANDLING
 # ==============================================================================
 
-# MAX_RETRY_ATTEMPTS imported from avionics/thresholds.py (canonical source)
+# MAX_RETRY_ATTEMPTS imported from jeeves_infra/thresholds.py (canonical source)
 RETRY_BACKOFF_MULTIPLIER = 2.0
 RETRY_INITIAL_DELAY = 1.0
 

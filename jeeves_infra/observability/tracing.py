@@ -1,4 +1,4 @@
-"""OpenTelemetry tracing configuration for avionics."""
+"""OpenTelemetry tracing configuration for jeeves_infra."""
 
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter

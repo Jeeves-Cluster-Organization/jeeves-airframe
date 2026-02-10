@@ -1,9 +1,9 @@
 """Database factory using registry pattern.
 
 Constitutional Reference:
-- Avionics R4: Swappable Implementations
-- Avionics R6: Database Backend Registry
-- Avionics R2: Configuration Over Code
+- Constitution R4: Swappable Implementations
+- Constitution R6: Database Backend Registry
+- Constitution R2: Configuration Over Code
 - Database Decoupling Audit (Option B)
 
 Ownership Model:
@@ -62,7 +62,7 @@ async def _maybe_init_schema(client: DatabaseClientProtocol, logger: LoggerProto
     All schemas come from CapabilityResourceRegistry — capabilities own their
     schemas and register them during wire_capabilities().
 
-    Reference: Avionics R3 (No Domain Logic), R4 (Swappable Implementations)
+    Reference: Constitution R3 (No Domain Logic), R4 (Swappable Implementations)
     """
     from jeeves_infra.protocols import get_capability_resource_registry
 

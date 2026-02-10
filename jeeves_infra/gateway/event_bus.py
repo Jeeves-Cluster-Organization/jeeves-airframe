@@ -63,9 +63,9 @@ class GatewayEventBus(EventEmitterProtocol):
     - Implements EventEmitterProtocol for swappable implementations
 
     Constitutional Compliance:
-    - Avionics R2 (Configuration Over Code): Event schema defined declaratively
-    - Avionics R3 (No Domain Logic): Pure transport - no business logic
-    - Avionics R4 (Swappable Implementations): Implements EventEmitterProtocol
+    - Constitution R2 (Configuration Over Code): Event schema defined declaratively
+    - Constitution R3 (No Domain Logic): Pure transport - no business logic
+    - Constitution R4 (Swappable Implementations): Implements EventEmitterProtocol
     - Decouples publishers from subscribers
     - Routers don't need to know about WebSocket implementation
     - WebSocket handler doesn't need to know about router internals

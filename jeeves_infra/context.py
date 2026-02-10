@@ -9,7 +9,7 @@ Design Mantra: One composition root builds one AppContext;
 everything gets dependencies from there, not from globals.
 
 Usage:
-    from avionics.context import AppContext
+    from jeeves_infra.context import AppContext
 
     # In composition root (bootstrap.py)
     app_context = create_app_context()

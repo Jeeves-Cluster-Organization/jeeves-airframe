@@ -172,19 +172,19 @@ class TestCreateMemoryManager:
             assert manager.vector is not None
 
 
-class TestAvionicsDependencies:
-    """Tests for create_avionics_dependencies function."""
+class TestInfraDependencies:
+    """Tests for create_infra_dependencies function."""
 
     def test_creates_llm_factory(self):
         """Test that LLM factory is created."""
         from mission_system.bootstrap import (
             create_app_context,
-            create_avionics_dependencies,
+            create_infra_dependencies,
         )
 
         with patch.dict("os.environ", {}, clear=True):
             context = create_app_context()
-            deps = create_avionics_dependencies(context)
+            deps = create_infra_dependencies(context)
 
             assert "llm_factory" in deps
             assert deps["llm_factory"] is not None
@@ -193,14 +193,14 @@ class TestAvionicsDependencies:
         """Test that node profiles are injected."""
         from mission_system.bootstrap import (
             create_app_context,
-            create_avionics_dependencies,
+            create_infra_dependencies,
         )
 
         mock_profiles = Mock()
 
         with patch.dict("os.environ", {}, clear=True):
             context = create_app_context()
-            deps = create_avionics_dependencies(context, node_profiles=mock_profiles)
+            deps = create_infra_dependencies(context, node_profiles=mock_profiles)
 
             assert deps["node_profiles"] == mock_profiles
 

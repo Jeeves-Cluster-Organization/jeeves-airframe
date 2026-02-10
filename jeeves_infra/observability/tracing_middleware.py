@@ -13,7 +13,7 @@ Usage:
     middleware = TracingMiddleware(otel_adapter)
     traced_handler = middleware.wrap(handler)
 
-Constitutional Reference: Avionics R1 (Adapter Pattern)
+Constitutional Reference: Constitution R1 (Adapter Pattern)
 """
 
 import functools

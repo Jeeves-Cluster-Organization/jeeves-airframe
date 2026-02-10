@@ -344,7 +344,7 @@ class HealthChecker:
                 last_check=datetime.now(timezone.utc),
             )
         except ImportError as e:
-            # avionics might not be available in all contexts
+            # jeeves_infra might not be available in all contexts
             return ComponentHealth(
                 status=ComponentStatus.DEGRADED,
                 message=f"Settings unavailable: {str(e)[:50]}",

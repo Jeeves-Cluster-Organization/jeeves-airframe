@@ -92,7 +92,7 @@ def get_interrupt_service(request: Request) -> InterruptServiceProtocol:
     """Get the interrupt service from the application state.
 
     The interrupt service must be registered in app.state.interrupt_service
-    by the application bootstrap. This avionics layer does not create
+    by the application bootstrap. This infrastructure layer does not create
     the service directly to maintain proper layer separation.
 
     Raises:

@@ -16,7 +16,7 @@ Constitutional Compliance:
 - P1 (Accuracy First): Single source of truth prevents drift
 - P5 (Deterministic Spine): Typed enums prevent typos/mismatches
 - P6 (Observable): Explicit registration for auditability
-- Avionics R4 (Swappable Implementations): Implements ToolRegistryProtocol
+- Constitution R4 (Swappable Implementations): Implements ToolRegistryProtocol
 """
 
 from dataclasses import dataclass

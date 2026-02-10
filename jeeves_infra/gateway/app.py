@@ -12,8 +12,8 @@ Endpoints:
 The gateway is stateless - all state lives in the orchestrator/database.
 
 Constitutional Compliance:
-- Avionics R3: No domain logic - gateway is pure transport
-- Avionics R4: Swappable - queries CapabilityResourceRegistry for identity
+- Constitution R3: No domain logic - gateway is pure transport
+- Constitution R4: Swappable - queries CapabilityResourceRegistry for identity
 """
 
 from __future__ import annotations
@@ -44,7 +44,7 @@ from jeeves_infra.observability.tracing import init_tracing, instrument_fastapi,
 
 
 def _get_service_identity() -> str:
-    """Get service identity from CapabilityResourceRegistry (Avionics R4)."""
+    """Get service identity from CapabilityResourceRegistry (Constitution R4)."""
     registry = get_capability_resource_registry()
     return registry.get_default_service() or "jeeves"
 

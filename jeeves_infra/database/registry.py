@@ -5,8 +5,8 @@ for multiple backends. The registry is empty by default - backends
 must be registered by the application/capability at startup.
 
 Constitutional Reference:
-- Avionics R4: Swappable Implementations
-- Avionics R6: Database Backend Registry
+- Constitution R4: Swappable Implementations
+- Constitution R6: Database Backend Registry
 - Database Decoupling Audit (Option B)
 
 Usage:

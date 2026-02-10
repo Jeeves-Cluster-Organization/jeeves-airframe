@@ -8,7 +8,7 @@ EventEmitter infrastructure. This adapter:
 3. Exports traces to configured backends (Jaeger, Zipkin, OTLP, etc.)
 
 Usage:
-    from avionics.observability import OpenTelemetryAdapter, create_tracer
+    from jeeves_infra.observability import OpenTelemetryAdapter, create_tracer
 
     # Initialize
     tracer = create_tracer("jeeves-my-capability")
@@ -22,7 +22,7 @@ Usage:
         span.set_attribute("agent.name", "planner")
         # ... agent execution ...
 
-Constitutional Reference: Avionics R1 (Adapter Pattern)
+Constitutional Reference: Constitution R1 (Adapter Pattern)
 """
 
 from contextlib import contextmanager

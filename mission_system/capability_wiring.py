@@ -24,7 +24,7 @@ Usage:
     wire_capabilities()  # Discovers and registers capabilities
 
 Constitutional Alignment:
-- Avionics R4: Capabilities register their own resources
+- Constitution R4: Capabilities register their own resources
 - No hardcoded capability knowledge in mission system
 """
 

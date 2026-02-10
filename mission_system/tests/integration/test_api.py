@@ -168,7 +168,7 @@ async def test_submit_request_success(test_app):
         )
         return result
 
-    # Patch control_tower.submit_request to return mock result
+    # Patch orchestrator.process_envelope to return mock result
     with patch.object(app_state.orchestrator, "process_envelope", side_effect=create_mock_envelope):
         response = await test_app.post(
             "/api/v1/requests",

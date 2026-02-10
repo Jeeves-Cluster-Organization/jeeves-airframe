@@ -16,8 +16,8 @@ Constitutional Compliance:
 - P6: Testable - tests catch real failures, not mock patterns
 
 Constitutional Import Boundary Note:
-- Mission system layer IS the wiring layer between app and avionics
-- Direct avionics imports are acceptable here for LLM factory access
+- Mission system layer IS the wiring layer between app and jeeves_infra
+- Direct jeeves_infra imports are acceptable here for LLM factory access
 - App layer tests must use mission_system.adapters instead
 """
 

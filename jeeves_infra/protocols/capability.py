@@ -1,8 +1,8 @@
 """Capability Registration Protocols.
 
 Constitutional Reference:
-- Avionics R3: No Domain Logic - infrastructure provides transport, not business logic
-- Avionics R4: Swappable Implementations - capabilities register their own resources
+- Constitution R3: No Domain Logic - infrastructure provides transport, not business logic
+- Constitution R4: Swappable Implementations - capabilities register their own resources
 - Mission System Constitution: Domain configs OWNED by capabilities
 
 This module defines protocols for capabilities to register their resources
@@ -18,7 +18,7 @@ Usage:
     registry.register_mode("my_capability", DomainModeConfig(...))
     registry.register_service("my_capability", DomainServiceConfig(...))
 
-    # In infrastructure (avionics/mission_system)
+    # In infrastructure (jeeves_infra/mission_system)
     from protocols.capability import get_capability_resource_registry
 
     registry = get_capability_resource_registry()
@@ -67,7 +67,7 @@ class CapabilityToolCatalog:
     CapabilityResourceRegistry.get_tools(capability_id) to get the catalog.
     
     This design ensures:
-    - Avionics R3: No Domain Logic in core (capabilities define their own tools)
+    - Constitution R3: No Domain Logic in core (capabilities define their own tools)
     - Full isolation between capabilities
     - No global ToolId enum needed for capability-specific tools
     

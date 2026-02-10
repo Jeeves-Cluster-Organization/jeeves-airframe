@@ -5,13 +5,13 @@ Capabilities register their agent configurations at startup, and
 infrastructure queries the registry instead of having hardcoded agent names.
 
 Constitutional Reference:
-    - Avionics R3: No Domain Logic - infrastructure provides transport, not business logic
+    - Constitution R3: No Domain Logic - infrastructure provides transport, not business logic
     - Capability Constitution R6: Domain Config Ownership
     - docs/CONSTITUTION.md: Layer separation enforcement
 
 Usage:
     # At capability startup (in jeeves-capability-my-capability)
-    from avionics.capability_registry import get_capability_registry
+    from jeeves_infra.capability_registry import get_capability_registry
     from jeeves_infra.protocols import AgentLLMConfig
 
     registry = get_capability_registry()
