@@ -1,110 +1,20 @@
 """
-Canonical Tool Catalog - Single source of truth for all tools.
+Tool Catalog Infrastructure - Generic tool registry and definitions.
 
-Decision 1:A: All tools registered here with typed ToolId, no hardcoded strings.
+This module provides the generic infrastructure for tool registration
+and execution. Capability-specific tool identifiers (ToolId enums) and
+catalog entries are owned by each capability layer.
 
-This module provides:
-- ToolId: Typed enum for all tool identifiers (no raw strings)
-- ToolCategory: IMPORTED from protocols (canonical location)
-- RiskLevel: IMPORTED from protocols (canonical location)
+Provides:
 - ToolCatalogEntry: Immutable metadata for each tool
-- ToolCatalog: Singleton registry and prompt generation
-- ToolDefinition: Tool definition for ToolExecutor (implements ToolDefinitionProtocol)
-- EXPOSED_TOOL_IDS: Tools visible to agents
-
-Constitutional Compliance:
-- P1 (Accuracy First): Single source of truth prevents drift
-- P5 (Deterministic Spine): Typed enums prevent typos/mismatches
-- P6 (Observable): Explicit registration for auditability
-- Constitution R4 (Swappable Implementations): Implements ToolRegistryProtocol
+- ToolCatalog: Registry implementing ToolRegistryProtocol
+- ToolDefinition: Tool definition for ToolExecutor
 """
 
 from dataclasses import dataclass
-from enum import Enum
-from typing import Any, Callable, Dict, FrozenSet, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from jeeves_infra.protocols import RiskLevel, ToolCategory
-
-
-class ToolId(str, Enum):
-    """Typed tool identifiers.
-
-    All tool references must use these enum values, not raw strings.
-    This ensures compile-time checking and prevents name mismatches.
-    """
-
-    # ═══════════════════════════════════════════════════════════════════════════
-    # CODE ANALYSIS TOOLS - Two-path architecture (Amendment XXII v2)
-    # ═══════════════════════════════════════════════════════════════════════════
-    # Primary search tool - always searches, never assumes paths exist
-    SEARCH_CODE = "search_code"
-    # Legacy unified tool - kept for backwards compatibility
-    ANALYZE = "analyze"
-
-    # ═══════════════════════════════════════════════════════════════════════════
-    # COMPOSITE TOOLS (Amendment XVII) - Multi-step workflows with fallbacks
-    # ═══════════════════════════════════════════════════════════════════════════
-    LOCATE = "locate"
-    EXPLORE_SYMBOL_USAGE = "explore_symbol_usage"
-    MAP_MODULE = "map_module"
-    TRACE_ENTRY_POINT = "trace_entry_point"
-    EXPLAIN_CODE_HISTORY = "explain_code_history"
-
-    # ═══════════════════════════════════════════════════════════════════════════
-    # RESILIENT TOOLS (Amendment XXI) - Wrapped base tools with retry/fallback
-    # ═══════════════════════════════════════════════════════════════════════════
-    READ_CODE = "read_code"
-    FIND_RELATED = "find_related"
-
-    # ═══════════════════════════════════════════════════════════════════════════
-    # STANDALONE TOOLS - Simple tools that don't need wrapping
-    # ═══════════════════════════════════════════════════════════════════════════
-    GIT_STATUS = "git_status"
-    LIST_TOOLS = "list_tools"
-
-    # ═══════════════════════════════════════════════════════════════════════════
-    # INTERNAL/BASE TOOLS - Implementation details, not exposed to agents
-    # ═══════════════════════════════════════════════════════════════════════════
-    # Core traversal
-    READ_FILE = "read_file"
-    GLOB_FILES = "glob_files"
-    GREP_SEARCH = "grep_search"
-    TREE_STRUCTURE = "tree_structure"
-
-    # Code parser
-    FIND_SYMBOL = "find_symbol"
-    GET_FILE_SYMBOLS = "get_file_symbols"
-    GET_IMPORTS = "get_imports"
-    GET_IMPORTERS = "get_importers"
-    PARSE_SYMBOLS = "parse_symbols"
-    FIND_REFERENCES = "find_references"
-    GET_DEPENDENCIES = "get_dependencies"
-    GET_DEPENDENTS = "get_dependents"
-
-    # File navigation
-    LIST_FILES = "list_files"
-    SEARCH_FILES = "search_files"
-    GET_PROJECT_TREE = "get_project_tree"
-
-    # Semantic/RAG
-    SEMANTIC_SEARCH = "semantic_search"
-    FIND_SIMILAR_FILES = "find_similar_files"
-    GET_INDEX_STATS = "get_index_stats"
-
-    # Git
-    GIT_LOG = "git_log"
-    GIT_BLAME = "git_blame"
-    GIT_DIFF = "git_diff"
-
-    # Session
-    GET_SESSION_STATE = "get_session_state"
-    SAVE_SESSION_STATE = "save_session_state"
-
-    # ═══════════════════════════════════════════════════════════════════════════
-    # NOTE: Capability-specific tools are NOT defined here.
-    # Each capability owns its own CapabilityToolCatalog (see protocols.capability).
-    # This enum only contains core/infrastructure tools and code-analysis tools.
-    # ═══════════════════════════════════════════════════════════════════════════
 
 
 @dataclass(frozen=True)
@@ -114,7 +24,7 @@ class ToolCatalogEntry:
     Frozen dataclass ensures entries cannot be modified after creation,
     supporting the single source of truth pattern.
     """
-    id: ToolId
+    id: str
     description: str
     parameters: Dict[str, str]
     category: ToolCategory
@@ -135,34 +45,8 @@ class ToolCatalogEntry:
             else:
                 param_parts.append(name)
         params = ", ".join(param_parts)
-        return f"- {self.id.value}({params}): {self.description}"
+        return f"- {self.id}({params}): {self.description}"
 
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# EXPOSED TOOL IDS - Tools visible to agents (Decision 2:B)
-# Only Traverser can execute, but Planner can see for planning
-# ═══════════════════════════════════════════════════════════════════════════════
-EXPOSED_TOOL_IDS: FrozenSet[ToolId] = frozenset({
-    # Unified Analyzer (Amendment XXII) - Primary entry point
-    ToolId.ANALYZE,
-    # Composite (5) - Now internal, orchestrated by analyze
-    ToolId.LOCATE,
-    ToolId.EXPLORE_SYMBOL_USAGE,
-    ToolId.MAP_MODULE,
-    ToolId.TRACE_ENTRY_POINT,
-    ToolId.EXPLAIN_CODE_HISTORY,
-    # Resilient (2)
-    ToolId.READ_CODE,
-    ToolId.FIND_RELATED,
-    # Standalone (2)
-    ToolId.GIT_STATUS,
-    ToolId.LIST_TOOLS,
-})
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# TOOL DEFINITION - Implements ToolDefinitionProtocol
-# ═══════════════════════════════════════════════════════════════════════════════
 
 @dataclass
 class ToolDefinition:
@@ -177,90 +61,31 @@ class ToolDefinition:
     description: str = ""
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# HELPER FUNCTIONS - Must be defined before ToolCatalog uses them
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def resolve_tool_id(name: str) -> Optional[ToolId]:
-    """Resolve string tool name to ToolId.
-
-    Args:
-        name: Tool name string (e.g., "locate")
-
-    Returns:
-        ToolId if valid, None otherwise
-    """
-    try:
-        return ToolId(name)
-    except ValueError:
-        return None
-
-
-def is_exposed_tool(tool_id: ToolId) -> bool:
-    """Check if tool is in exposed set.
-
-    Args:
-        tool_id: Tool to check
-
-    Returns:
-        True if tool should be visible to agents
-    """
-    return tool_id in EXPOSED_TOOL_IDS
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# TOOL CATALOG - Implements ToolRegistryProtocol
-# ═══════════════════════════════════════════════════════════════════════════════
-
 class ToolCatalog:
-    """Canonical tool catalog - single source of truth (Decision 1:A).
+    """Generic tool catalog - implements ToolRegistryProtocol.
 
-    Implements ToolRegistryProtocol from protocols.
-
-    Singleton registry that:
+    Registry that:
     - Stores all tool metadata (ToolCatalogEntry)
-    - Maps ToolId to implementation functions
-    - Generates consistent prompts for Planner
-    - Validates tool existence by typed ID or string name
+    - Maps tool name strings to implementation functions
+    - Generates consistent prompts for agents
+    - Validates tool existence by string name
 
     Usage:
-        catalog = ToolCatalog.get_instance()
+        catalog = ToolCatalog()
 
-        @catalog.register(
-            tool_id=ToolId.LOCATE,
+        catalog.register_function(
+            tool_name="locate",
+            func=locate_impl,
             description="Find code anywhere",
             parameters={"symbol": "string", "scope": "string?"},
             category=ToolCategory.COMPOSITE,
         )
-        async def locate(symbol: str, scope: str = None):
-            ...
     """
 
-    _instance: Optional["ToolCatalog"] = None
-
     def __init__(self) -> None:
-        """Initialize empty catalog.
-
-        Use get_instance() for singleton access.
-        """
-        self._entries: Dict[ToolId, ToolCatalogEntry] = {}
-        self._functions: Dict[ToolId, Callable] = {}
-
-    @classmethod
-    def get_instance(cls) -> "ToolCatalog":
-        """Get singleton instance.
-
-        Returns:
-            The global ToolCatalog instance
-        """
-        if cls._instance is None:
-            cls._instance = cls()
-        return cls._instance
-
-    @classmethod
-    def reset_instance(cls) -> None:
-        """Reset singleton instance (for testing only)."""
-        cls._instance = None
+        """Initialize empty catalog."""
+        self._entries: Dict[str, ToolCatalogEntry] = {}
+        self._functions: Dict[str, Callable] = {}
 
     # ═══════════════════════════════════════════════════════════════════════════
     # REGISTRATION METHODS
@@ -268,7 +93,7 @@ class ToolCatalog:
 
     def register(
         self,
-        tool_id: ToolId,
+        tool_name: str,
         description: str,
         parameters: Dict[str, str],
         category: ToolCategory,
@@ -279,7 +104,7 @@ class ToolCatalog:
         """Register tool. Can be used as decorator.
 
         Args:
-            tool_id: Typed tool identifier
+            tool_name: String tool identifier
             description: Human-readable description
             parameters: Dict of param_name -> type_description
             category: Tool category
@@ -291,7 +116,7 @@ class ToolCatalog:
             Decorator function that registers the tool implementation
         """
         entry = ToolCatalogEntry(
-            id=tool_id,
+            id=tool_name,
             description=description,
             parameters=parameters,
             category=category,
@@ -299,16 +124,16 @@ class ToolCatalog:
             accepts=accepts,
             returns=returns,
         )
-        self._entries[tool_id] = entry
+        self._entries[tool_name] = entry
 
         def decorator(func: Callable) -> Callable:
-            self._functions[tool_id] = func
+            self._functions[tool_name] = func
             return func
         return decorator
 
     def register_function(
         self,
-        tool_id: ToolId,
+        tool_name: str,
         func: Callable,
         description: str,
         parameters: Dict[str, str],
@@ -318,7 +143,7 @@ class ToolCatalog:
         """Register tool without decorator syntax.
 
         Args:
-            tool_id: Typed tool identifier
+            tool_name: String tool identifier
             func: Implementation function
             description: Human-readable description
             parameters: Dict of param_name -> type_description
@@ -326,14 +151,14 @@ class ToolCatalog:
             risk_level: Risk classification
         """
         entry = ToolCatalogEntry(
-            id=tool_id,
+            id=tool_name,
             description=description,
             parameters=parameters,
             category=category,
             risk_level=risk_level,
         )
-        self._entries[tool_id] = entry
-        self._functions[tool_id] = func
+        self._entries[tool_name] = entry
+        self._functions[tool_name] = func
 
     # ═══════════════════════════════════════════════════════════════════════════
     # TOOLREGISTRYPROTOCOL IMPLEMENTATION (string-based interface)
@@ -342,23 +167,16 @@ class ToolCatalog:
     def has_tool(self, name: str) -> bool:
         """Check if tool is registered by string name.
 
-        Implements ToolRegistryProtocol.has_tool().
-
         Args:
             name: Tool name string (e.g., "analyze")
 
         Returns:
             True if tool has both entry and function registered
         """
-        tool_id = resolve_tool_id(name)
-        if tool_id is None:
-            return False
-        return tool_id in self._entries and tool_id in self._functions
+        return name in self._entries and name in self._functions
 
     def get_tool(self, name: str) -> Optional[ToolDefinition]:
         """Get tool by string name.
-
-        Implements ToolRegistryProtocol.get_tool().
 
         Args:
             name: Tool name string (e.g., "analyze")
@@ -366,11 +184,8 @@ class ToolCatalog:
         Returns:
             ToolDefinition with function and parameters, or None
         """
-        tool_id = resolve_tool_id(name)
-        if tool_id is None:
-            return None
-        entry = self._entries.get(tool_id)
-        func = self._functions.get(tool_id)
+        entry = self._entries.get(name)
+        func = self._functions.get(name)
         if entry is None or func is None:
             return None
         return ToolDefinition(
@@ -381,64 +196,30 @@ class ToolCatalog:
         )
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # TOOLID-BASED ACCESS (typed interface for internal use)
+    # CATALOG OPERATIONS
     # ═══════════════════════════════════════════════════════════════════════════
 
-    def has_tool_id(self, tool_id: ToolId) -> bool:
-        """Check if tool is registered by ToolId.
+    def get_entry(self, tool_name: str) -> Optional[ToolCatalogEntry]:
+        """Get tool metadata by name.
 
         Args:
-            tool_id: Typed tool identifier
-
-        Returns:
-            True if tool has both entry and function registered
-        """
-        return tool_id in self._entries and tool_id in self._functions
-
-    def get_entry(self, tool_id: ToolId) -> Optional[ToolCatalogEntry]:
-        """Get tool metadata by ToolId.
-
-        Args:
-            tool_id: Typed tool identifier
+            tool_name: Tool name string
 
         Returns:
             ToolCatalogEntry if registered, None otherwise
         """
-        return self._entries.get(tool_id)
+        return self._entries.get(tool_name)
 
-    def get_function(self, tool_id: ToolId) -> Optional[Callable]:
-        """Get tool implementation by ToolId.
+    def get_function(self, tool_name: str) -> Optional[Callable]:
+        """Get tool implementation by name.
 
         Args:
-            tool_id: Typed tool identifier
+            tool_name: Tool name string
 
         Returns:
             Implementation function if registered, None otherwise
         """
-        return self._functions.get(tool_id)
-
-    def has_entry(self, tool_id: ToolId) -> bool:
-        """Check if tool entry exists (may not have function yet).
-
-        Args:
-            tool_id: Typed tool identifier
-
-        Returns:
-            True if entry registered
-        """
-        return tool_id in self._entries
-
-    # ═══════════════════════════════════════════════════════════════════════════
-    # CATALOG OPERATIONS
-    # ═══════════════════════════════════════════════════════════════════════════
-
-    def get_exposed_entries(self) -> List[ToolCatalogEntry]:
-        """Get entries for all exposed tools.
-
-        Returns:
-            List of ToolCatalogEntry for tools in EXPOSED_TOOL_IDS
-        """
-        return [self._entries[tid] for tid in EXPOSED_TOOL_IDS if tid in self._entries]
+        return self._functions.get(tool_name)
 
     def get_entries_by_category(self, category: ToolCategory) -> List[ToolCatalogEntry]:
         """Get all entries in a category.
@@ -451,14 +232,12 @@ class ToolCatalog:
         """
         return [e for e in self._entries.values() if e.category == category]
 
-    def generate_planner_prompt(self, allowed_tools: FrozenSet[ToolId]) -> str:
-        """Generate tool descriptions for Planner prompt (Decision 1:A).
-
-        This replaces hardcoded tool lists in planner.py.
-        Generates consistent, up-to-date tool documentation.
+    def generate_prompt(self, allowed_tools: Optional[List[str]] = None) -> str:
+        """Generate tool descriptions for agent prompts.
 
         Args:
-            allowed_tools: Set of ToolIds the Planner can reference
+            allowed_tools: Optional list of tool names to include.
+                           If None, includes all registered tools.
 
         Returns:
             Formatted multi-line string with tool descriptions
@@ -468,39 +247,26 @@ class ToolCatalog:
             cat: [] for cat in ToolCategory
         }
 
-        for tid in allowed_tools:
-            entry = self._entries.get(tid)
+        tools_to_show = allowed_tools or list(self._entries.keys())
+        for name in tools_to_show:
+            entry = self._entries.get(name)
             if entry:
                 by_category[entry.category].append(entry)
 
-        # Order: Unified, Composite, Resilient, Standalone (skip Internal)
-        if by_category[ToolCategory.UNIFIED]:
-            lines.append("═══ UNIFIED (primary entry point) ═══")
-            for entry in sorted(by_category[ToolCategory.UNIFIED], key=lambda e: e.id.value):
-                lines.append(entry.to_prompt_line())
-
-        if by_category[ToolCategory.COMPOSITE]:
-            lines.append("\n═══ COMPOSITE (multi-step workflows) ═══")
-            for entry in sorted(by_category[ToolCategory.COMPOSITE], key=lambda e: e.id.value):
-                lines.append(entry.to_prompt_line())
-
-        if by_category[ToolCategory.RESILIENT]:
-            lines.append("\n═══ RESILIENT (with fallbacks) ═══")
-            for entry in sorted(by_category[ToolCategory.RESILIENT], key=lambda e: e.id.value):
-                lines.append(entry.to_prompt_line())
-
-        if by_category[ToolCategory.STANDALONE]:
-            lines.append("\n═══ STANDALONE ═══")
-            for entry in sorted(by_category[ToolCategory.STANDALONE], key=lambda e: e.id.value):
-                lines.append(entry.to_prompt_line())
+        for category in ToolCategory:
+            entries = by_category.get(category, [])
+            if entries:
+                lines.append(f"\n═══ {category.value.upper()} ═══")
+                for entry in sorted(entries, key=lambda e: e.id):
+                    lines.append(entry.to_prompt_line())
 
         return "\n".join(lines)
 
-    def list_all_ids(self) -> List[ToolId]:
-        """List all registered tool IDs.
+    def list_all_names(self) -> List[str]:
+        """List all registered tool names.
 
         Returns:
-            List of all registered ToolIds
+            List of all registered tool name strings
         """
         return list(self._entries.keys())
 
@@ -511,15 +277,11 @@ class ToolCatalog:
             Dict mapping tool names to their metadata
         """
         return {
-            tid.value: {
+            name: {
                 "description": entry.description,
                 "parameters": entry.parameters,
                 "category": entry.category.value,
                 "risk_level": entry.risk_level.value,
             }
-            for tid, entry in self._entries.items()
+            for name, entry in self._entries.items()
         }
-
-
-# Global singleton instance
-tool_catalog = ToolCatalog.get_instance()

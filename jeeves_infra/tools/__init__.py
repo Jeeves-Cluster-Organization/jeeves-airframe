@@ -1,36 +1,22 @@
 """
-Infrastructure Tools Module - Canonical Tool Infrastructure.
+Infrastructure Tools Module - Generic Tool Infrastructure.
 
-Decision 1:A Implementation:
-- ToolId: Typed enum for all tool identifiers
-- ToolCatalog: Singleton registry for tool metadata
-- ToolCategory, RiskLevel: Classification enums
-
-This module provides the infrastructure layer for tools.
-Capability-specific tool implementations are in the capability layer
-(e.g., jeeves-capability-*/tools/).
+This module provides the infrastructure layer for tool registration and
+execution. Capability-specific tool identifiers and implementations are
+owned by each capability layer.
 
 Usage:
     from jeeves_infra.tools import (
-        ToolId,
         ToolCatalog,
+        ToolCatalogEntry,
+        ToolDefinition,
         ToolCategory,
         RiskLevel,
-        tool_catalog,
-        EXPOSED_TOOL_IDS,
     )
-
-    # Check tool by typed ID
-    if tool_catalog.has_tool_id(ToolId.LOCATE):
-        entry = tool_catalog.get_entry(ToolId.LOCATE)
-
-    # Generate Planner prompt
-    prompt = tool_catalog.generate_planner_prompt(EXPOSED_TOOL_IDS)
 """
 
 from jeeves_infra.tools.catalog import (
-    # Enums
-    ToolId,
+    # Classification (from protocols)
     ToolCategory,
     RiskLevel,
     # Dataclasses
@@ -38,18 +24,11 @@ from jeeves_infra.tools.catalog import (
     ToolDefinition,
     # Catalog
     ToolCatalog,
-    tool_catalog,
-    # Constants
-    EXPOSED_TOOL_IDS,
-    # Helpers
-    resolve_tool_id,
-    is_exposed_tool,
 )
 
 
 __all__ = [
-    # Enums
-    "ToolId",
+    # Classification
     "ToolCategory",
     "RiskLevel",
     # Dataclasses
@@ -57,10 +36,4 @@ __all__ = [
     "ToolDefinition",
     # Catalog
     "ToolCatalog",
-    "tool_catalog",
-    # Constants
-    "EXPOSED_TOOL_IDS",
-    # Helpers
-    "resolve_tool_id",
-    "is_exposed_tool",
 ]
