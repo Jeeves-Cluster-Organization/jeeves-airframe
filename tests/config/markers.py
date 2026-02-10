@@ -30,16 +30,16 @@ Marker Reference:
 import os
 import pytest
 
-from mission_system.tests.config.environment import (
+from tests.config.environment import (
     IS_CI,
     PROD_TESTS_ENABLED,
 )
-from mission_system.tests.config.llm_config import (
+from tests.config.llm_config import (
     AZURE_AVAILABLE,
     is_llamaserver_available,
     get_llm_provider_type,
 )
-from mission_system.tests.config.services import (
+from tests.config.services import (
     is_database_available,
     is_llama_server_available,
     are_all_services_available,

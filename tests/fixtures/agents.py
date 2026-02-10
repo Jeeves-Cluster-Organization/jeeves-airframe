@@ -14,7 +14,7 @@ Usage:
 
 import pytest
 from typing import Callable, Dict, Any
-from mission_system.contracts_core import (
+from jeeves_infra.protocols import (
     Envelope,
     create_envelope,
 )

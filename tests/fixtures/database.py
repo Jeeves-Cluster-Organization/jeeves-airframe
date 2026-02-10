@@ -10,8 +10,8 @@ from uuid import uuid4
 
 import pytest
 
-from mission_system.tests.config.fixtures_data import TEST_USER_ID
-from mission_system.tests.config.test_thresholds import TEST_HIGH_CONFIDENCE
+from tests.config.fixtures_data import TEST_USER_ID
+from tests.config.test_thresholds import TEST_HIGH_CONFIDENCE
 from tests.fixtures.sqlite_client import SQLiteClient
 
 _SCHEMA = Path(__file__).parent / "test_schema.sql"

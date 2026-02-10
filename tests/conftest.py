@@ -29,7 +29,7 @@ if str(tests_root) not in sys.path:
 # =============================================================================
 # IMPORT FIXTURES FROM FIXTURES PACKAGE
 # =============================================================================
-# Note: Some fixtures have complex dependencies (mission_system, shared).
+# Note: Some fixtures have complex dependencies (jeeves_infra, shared).
 # Import failures are handled gracefully to allow unit tests to run.
 
 try:

@@ -18,7 +18,7 @@ Usage:
     registry.register_mode("my_capability", DomainModeConfig(...))
     registry.register_service("my_capability", DomainServiceConfig(...))
 
-    # In infrastructure (jeeves_infra/mission_system)
+    # In infrastructure (jeeves_infra)
     from protocols.capability import get_capability_resource_registry
 
     registry = get_capability_resource_registry()

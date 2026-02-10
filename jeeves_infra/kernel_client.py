@@ -916,7 +916,7 @@ class KernelClient:
                 embedding computation fails
 
         Example:
-            # With EmbeddingService from mission_system.memory.services
+            # With EmbeddingService from capability memory services
             embedding_service = EmbeddingService()
             embeddings = await kernel_client.embed_batch(
                 pid="process-123",

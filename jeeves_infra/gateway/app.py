@@ -107,7 +107,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         # Store in app state for dependency injection
         app.state.grpc_client = client
 
-        # Note: InterruptService is injected by the composition root (mission_system.bootstrap)
+        # Note: InterruptService is injected by the composition root (jeeves_infra.bootstrap)
         # The gateway does not create it directly to maintain proper layer separation.
         # If interrupt_service is not set, interrupt endpoints will return 503.
         if not hasattr(app.state, "interrupt_service"):

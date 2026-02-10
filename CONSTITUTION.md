@@ -2,36 +2,78 @@
 
 ## 0) Purpose
 
-Jeeves-airframe is a **reusable inference platform substrate** that standardizes how capabilities interact with heterogeneous LLM backends. It provides endpoint representation, backend adapters, health signals, and a stable stream-first inference contract.
-
-Airframe is **capability-agnostic**. It knows nothing about agents, prompts, tools, or domain logic.
+Jeeves-airframe (`jeeves_infra`) is the **unified infrastructure and orchestration framework** for the Jeeves ecosystem. It provides everything between the Rust micro-kernel (jeeves-core) and the capability layer: LLM providers, pipeline execution, gateway, orchestration, memory handling, configuration, and bootstrap.
 
 ## 1) Ownership Boundaries
 
-### Airframe MUST Own
+### jeeves_infra MUST Own
 
-| Concern | Description |
-|---------|-------------|
-| **Endpoint Representation** | `EndpointSpec` with name, base_url, backend_kind, tags, capacity hints, metadata |
-| **Endpoint Discovery** | Registries (`StaticRegistry`, `K8sRegistry`) with watchability |
-| **Backend Adapters** | Normalize request/response across llama.cpp, OpenAI, Anthropic, etc. |
-| **Health Signals** | `HealthState` representation and optional `HealthProbe` mechanisms |
-| **Observability Hooks** | Request-level spans, metrics fields, structured log context |
-| **Error Taxonomy** | Stable categories: timeout, connection, backend, parse, unknown |
+| Domain | Description |
+|--------|-------------|
+| **Protocols & Types** | All interfaces, type definitions, capability registration (`protocols.py`) |
+| **LLM Infrastructure** | Providers, factory, gateway, cost calculator (`llm/`) |
+| **Gateway** | FastAPI HTTP/WS/SSE/gRPC server, routers, lifespan (`gateway/`) |
+| **Kernel Client** | gRPC bridge to Rust kernel (`kernel_client.py`) |
+| **Pipeline Runner** | Kernel-driven agent execution (`runtime/`) |
+| **Tool Execution** | ToolExecutor framework - not tool catalogs, capability owns those (`wiring.py`) |
+| **Database Abstraction** | Factory, registry, protocols - not implementations (`database/`) |
+| **Bootstrap** | AppContext creation, composition root (`bootstrap.py`) |
+| **Capability Wiring** | Registration, discovery, router mounting (`capability_wiring.py`) |
+| **Config** | Agent profiles, registry, constants (`config/`) |
+| **Orchestrator** | Event context, emitter, governance, flow, vertical service (`orchestrator/`) |
+| **Memory Handlers** | CommBus handler registration, message types (`memory/`) |
+| **Events** | Event bridge for kernel <-> gateway (`events/`) |
+| **Observability** | Metrics, tracing, OTEL |
+| **Logging** | Structlog infrastructure (`logging.py`) |
+| **Health** | Kubernetes liveness/readiness probes (`health.py`) |
+| **Feature Flags** | Runtime toggles (`feature_flags.py`) |
+| **Settings** | Application configuration (`settings.py`) |
 
-### Airframe MUST NOT Own
+### jeeves_infra MUST NOT Own
 
 | Concern | Belongs To |
 |---------|------------|
-| Agent logic, prompts, pipelines | Capability |
-| Endpoint selection policy (routing) | Capability |
-| Tool execution | Capability |
-| Workflow orchestration (queues, checkpoints) | Mission System |
+| Agent logic, prompts, tools | Capability |
+| Domain-specific database backends | Capability |
+| Pipeline configuration (AgentConfig lists) | Capability |
+| Tool catalogs and tool implementations | Capability |
+| Domain services (ChatbotService, etc.) | Capability |
 | Cluster mutation (Helm, autoscaling) | Platform/Ops |
 
-## 2) Canonical Inference Contract
+## 2) Dependency Direction
 
-Airframe exposes a single, backend-agnostic inference interface:
+```
+Capability Layer (agents, prompts, tools, domain DB, memory services)
+       | imports from
+       v
+jeeves_infra (everything in section 1)
+       | gRPC bridge
+       v
+jeeves-core (Rust kernel)
+```
+
+- jeeves_infra MUST NOT import from any capability
+- jeeves_infra communicates with jeeves-core via gRPC (`kernel_client.py`)
+- Capabilities import from jeeves_infra public modules only
+
+## 3) Public API Surface
+
+Capabilities may import from these modules:
+
+| Module | Purpose |
+|--------|---------|
+| `jeeves_infra.protocols` | All type definitions, Envelope, AgentConfig, PipelineConfig |
+| `jeeves_infra.wiring` | Factory functions: create_llm_provider_factory, create_tool_executor |
+| `jeeves_infra.settings` | get_settings() |
+| `jeeves_infra.bootstrap` | create_app_context() |
+| `jeeves_infra.kernel_client` | KernelClient class |
+| `jeeves_infra.orchestrator` | EventOrchestrator, create_event_context |
+| `jeeves_infra.memory.messages` | CommBus message types |
+| `jeeves_infra.config.constants` | Platform constants |
+| `jeeves_infra.logging` | get_current_logger |
+| `jeeves_infra.feature_flags` | get_feature_flags |
+
+## 4) Canonical Inference Contract
 
 ```python
 async def stream_infer(
@@ -40,141 +82,32 @@ async def stream_infer(
 ) -> AsyncIterator[InferenceStreamEvent]
 ```
 
-### Request Contract
-
-```python
-@dataclass
-class InferenceRequest:
-    messages: List[Message]           # Required: chat messages
-    model: Optional[str]              # Hint; endpoint may ignore
-    tools: Optional[List[ToolSpec]]   # For function calling
-    temperature: Optional[float]
-    max_tokens: Optional[int]
-    stream: bool = True
-    extra_params: Dict[str, Any]      # Backend-specific passthrough
-```
-
 - Capabilities MUST NOT format backend-specific payloads
 - Adapters MUST translate to backend wire format
-
-### Response Contract (Stream Events)
-
-```python
-class StreamEventType(Enum):
-    TOKEN = "token"           # Incremental content
-    MESSAGE = "message"       # Complete message (non-streaming)
-    TOOL_CALL = "tool_call"   # Function call request
-    ERROR = "error"           # Error occurred
-    DONE = "done"             # Stream complete
-```
-
-- Every stream MUST emit exactly one `DONE` event
-- Non-streaming backends emit `MESSAGE` + `DONE`
+- Every stream MUST emit exactly one DONE event
 - Errors are events, not exceptions
 
-## 3) Error Semantics
+## 5) Error Semantics
 
 ```python
 class ErrorCategory(Enum):
-    TIMEOUT = "timeout"           # Request timed out
-    CONNECTION = "connection"     # Network/DNS/TLS failure
-    BACKEND = "backend"           # HTTP 4xx/5xx from backend
-    PARSE = "parse"               # JSON/SSE parsing failure
-    UNKNOWN = "unknown"           # Uncategorized
+    TIMEOUT = "timeout"
+    CONNECTION = "connection"
+    BACKEND = "backend"
+    PARSE = "parse"
+    UNKNOWN = "unknown"
 ```
 
 - Errors MUST preserve raw backend payloads when available
 - Adapters MUST NOT raise backend-specific exceptions across public API
-- Capabilities handle errors via stream events, not try/catch
 
-## 4) Registry Contract
+## 6) Acceptance Criteria
 
-```python
-class EndpointRegistry(ABC):
-    def list_endpoints(self) -> List[EndpointSpec]: ...
-    def get_health(self, name: str) -> Optional[HealthState]: ...
-    def watch(self, callback) -> WatchHandle: ...
-```
+A change to jeeves_infra is acceptable only if:
 
-- Registries are **read-only** views of available endpoints
-- `watch()` enables reactive updates without polling
-- Health state starts as `unknown` until probed
-
-## 5) Health Contract
-
-```python
-@dataclass
-class HealthState:
-    status: str          # healthy | degraded | unhealthy | unknown
-    checked_at: float    # Unix timestamp
-    detail: str          # Human-readable context
-```
-
-- Health probing is **optional** (probe may be None)
-- Capabilities decide what to do with health (airframe just reports)
-
-## 6) Adapter Contract
-
-```python
-class BackendAdapter(ABC):
-    async def stream_infer(
-        self, endpoint: EndpointSpec, request: InferenceRequest
-    ) -> AsyncIterator[InferenceStreamEvent]: ...
-```
-
-- One adapter per backend kind (llama_server, openai_chat, etc.)
-- Adapters handle retries, timeouts, SSE parsing internally
-- New adapters MUST NOT break existing callers
-
-## 7) Kubernetes Integration
-
-K8s support is **optional and read-only**:
-
-- Read endpoint specs from ConfigMap/CRD
-- Watch for changes via polling
-- No cluster mutation, no admin privileges required
-- Import error if kubernetes package not installed (graceful)
-
-## 8) Dependency Direction
-
-```
-┌─────────────────────────────────────────────┐
-│            Capability Layer                 │
-│  (agents, prompts, tools, routing policy)   │
-└─────────────────┬───────────────────────────┘
-                  │ imports from
-┌─────────────────▼───────────────────────────┐
-│             Airframe                         │
-│  (endpoints, adapters, health, streaming)   │
-│                                             │
-│  ⚠️  NO imports from capability             │
-│  ⚠️  NO imports from jeeves-core            │
-└─────────────────────────────────────────────┘
-                  │ imports from
-┌─────────────────▼───────────────────────────┐
-│         Standard Library + httpx            │
-│         (+ optional: kubernetes)            │
-└─────────────────────────────────────────────┘
-```
-
-## 9) Versioning Guarantees
-
-| Change Type | Compatibility |
-|-------------|---------------|
-| New adapter | Backward compatible |
-| New registry | Backward compatible |
-| New StreamEventType | Backward compatible |
-| New ErrorCategory | Backward compatible |
-| Remove/rename public symbol | Breaking (major version) |
-| Change InferenceRequest fields | Breaking (major version) |
-
-## 10) Acceptance Criteria
-
-A change to airframe is acceptable only if:
-
-- [ ] No routing policy embedded in airframe
-- [ ] No capability-specific logic
+- [ ] No capability-specific logic embedded
+- [ ] No tool implementations (only tool executor framework)
+- [ ] No database backend implementations (only factory/registry)
 - [ ] Stream/error semantics preserved
-- [ ] Adapters remain isolated
-- [ ] K8s remains optional
-- [ ] No new required dependencies beyond httpx
+- [ ] K8s integration remains optional
+- [ ] Dependency direction maintained (no capability imports)

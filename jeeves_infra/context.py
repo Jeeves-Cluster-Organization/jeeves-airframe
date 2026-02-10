@@ -2,7 +2,7 @@
 
 ADR-001 Decision 3: Singleton Elimination via AppContext
 This module provides the AppContext dataclass that contains all
-injected dependencies. Built by the composition root (mission_system),
+injected dependencies. Built by the composition root (bootstrap),
 passed to all components.
 
 Design Mantra: One composition root builds one AppContext;
@@ -61,7 +61,7 @@ class AppContext:
     """Concrete application context for dependency injection.
 
     Contains all the dependencies that components need. Built once
-    by the composition root (mission_system/bootstrap.py) and passed
+    by the composition root (jeeves_infra/bootstrap.py) and passed
     to all components.
 
     ADR-001 Decision 3: This replaces scattered global singletons with

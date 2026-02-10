@@ -6,7 +6,7 @@ This module centralizes all confidence thresholds and scoring values used in tes
 Instead of hardcoding values like 0.95, 0.8, 0.5 throughout test files, import from here.
 
 Usage:
-    from mission_system.tests.config.test_thresholds import TEST_HIGH_CONFIDENCE, TEST_LOW_CONFIDENCE
+    from tests.config.test_thresholds import TEST_HIGH_CONFIDENCE, TEST_LOW_CONFIDENCE
 
 Constitutional Compliance:
 - Amendment I: Repo Hygiene - Single source of truth for thresholds

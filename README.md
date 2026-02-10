@@ -73,7 +73,7 @@ Core infrastructure with 230+ type exports:
 - Database clients
 - Observability
 
-### mission_system
+### Orchestration (within jeeves_infra)
 
 Capability-agnostic orchestration infrastructure:
 - Agent profiles and configuration

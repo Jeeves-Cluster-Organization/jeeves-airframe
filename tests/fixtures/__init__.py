@@ -9,5 +9,5 @@ Provides centralized fixtures for jeeves-infra tests:
 - mocks/: Mock implementations for isolated testing
 
 Fixtures are imported directly by conftest.py — no re-exports here.
-This avoids circular imports between tests/fixtures/ and mission_system/tests/fixtures/.
+This avoids circular imports between fixture modules.
 """

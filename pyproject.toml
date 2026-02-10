@@ -67,7 +67,7 @@ all = [
 Repository = "https://github.com/Jeeves-Cluster-Organization/jeeves-airframe"
 
 [tool.hatch.build.targets.wheel]
-packages = ["jeeves_infra", "mission_system"]
+packages = ["jeeves_infra"]
 
 [tool.black]
 line-length = 100

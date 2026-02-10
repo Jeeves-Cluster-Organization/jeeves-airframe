@@ -13,7 +13,7 @@ Constitutional Compliance:
 - M4: Observability - clear service status reporting
 
 Usage:
-    from mission_system.tests.config.services import (
+    from tests.config.services import (
         is_database_available,
         is_llama_server_available,
         is_api_available,
@@ -33,7 +33,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from typing import Optional
 
-from mission_system.tests.config.environment import (
+from tests.config.environment import (
     TEST_DB_HOST,
     TEST_DB_PORT,
     TEST_DB_USER,

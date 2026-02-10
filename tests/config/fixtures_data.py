@@ -7,7 +7,7 @@ Instead of hardcoding values like "test-user", "user-123", "pending" throughout
 test files, import from here.
 
 Usage:
-    from mission_system.tests.config.fixtures_data import TEST_USER_ID, TEST_STATUS_PENDING
+    from tests.config.fixtures_data import TEST_USER_ID, TEST_STATUS_PENDING
 
 Constitutional Compliance:
 - Amendment I: Repo Hygiene - Single source of truth for test data

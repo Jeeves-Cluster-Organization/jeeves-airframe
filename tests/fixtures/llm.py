@@ -18,14 +18,14 @@ Constitutional Compliance:
 Constitutional Import Boundary Note:
 - Mission system layer IS the wiring layer between app and jeeves_infra
 - Direct jeeves_infra imports are acceptable here for LLM factory access
-- App layer tests must use mission_system.adapters instead
+- App layer tests must use jeeves_infra.wiring instead
 """
 
 from pathlib import Path
 
 import pytest
 
-from mission_system.tests.config.llm_config import get_llm_provider_type
+from tests.config.llm_config import get_llm_provider_type
 
 
 @pytest.fixture

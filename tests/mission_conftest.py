@@ -39,14 +39,14 @@ if str(project_root) not in sys.path:
 # App layer setup (for mission system code that imports from app layer)
 # NOTE: This is needed because mission system code imports from app layer
 # (e.g., prompts.registry). Ideally this dependency should be inverted.
-# IMPORTANT: Append (not insert) so mission_system paths take precedence
+# IMPORTANT: Append (not insert) so jeeves_infra paths take precedence
 app_dir = project_root.parent / "jeeves-capability-code-analyser"
 if app_dir.exists() and str(app_dir) not in sys.path:
     sys.path.append(str(app_dir))
 
 # Import config for environment setup
-from mission_system.tests.config.llm_config import LLAMASERVER_HOST, DEFAULT_MODEL
-from mission_system.tests.config.markers import (
+from tests.config.llm_config import LLAMASERVER_HOST, DEFAULT_MODEL
+from tests.config.markers import (
     configure_markers,
     apply_skip_markers,
     setup_e2e_skip,
@@ -113,27 +113,27 @@ def pytest_runtest_setup(item):
 # ============================================================
 
 # Database fixtures
-from mission_system.tests.fixtures.database import (
+from tests.fixtures.database import (
     test_db,
     create_test_prerequisites,
     create_session_only,
 )
 
 # LLM fixtures
-from mission_system.tests.fixtures.llm import (
+from tests.fixtures.llm import (
     llm_provider,
     schema_path,
 )
 
 # Service fixtures
-from mission_system.tests.fixtures.services import (
+from tests.fixtures.services import (
     session_service,
     tool_health_service,
     tool_registry,
 )
 
 # Envelope and mock fixtures (mission system level - no app imports)
-from mission_system.tests.fixtures.agents import (
+from tests.fixtures.agents import (
     # Envelope fixtures
     envelope_factory,
     sample_envelope,

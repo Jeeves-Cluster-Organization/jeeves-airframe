@@ -7,7 +7,7 @@ Instead of hardcoding values like `timeout=30` or `asyncio.sleep(0.5)` throughou
 test files, import from here.
 
 Usage:
-    from mission_system.tests.config.timeouts import TEST_SERVER_STARTUP_TIMEOUT, TEST_ASYNC_SLEEP_SHORT
+    from tests.config.timeouts import TEST_SERVER_STARTUP_TIMEOUT, TEST_ASYNC_SLEEP_SHORT
 
 Constitutional Compliance:
 - Amendment I: Repo Hygiene - Single source of truth for timeouts

@@ -5,7 +5,7 @@ All values have sensible defaults for local development.
 Override via environment variables when needed.
 
 Usage:
-    from mission_system.tests.config.endpoints import TEST_LLAMASERVER_HOST, TEST_API_HOST
+    from tests.config.endpoints import TEST_LLAMASERVER_HOST, TEST_API_HOST
 
 Constitutional Compliance:
 - Amendment I: Repo Hygiene - Single source of truth for endpoints
