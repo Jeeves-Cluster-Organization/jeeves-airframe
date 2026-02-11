@@ -180,7 +180,7 @@ async def test_pipeline_worker_initialization(mock_kernel_client, mock_agents, m
     )
     mock_kernel_client.get_next_instruction.return_value = OrchestratorInstruction(
         kind="TERMINATE",
-        terminal_reason="TERMINAL_REASON_COMPLETED",
+        terminal_reason="COMPLETED",
         termination_message="Pipeline completed",
         envelope={"current_stage": "end", "outputs": {}},
     )
@@ -247,7 +247,7 @@ async def test_pipeline_worker_executes_agents(mock_kernel_client, mock_agents, 
         ),
         OrchestratorInstruction(
             kind="TERMINATE",
-            terminal_reason="TERMINAL_REASON_COMPLETED",
+            terminal_reason="COMPLETED",
             envelope={"current_stage": "end"},
         ),
     ]
@@ -281,7 +281,7 @@ async def test_pipeline_worker_executes_agents(mock_kernel_client, mock_agents, 
 
     # Verify final result
     assert result.terminated is True
-    assert result.terminal_reason == "TERMINAL_REASON_COMPLETED"
+    assert result.terminal_reason == "COMPLETED"
 
 
 # =============================================================================
@@ -298,7 +298,7 @@ async def test_pipeline_worker_handles_immediate_termination(mock_kernel_client,
     )
     mock_kernel_client.get_next_instruction.return_value = OrchestratorInstruction(
         kind="TERMINATE",
-        terminal_reason="TERMINAL_REASON_MAX_LLM_CALLS_EXCEEDED",
+        terminal_reason="MAX_LLM_CALLS_EXCEEDED",
         termination_message="LLM quota exceeded",
         envelope={"current_stage": "understand", "terminated": True},
     )
@@ -386,7 +386,7 @@ async def test_pipeline_worker_handles_agent_not_found(mock_kernel_client, mock_
         ),
         OrchestratorInstruction(
             kind="TERMINATE",
-            terminal_reason="TERMINAL_REASON_TOOL_FAILED_FATALLY",
+            terminal_reason="TOOL_FAILED_FATALLY",
             envelope={"terminated": True},
         ),
     ]
@@ -434,7 +434,7 @@ async def test_pipeline_worker_handles_agent_exception(mock_kernel_client, mock_
         ),
         OrchestratorInstruction(
             kind="TERMINATE",
-            terminal_reason="TERMINAL_REASON_TOOL_FAILED_FATALLY",
+            terminal_reason="TOOL_FAILED_FATALLY",
             envelope={"terminated": True},
         ),
     ]
@@ -520,7 +520,7 @@ async def test_pipeline_worker_streaming(mock_kernel_client, mock_agents, mock_e
         ),
         OrchestratorInstruction(
             kind="TERMINATE",
-            terminal_reason="TERMINAL_REASON_COMPLETED",
+            terminal_reason="COMPLETED",
             envelope={"current_stage": "end"},
         ),
     ]

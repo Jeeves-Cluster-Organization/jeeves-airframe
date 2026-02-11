@@ -143,7 +143,7 @@ class EventBridge:
             new_state = data.get("new_state")
 
             # Map to frontend-friendly names
-            if new_state == "terminated":
+            if new_state == "TERMINATED":
                 return {
                     "type": "orchestrator.completed",
                     "data": {
@@ -151,7 +151,7 @@ class EventBridge:
                         "status": "completed",
                     },
                 }
-            elif new_state == "waiting":
+            elif new_state == "WAITING":
                 # Check if it's clarification or confirmation
                 return None  # interrupt.raised will handle this
 

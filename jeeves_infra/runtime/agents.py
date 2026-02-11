@@ -427,6 +427,12 @@ class PipelineRunner:
     def _build_agents(self):
         """Build agents from pipeline config."""
         for agent_config in self.config.agents:
+            if agent_config.has_llm and not self.llm_factory:
+                raise ValueError(
+                    f"Agent '{agent_config.name}' requires LLM but no llm_factory provided "
+                    f"to pipeline '{self.config.name}'"
+                )
+
             llm = None
             if agent_config.has_llm and self.llm_factory and agent_config.model_role:
                 llm = self.llm_factory(agent_config.model_role)
@@ -460,8 +466,14 @@ class PipelineRunner:
             return None
         return await self.persistence.load_state(thread_id)
 
-    def get_agent(self, name: str) -> Optional[Agent]:
-        return self.agents.get(name)
+    def get_agent(self, name: str) -> Agent:
+        """Get agent by name. Raises ValueError on miss."""
+        if name not in self.agents:
+            raise ValueError(
+                f"Agent '{name}' not found in pipeline '{self.config.name}'. "
+                f"Available: {list(self.agents.keys())}"
+            )
+        return self.agents[name]
 
 
 # =============================================================================
@@ -487,6 +499,51 @@ def create_pipeline_runner(
         prompt_registry=prompt_registry,
         use_mock=use_mock,
     )
+
+
+class PipelineRegistry:
+    """Dispatches to the right PipelineRunner by pipeline name.
+
+    Eliminates agent name collisions across pipelines by scoping
+    lookups to pipeline_name + agent_name.
+    """
+
+    def __init__(self):
+        self._runners: Dict[str, PipelineRunner] = {}
+
+    def register(self, pipeline_name: str, runner: PipelineRunner) -> None:
+        """Register a runner under a pipeline name. Raises on duplicate."""
+        if pipeline_name in self._runners:
+            raise ValueError(f"Pipeline already registered: {pipeline_name}")
+        self._runners[pipeline_name] = runner
+
+    def get_runner(self, pipeline_name: str) -> PipelineRunner:
+        """Get runner by pipeline name. Raises ValueError on miss."""
+        if pipeline_name not in self._runners:
+            raise ValueError(
+                f"Unknown pipeline: {pipeline_name}. "
+                f"Registered: {list(self._runners.keys())}"
+            )
+        return self._runners[pipeline_name]
+
+    def get_agent(self, pipeline_name: str, agent_name: str) -> Agent:
+        """Get agent from a specific pipeline. Raises ValueError on miss."""
+        runner = self.get_runner(pipeline_name)
+        agent = runner.agents.get(agent_name)
+        if agent is None:
+            raise ValueError(
+                f"Agent '{agent_name}' not found in pipeline '{pipeline_name}'. "
+                f"Available: {list(runner.agents.keys())}"
+            )
+        return agent
+
+    def has_agent(self, pipeline_name: str, agent_name: str) -> bool:
+        """Check if a pipeline has a specific agent (for LLM vs deterministic routing)."""
+        runner = self._runners.get(pipeline_name)
+        return runner is not None and agent_name in runner.agents
+
+    def list_pipelines(self) -> list:
+        return list(self._runners.keys())
 
 
 def create_envelope(

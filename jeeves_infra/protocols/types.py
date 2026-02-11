@@ -17,16 +17,16 @@ from jeeves_infra.protocols.interfaces import RequestContext
 # =============================================================================
 
 class TerminalReason(str, Enum):
-    """Terminal reason enum - mirrors Go TerminalReason."""
-    UNSPECIFIED = "unspecified"
-    MAX_ITERATIONS_EXCEEDED = "max_iterations_exceeded"
-    MAX_LLM_CALLS_EXCEEDED = "max_llm_calls_exceeded"
-    MAX_AGENT_HOPS_EXCEEDED = "max_agent_hops_exceeded"
-    USER_CANCELLED = "user_cancelled"
-    TOOL_FAILED_FATALLY = "tool_failed_fatally"
-    LLM_FAILED_FATALLY = "llm_failed_fatally"
-    COMPLETED = "completed"
-    POLICY_VIOLATION = "policy_violation"
+    """Terminal reason enum — SCREAMING_SNAKE_CASE, matches Rust serde output."""
+    UNSPECIFIED = "UNSPECIFIED"
+    MAX_ITERATIONS_EXCEEDED = "MAX_ITERATIONS_EXCEEDED"
+    MAX_LLM_CALLS_EXCEEDED = "MAX_LLM_CALLS_EXCEEDED"
+    MAX_AGENT_HOPS_EXCEEDED = "MAX_AGENT_HOPS_EXCEEDED"
+    USER_CANCELLED = "USER_CANCELLED"
+    TOOL_FAILED_FATALLY = "TOOL_FAILED_FATALLY"
+    LLM_FAILED_FATALLY = "LLM_FAILED_FATALLY"
+    COMPLETED = "COMPLETED"
+    POLICY_VIOLATION = "POLICY_VIOLATION"
 
 
 class InterruptKind(str, Enum):
