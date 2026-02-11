@@ -240,29 +240,18 @@ def create_app_context(
     # Eagerly provision config registry
     config_registry = ConfigRegistry()
 
-    # Eagerly provision LLM provider factory
-    llm_provider_factory = None
-    try:
-        from jeeves_infra.llm.factory import create_llm_provider_factory as _create_llm_factory
-        llm_provider_factory = _create_llm_factory(settings)
-        root_logger.info("llm_provider_factory_provisioned", adapter=settings.llm_adapter)
-    except Exception as e:
-        root_logger.warning("llm_provider_factory_unavailable", error=str(e))
+    # Eagerly provision LLM provider factory (required — fail loud)
+    from jeeves_infra.llm.factory import create_llm_provider_factory as _create_llm_factory
+    llm_provider_factory = _create_llm_factory(settings)
+    root_logger.info("llm_provider_factory_provisioned", adapter=settings.llm_adapter)
 
-    # Eagerly provision kernel client (graceful fallback to None)
-    kernel_client = None
-    try:
-        from jeeves_infra.ipc import IpcTransport
-        kernel_address = os.getenv("JEEVES_KERNEL_ADDRESS", DEFAULT_KERNEL_ADDRESS)
-        host, _, port_str = kernel_address.rpartition(":")
-        transport = IpcTransport(host=host or "127.0.0.1", port=int(port_str or 50051))
-        kernel_client = KernelClient(transport)
-        root_logger.info("kernel_client_provisioned", address=kernel_address)
-    except Exception as e:
-        root_logger.warning(
-            "kernel_client_unavailable", error=str(e),
-            message="Running without Rust kernel — standalone mode",
-        )
+    # Eagerly provision kernel client (required — fail loud)
+    from jeeves_infra.ipc import IpcTransport
+    kernel_address = os.getenv("JEEVES_KERNEL_ADDRESS", DEFAULT_KERNEL_ADDRESS)
+    host, _, port_str = kernel_address.rpartition(":")
+    transport = IpcTransport(host=host or "127.0.0.1", port=int(port_str or 50051))
+    kernel_client = KernelClient(transport)
+    root_logger.info("kernel_client_provisioned", address=kernel_address)
 
     root_logger.info(
         "app_context_created",
@@ -270,8 +259,6 @@ def create_app_context(
         max_llm_calls=core_config.max_llm_calls,
         max_iterations=core_config.max_iterations,
         max_agent_hops=core_config.max_agent_hops,
-        has_kernel_client=kernel_client is not None,
-        has_llm_factory=llm_provider_factory is not None,
     )
 
     return AppContext(

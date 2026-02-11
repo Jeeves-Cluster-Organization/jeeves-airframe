@@ -28,7 +28,7 @@ class FlowServicer:
     def __init__(
         self,
         db,
-        capability_servicer=None,
+        capability_servicer,
         logger=None,
     ):
         self._db = db

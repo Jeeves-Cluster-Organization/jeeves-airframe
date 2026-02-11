@@ -12,8 +12,8 @@ Jeeves-airframe (`jeeves_infra`) is the **unified infrastructure and orchestrati
 |--------|-------------|
 | **Protocols & Types** | All interfaces, type definitions, capability registration (`protocols.py`) |
 | **LLM Infrastructure** | Providers, factory, gateway, cost calculator (`llm/`) |
-| **Gateway** | FastAPI HTTP/WS/SSE/gRPC server, routers, lifespan (`gateway/`) |
-| **Kernel Client** | gRPC bridge to Rust kernel (`kernel_client.py`) |
+| **Gateway** | FastAPI HTTP/WS/SSE server, routers, lifespan (`gateway/`) |
+| **Kernel Client** | IPC bridge to Rust kernel via TCP+msgpack (`kernel_client.py`) |
 | **Pipeline Runner** | Kernel-driven agent execution (`runtime/`) |
 | **Tool Execution** | ToolExecutor framework - not tool catalogs, capability owns those (`wiring.py`) |
 | **Database Abstraction** | Factory, registry, protocols - not implementations (`database/`) |
@@ -47,13 +47,13 @@ Capability Layer (agents, prompts, tools, domain DB, memory services)
        | imports from
        v
 jeeves_infra (everything in section 1)
-       | gRPC bridge
+       | IPC (TCP+msgpack)
        v
 jeeves-core (Rust kernel)
 ```
 
 - jeeves_infra MUST NOT import from any capability
-- jeeves_infra communicates with jeeves-core via gRPC (`kernel_client.py`)
+- jeeves_infra communicates with jeeves-core via TCP+msgpack IPC (`kernel_client.py`)
 - Capabilities import from jeeves_infra public modules only
 
 ## 3) Public API Surface
@@ -79,7 +79,7 @@ Capabilities may import from these modules:
 from jeeves_infra.bootstrap import create_app_context
 
 app_context = create_app_context()
-# app_context.kernel_client       — gRPC bridge (or None)
+# app_context.kernel_client       — IPC bridge to Rust kernel (TCP+msgpack)
 # app_context.llm_provider_factory — creates LLM providers per agent role
 # app_context.config_registry     — configuration registry
 # app_context.settings            — application settings

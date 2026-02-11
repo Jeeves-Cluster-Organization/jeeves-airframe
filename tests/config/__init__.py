@@ -20,7 +20,7 @@ Constitutional Compliance:
 - Amendment V: Bootstrap Freedom - No backward compatibility pre-v1.0
 """
 
-from tests.config.environment import (
+from .environment import (
     # Environment Detection
     IS_CI,
     IS_GITHUB_ACTIONS,
@@ -47,7 +47,7 @@ from tests.config.environment import (
     SILENCE_LIBRARY_LOGS,
 )
 
-from tests.config.llm_config import (
+from .llm_config import (
     # LLM Configuration
     DEFAULT_LLM_PROVIDER,
     LLAMASERVER_HOST,
@@ -58,7 +58,7 @@ from tests.config.llm_config import (
     is_llamaserver_available,
 )
 
-from tests.config.services import (
+from .services import (
     # Service Detection (v4.3)
     is_database_available,
     is_llama_server_available,
@@ -69,7 +69,7 @@ from tests.config.services import (
     get_service_status_report,
 )
 
-from tests.config.endpoints import (
+from .endpoints import (
     # LlamaServer
     TEST_LLAMASERVER_HOST,
     TEST_LLAMASERVER_PORT,
@@ -85,7 +85,7 @@ from tests.config.endpoints import (
     get_api_url,
 )
 
-from tests.config.test_thresholds import (
+from .test_thresholds import (
     # Confidence Levels
     TEST_HIGH_CONFIDENCE,
     TEST_MEDIUM_HIGH_CONFIDENCE,
@@ -114,7 +114,7 @@ from tests.config.test_thresholds import (
     TEST_COSINE_SIMILARITY_IDENTITY,
 )
 
-from tests.config.timeouts import (
+from .timeouts import (
     # Server Startup
     TEST_SERVER_STARTUP_TIMEOUT,
     TEST_DB_STARTUP_TIMEOUT,
@@ -148,7 +148,7 @@ from tests.config.timeouts import (
     TEST_MAX_RETRIES,
 )
 
-from tests.config.fixtures_data import (
+from .fixtures_data import (
     # User IDs
     TEST_USER_ID,
     TEST_USER_ID_ALT,
@@ -207,7 +207,7 @@ from tests.config.fixtures_data import (
 
 # Markers module requires pytest - only import when available
 try:
-    from tests.config.markers import (
+    from .markers import (
         configure_markers,
         apply_skip_markers,
         setup_e2e_skip,

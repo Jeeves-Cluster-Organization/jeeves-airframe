@@ -179,7 +179,7 @@ class LLMGateway:
         settings: Settings,
         fallback_providers: Optional[List[str]] = None,
         logger: Optional[LoggerProtocol] = None,
-        kernel_client: Optional["KernelClient"] = None,
+        kernel_client: "KernelClient",
         streaming_callback: Optional[StreamingEventCallback] = None,
     ):
         """Initialize gateway.
@@ -190,8 +190,8 @@ class LLMGateway:
                               If None, uses only primary provider.
                               Example: ["llamaserver", "openai"] tries OpenAI if llama-server fails
             logger: Logger for DI (uses context logger if not provided)
-            kernel_client: Optional KernelClient for resource tracking (Rust kernel integration).
-                          When set, token usage is reported to kernel after each LLM call.
+            kernel_client: KernelClient for resource tracking (Rust kernel via TCP+msgpack).
+                          Token usage is reported to kernel after each LLM call.
             streaming_callback: Optional callback for streaming events.
                               Called for each token chunk during streaming generation.
         """
@@ -584,32 +584,22 @@ class LLMGateway:
         stats["cost_usd"] += response.cost_usd
         stats["total_latency_ms"] += response.latency_ms
 
-        # Report to kernel if client and PID are set
-        if self._kernel_client and self._current_pid:
-            try:
-                exceeded_reason = await self._kernel_client.record_llm_call(
+        # Report to kernel if PID is set
+        if self._current_pid:
+            exceeded_reason = await self._kernel_client.record_llm_call(
+                pid=self._current_pid,
+                tokens_in=response.prompt_tokens,
+                tokens_out=response.completion_tokens,
+            )
+            if exceeded_reason:
+                self._logger.warning(
+                    "llm_quota_exceeded",
                     pid=self._current_pid,
                     tokens_in=response.prompt_tokens,
                     tokens_out=response.completion_tokens,
+                    reason=exceeded_reason,
                 )
-                if exceeded_reason:
-                    self._logger.warning(
-                        "llm_quota_exceeded",
-                        pid=self._current_pid,
-                        tokens_in=response.prompt_tokens,
-                        tokens_out=response.completion_tokens,
-                        reason=exceeded_reason,
-                    )
-                    raise QuotaExceededError(exceeded_reason)
-            except QuotaExceededError:
-                raise
-            except Exception as e:
-                # Log but don't fail the request if kernel reporting fails
-                self._logger.warning(
-                    "kernel_reporting_failed",
-                    pid=self._current_pid,
-                    error=str(e),
-                )
+                raise QuotaExceededError(exceeded_reason)
 
     def set_pid(self, pid: Optional[str]) -> None:
         """Set the current process ID for resource tracking.
@@ -621,14 +611,6 @@ class LLMGateway:
             pid: Process ID (envelope_id) or None to disable tracking
         """
         self._current_pid = pid
-
-    def set_kernel_client(self, client: Optional["KernelClient"]) -> None:
-        """Set or update the kernel client.
-
-        Args:
-            client: KernelClient instance or None to disable kernel integration
-        """
-        self._kernel_client = client
 
     def get_stats(self) -> Dict[str, Any]:
         """Get gateway statistics.

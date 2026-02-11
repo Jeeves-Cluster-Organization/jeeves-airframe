@@ -24,7 +24,7 @@ Constitutional Compliance:
 import os
 from typing import Literal
 
-from tests.config.environment import IS_CI
+from .environment import IS_CI
 
 # ============================================================
 # CRITICAL: LLAMASERVER_ALWAYS Policy

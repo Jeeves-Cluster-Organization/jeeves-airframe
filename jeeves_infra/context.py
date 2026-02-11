@@ -102,17 +102,17 @@ class AppContext:
     config_registry: Optional[ConfigRegistryProtocol] = None
 
     # LLM Provider Factory - creates LLM providers per agent role
-    # Eagerly provisioned by bootstrap, like kubelet provisioning container runtime
-    llm_provider_factory: Optional[Callable[[str], LLMProviderProtocol]] = None
+    # Eagerly provisioned by bootstrap — required, fail-loud on init
+    llm_provider_factory: Callable[[str], LLMProviderProtocol] = None  # type: ignore[assignment]  # Set by bootstrap, never None at runtime
 
     # Core configuration (previously global state in protocols)
     core_config: ExecutionConfig = field(default_factory=ExecutionConfig)
     orchestration_flags: OrchestrationFlags = field(default_factory=OrchestrationFlags)
     vertical_registry: Dict[str, bool] = field(default_factory=dict)
 
-    # Kernel Client - gRPC client to Rust kernel for orchestration
+    # Kernel Client - IPC client to Rust kernel for orchestration (TCP+msgpack)
     # Uses string annotation for TYPE_CHECKING-only import (layer extraction support)
-    kernel_client: Optional["KernelClient"] = None
+    kernel_client: "KernelClient" = None  # type: ignore[assignment]  # Set by bootstrap, never None at runtime
 
     # Optional request-scoped context
     request_id: Optional[str] = None

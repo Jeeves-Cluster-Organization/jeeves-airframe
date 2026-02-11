@@ -16,7 +16,7 @@ jeeves-core (Microkernel - Rust)
 
 This package provides infrastructure implementations for the jeeves-core microkernel:
 
-- **gateway/** - HTTP/WebSocket/gRPC translation (FastAPI)
+- **gateway/** - HTTP/WebSocket translation (FastAPI)
 - **llm/** - LLM providers (LiteLLM, OpenAI HTTP, Mock)
 - **database/** - Database backend registry and factory
 - **redis/** - Distributed state backend
@@ -28,7 +28,7 @@ This package provides infrastructure implementations for the jeeves-core microke
 ## Installation
 
 ```bash
-# Core only (gRPC, protocols)
+# Core only (IPC, protocols)
 pip install jeeves-infra
 
 # With specific features
@@ -68,7 +68,7 @@ from jeeves_infra.gateway import create_gateway_app
 Core infrastructure with 230+ type exports:
 - Protocols and interfaces
 - LLM providers
-- Gateway (HTTP/WS/gRPC)
+- Gateway (HTTP/WebSocket)
 - Memory services
 - Database clients
 - Observability
@@ -94,7 +94,7 @@ Capability-agnostic orchestration infrastructure:
 ## Requirements
 
 - Python 3.11+
-- gRPC and protobuf (core)
+- msgpack (IPC transport)
 
 ## License
 

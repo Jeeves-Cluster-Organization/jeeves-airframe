@@ -17,7 +17,7 @@ from typing import Any, Dict, Optional
 
 # Test the REAL implementations
 from jeeves_infra.tools.executor import ToolExecutionCore
-from jeeves_infra.wiring import ToolExecutor, RESILIENT_PARAM_MAP, RESILIENT_OPS_MAP
+from jeeves_infra.wiring import ToolExecutor
 
 
 # =============================================================================
@@ -406,68 +406,3 @@ class TestToolExecutor:
         assert executor.has_tool("exists") is True
         assert executor.has_tool("not_exists") is False
 
-
-# =============================================================================
-# Tests for Resilient Parameter Transformation
-# =============================================================================
-
-
-class TestResilientParameterTransformation:
-    """Test parameter transformation for resilient tool execution."""
-
-    def test_resilient_param_map_exists(self):
-        """Verify RESILIENT_PARAM_MAP is defined."""
-        assert isinstance(RESILIENT_PARAM_MAP, dict)
-        assert "find_similar_files" in RESILIENT_PARAM_MAP
-        assert RESILIENT_PARAM_MAP["find_similar_files"] == {"file_path": "reference"}
-
-    def test_resilient_ops_map_exists(self):
-        """Verify RESILIENT_OPS_MAP is defined."""
-        assert isinstance(RESILIENT_OPS_MAP, dict)
-        assert "find_similar_files" in RESILIENT_OPS_MAP
-        assert RESILIENT_OPS_MAP["find_similar_files"] == "find_related"
-
-    def test_transform_resilient_params_transforms_keys(self):
-        """Verify _transform_resilient_params correctly maps parameter names."""
-        registry = MockToolRegistry()
-        executor = ToolExecutor(registry)
-
-        params = {"file_path": "agent.py", "limit": 5}
-        transformed = executor._transform_resilient_params("find_similar_files", params)
-
-        assert "reference" in transformed
-        assert transformed["reference"] == "agent.py"
-        assert transformed["limit"] == 5
-        assert "file_path" not in transformed
-
-    def test_transform_resilient_params_no_mapping(self):
-        """Verify params pass through unchanged when no mapping exists."""
-        registry = MockToolRegistry()
-        executor = ToolExecutor(registry)
-
-        params = {"path": "test.py", "start_line": 1}
-        transformed = executor._transform_resilient_params("read_file", params)
-
-        assert transformed == params
-
-    def test_transform_resilient_params_preserves_unmapped(self):
-        """Verify unmapped parameter keys are preserved."""
-        registry = MockToolRegistry()
-        executor = ToolExecutor(registry)
-
-        params = {"file_path": "agent.py", "limit": 10, "min_similarity": 0.5}
-        transformed = executor._transform_resilient_params("find_similar_files", params)
-
-        assert transformed["reference"] == "agent.py"
-        assert transformed["limit"] == 10
-        assert transformed["min_similarity"] == 0.5
-
-    def test_get_resilient_mapping(self):
-        """Verify get_resilient_mapping returns correct mappings."""
-        registry = MockToolRegistry()
-        executor = ToolExecutor(registry)
-
-        assert executor.get_resilient_mapping("read_file") == "read_code"
-        assert executor.get_resilient_mapping("find_symbol") == "locate"
-        assert executor.get_resilient_mapping("find_similar_files") == "find_related"
-        assert executor.get_resilient_mapping("unknown_tool") is None

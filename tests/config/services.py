@@ -33,7 +33,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from typing import Optional
 
-from tests.config.environment import (
+from .environment import (
     TEST_DB_HOST,
     TEST_DB_PORT,
     TEST_DB_USER,
