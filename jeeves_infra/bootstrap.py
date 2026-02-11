@@ -331,6 +331,7 @@ def create_infra_dependencies(
             settings=app_context.settings,
             fallback_providers=fallback_providers,
             logger=gateway_logger,
+            kernel_client=app_context.kernel_client,
         )
 
         gateway_logger.info(
