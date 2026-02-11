@@ -570,8 +570,7 @@ class InferenceEndpointsProtocol(Protocol):
 class AgentLLMConfig:
     """LLM configuration for a specific agent.
 
-    Note: Also available as a proto message in engine_pb2.AgentLLMConfig.
-    This Python dataclass version provides validation and defaults.
+    This Python dataclass is the canonical definition. Validation and defaults included.
     """
     agent_name: str
     model: str  # Required — capability must specify

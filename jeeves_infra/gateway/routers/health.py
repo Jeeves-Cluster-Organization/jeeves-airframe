@@ -6,19 +6,14 @@ Provides read-only access to tool health metrics.
 
 from __future__ import annotations
 
+import os
 from typing import List, Optional
 
 from fastapi import APIRouter, Request, HTTPException
 from pydantic import BaseModel
 
-from jeeves_infra.gateway.grpc_client import get_grpc_client
 from jeeves_infra.logging import get_current_logger
 from jeeves_infra.utils.serialization import ms_to_iso
-
-try:
-    from proto import jeeves_pb2
-except ImportError:
-    jeeves_pb2 = None
 
 router = APIRouter()
 
@@ -28,16 +23,14 @@ router = APIRouter()
 # =============================================================================
 
 class ToolHealthBrief(BaseModel):
-    """Brief tool health status."""
     tool_name: str
-    status: str  # healthy, degraded, unhealthy
+    status: str
     success_rate: float
     last_used: Optional[str] = None
 
 
 class HealthSummaryResponse(BaseModel):
-    """Overall system health summary."""
-    overall_status: str  # healthy, degraded, unhealthy
+    overall_status: str
     total_tools: int
     healthy_tools: int
     degraded_tools: int
@@ -46,7 +39,6 @@ class HealthSummaryResponse(BaseModel):
 
 
 class ToolHealthResponse(BaseModel):
-    """Detailed tool health information."""
     tool_name: str
     status: str
     total_calls: int
@@ -60,7 +52,6 @@ class ToolHealthResponse(BaseModel):
 
 
 class AgentInfo(BaseModel):
-    """Agent information."""
     name: str
     description: str
     status: str
@@ -68,7 +59,6 @@ class AgentInfo(BaseModel):
 
 
 class MemoryLayerInfo(BaseModel):
-    """Memory layer information."""
     name: str
     description: str
     status: str
@@ -76,18 +66,27 @@ class MemoryLayerInfo(BaseModel):
 
 
 class ConfigInfo(BaseModel):
-    """Configuration info."""
     llm_provider: str
     database_backend: str
     log_level: str
 
 
 class DashboardResponse(BaseModel):
-    """Full governance dashboard data."""
     tools: List[ToolHealthBrief]
     agents: List[AgentInfo]
     memory_layers: List[MemoryLayerInfo]
     config: ConfigInfo
+
+
+# =============================================================================
+# Helpers
+# =============================================================================
+
+def _get_health_servicer(request: Request):
+    servicer = getattr(request.app.state, "health_servicer", None)
+    if servicer is None:
+        raise HTTPException(status_code=503, detail="Health service not configured")
+    return servicer
 
 
 # =============================================================================
@@ -96,89 +95,58 @@ class DashboardResponse(BaseModel):
 
 @router.get("/dashboard", response_model=DashboardResponse)
 async def get_dashboard(request: Request):
-    """
-    Get full governance dashboard data.
-
-    Returns tools health, agents, memory layers, and configuration.
-    Per P2 (Fail loudly) - returns empty lists for data that can't be fetched,
-    NOT fake/dummy data. Frontend should display "no data available" states.
-    """
     _logger = get_current_logger()
-    import os
+    servicer = _get_health_servicer(request)
 
-    if jeeves_pb2 is None:
-        raise HTTPException(
-            status_code=503,
-            detail="gRPC stubs not generated. Run proto compilation first."
-        )
-
-    # Get tools health from gRPC - this is required
+    # Tools health
     tools = []
     try:
-        client = get_grpc_client()
-        grpc_request = jeeves_pb2.GetHealthSummaryRequest()
-        summary = await client.governance.GetHealthSummary(grpc_request)
+        summary = await servicer.get_health_summary()
         tools = [
             ToolHealthBrief(
-                tool_name=t.tool_name,
-                status=t.status,
-                success_rate=t.success_rate,
-                last_used=ms_to_iso(t.last_used_ms) if t.last_used_ms else None,
+                tool_name=t["tool_name"],
+                status=t["status"],
+                success_rate=t["success_rate"],
+                last_used=ms_to_iso(t["last_used_ms"]) if t.get("last_used_ms") else None,
             )
-            for t in summary.tools
+            for t in summary.get("tools", [])
         ]
     except Exception as e:
-        _logger.error("Failed to get tools health from gRPC", error=str(e))
-        raise HTTPException(
-            status_code=503,
-            detail=f"Backend unavailable: {str(e)}"
-        )
+        _logger.error("Failed to get tools health", error=str(e))
+        raise HTTPException(status_code=503, detail=f"Backend unavailable: {str(e)}")
 
-    # Get agents from gRPC
+    # Agents
     agents = []
     try:
-        agents_request = jeeves_pb2.GetAgentsRequest()
-        agents_response = await client.governance.GetAgents(agents_request)
+        agents_result = await servicer.get_agents()
         agents = [
             AgentInfo(
-                name=a.name,
-                description=a.description,
-                status=a.status,
-                layer=a.layer,
+                name=a["name"],
+                description=a["description"],
+                status=a["status"],
+                layer=a["layer"],
             )
-            for a in agents_response.agents
+            for a in agents_result.get("agents", [])
         ]
     except Exception as e:
-        _logger.error(
-            "grpc_agents_fetch_failed",
-            error=str(e),
-            error_type=type(e).__name__,
-        )
-        # Return empty list per P2 (fail loudly, no dummy data)
+        _logger.error("agents_fetch_failed", error=str(e))
 
-    # Get memory layers from gRPC
+    # Memory layers
     memory_layers = []
     try:
-        layers_request = jeeves_pb2.GetMemoryLayersRequest()
-        layers_response = await client.governance.GetMemoryLayers(layers_request)
+        layers_result = await servicer.get_memory_layers()
         memory_layers = [
             MemoryLayerInfo(
-                name=m.name,
-                description=m.description,
-                status=m.status,
-                backend=m.backend,
+                name=m["name"],
+                description=m["description"],
+                status=m["status"],
+                backend=m["backend"],
             )
-            for m in layers_response.layers
+            for m in layers_result.get("layers", [])
         ]
     except Exception as e:
-        _logger.error(
-            "grpc_memory_layers_fetch_failed",
-            error=str(e),
-            error_type=type(e).__name__,
-        )
-        # Return empty list per P2 (fail loudly, no dummy data)
+        _logger.error("memory_layers_fetch_failed", error=str(e))
 
-    # Configuration from environment (this is real local config, not dummy data)
     config = ConfigInfo(
         llm_provider=os.environ.get("LLM_PROVIDER", "llamaserver"),
         database_backend=os.environ.get("DATABASE_BACKEND", "unknown"),
@@ -195,36 +163,28 @@ async def get_dashboard(request: Request):
 
 @router.get("/health", response_model=HealthSummaryResponse)
 async def get_health_summary(request: Request):
-    """Get overall system health summary."""
     _logger = get_current_logger()
-    if jeeves_pb2 is None:
-        raise HTTPException(status_code=503, detail="gRPC stubs not generated")
-
-    client = get_grpc_client()
+    servicer = _get_health_servicer(request)
 
     try:
-        grpc_request = jeeves_pb2.GetHealthSummaryRequest()
-        summary = await client.governance.GetHealthSummary(grpc_request)
-
+        summary = await servicer.get_health_summary()
         tools = [
             ToolHealthBrief(
-                tool_name=t.tool_name,
-                status=t.status,
-                success_rate=t.success_rate,
-                last_used=ms_to_iso(t.last_used_ms) if t.last_used_ms else None,
+                tool_name=t["tool_name"],
+                status=t["status"],
+                success_rate=t["success_rate"],
+                last_used=ms_to_iso(t["last_used_ms"]) if t.get("last_used_ms") else None,
             )
-            for t in summary.tools
+            for t in summary.get("tools", [])
         ]
-
         return HealthSummaryResponse(
-            overall_status=summary.overall_status,
-            total_tools=summary.total_tools,
-            healthy_tools=summary.healthy_tools,
-            degraded_tools=summary.degraded_tools,
-            unhealthy_tools=summary.unhealthy_tools,
+            overall_status=summary["overall_status"],
+            total_tools=summary["total_tools"],
+            healthy_tools=summary["healthy_tools"],
+            degraded_tools=summary["degraded_tools"],
+            unhealthy_tools=summary["unhealthy_tools"],
             tools=tools,
         )
-
     except Exception as e:
         _logger.error("get_health_summary_failed", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
@@ -232,32 +192,23 @@ async def get_health_summary(request: Request):
 
 @router.get("/tools/{tool_name}", response_model=ToolHealthResponse)
 async def get_tool_health(request: Request, tool_name: str):
-    """Get detailed health info for a specific tool."""
     _logger = get_current_logger()
-    if jeeves_pb2 is None:
-        raise HTTPException(status_code=503, detail="gRPC stubs not generated")
-
-    client = get_grpc_client()
+    servicer = _get_health_servicer(request)
 
     try:
-        grpc_request = jeeves_pb2.GetToolHealthRequest(tool_name=tool_name)
-        health = await client.governance.GetToolHealth(grpc_request)
-
+        health = await servicer.get_tool_health(tool_name)
         return ToolHealthResponse(
-            tool_name=health.tool_name,
-            status=health.status,
-            total_calls=health.total_calls,
-            successful_calls=health.successful_calls,
-            failed_calls=health.failed_calls,
-            success_rate=health.success_rate,
-            avg_latency_ms=health.avg_latency_ms,
-            last_success=ms_to_iso(health.last_success_ms) if health.last_success_ms else None,
-            last_failure=ms_to_iso(health.last_failure_ms) if health.last_failure_ms else None,
-            last_error=health.last_error or None,
+            tool_name=health["tool_name"],
+            status=health["status"],
+            total_calls=health["total_calls"],
+            successful_calls=health["successful_calls"],
+            failed_calls=health["failed_calls"],
+            success_rate=health["success_rate"],
+            avg_latency_ms=health["avg_latency_ms"],
+            last_success=ms_to_iso(health["last_success_ms"]) if health.get("last_success_ms") else None,
+            last_failure=ms_to_iso(health["last_failure_ms"]) if health.get("last_failure_ms") else None,
+            last_error=health.get("last_error") or None,
         )
-
     except Exception as e:
         _logger.error("get_tool_health_failed", error=str(e), tool_name=tool_name)
         raise HTTPException(status_code=404, detail=f"Tool not found: {tool_name}")
-
-

@@ -12,7 +12,7 @@ requires-python = ">=3.11"
 authors = [
     {name = "Jeeves Cluster Organization"}
 ]
-keywords = ["llm", "inference", "infrastructure", "grpc", "orchestration", "agents"]
+keywords = ["llm", "inference", "infrastructure", "ipc", "orchestration", "agents"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -23,10 +23,8 @@ classifiers = [
 ]
 
 dependencies = [
-    # gRPC for kernel communication (Rust kernel via gRPC)
-    "grpcio>=1.60.0",
-    "grpcio-tools>=1.60.0",
-    "protobuf>=4.25.0",
+    # IPC transport for kernel communication (Rust kernel via TCP+msgpack)
+    "msgpack>=1.0.0",
     # HTTP client (used by LLM providers and health probes)
     "httpx>=0.25.0",
     # Data validation

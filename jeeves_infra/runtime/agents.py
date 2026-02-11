@@ -7,6 +7,7 @@ Architecture:
 """
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Protocol, AsyncIterator, Tuple, TYPE_CHECKING
 
@@ -115,7 +116,8 @@ class Agent:
 
         # Pre-process hook
         if self.pre_process:
-            envelope = self.pre_process(envelope, self)
+            result = self.pre_process(envelope, self)
+            envelope = await result if asyncio.iscoroutine(result) else result
 
         # Get output
         if self.use_mock and self.mock_handler:
@@ -154,7 +156,8 @@ class Agent:
 
         # Post-process hook
         if self.post_process:
-            envelope = self.post_process(envelope, output, self)
+            result = self.post_process(envelope, output, self)
+            envelope = await result if asyncio.iscoroutine(result) else result
 
         # Store output
         envelope.outputs[self.config.output_key] = output
@@ -251,7 +254,8 @@ class Agent:
 
         # Pre-process hook
         if self.pre_process:
-            envelope = self.pre_process(envelope, self)
+            result = self.pre_process(envelope, self)
+            envelope = await result if asyncio.iscoroutine(result) else result
 
         # Determine if tokens should be authoritative
         is_authoritative = self.config.token_stream == TokenStreamMode.AUTHORITATIVE

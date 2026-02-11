@@ -252,10 +252,11 @@ def create_app_context(
     # Eagerly provision kernel client (graceful fallback to None)
     kernel_client = None
     try:
-        import grpc.aio as grpc_aio
+        from jeeves_infra.ipc import IpcTransport
         kernel_address = os.getenv("JEEVES_KERNEL_ADDRESS", DEFAULT_KERNEL_ADDRESS)
-        channel = grpc_aio.insecure_channel(kernel_address)
-        kernel_client = KernelClient(channel)
+        host, _, port_str = kernel_address.rpartition(":")
+        transport = IpcTransport(host=host or "127.0.0.1", port=int(port_str or 50051))
+        kernel_client = KernelClient(transport)
         root_logger.info("kernel_client_provisioned", address=kernel_address)
     except Exception as e:
         root_logger.warning(

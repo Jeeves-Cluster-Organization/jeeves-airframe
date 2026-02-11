@@ -1,10 +1,7 @@
-"""Python type wrappers for proto-generated messages.
+"""Python type definitions for the Jeeves protocol layer.
 
-These dataclasses provide backward compatibility with the original
-jeeves_core.types module, adding convenience methods while the
-proto messages serve as the source of truth.
-
-Session 10: Types moved from jeeves-core/jeeves_core/types/
+These dataclasses and enums define the contract between Python and Rust.
+No proto dependency — code is the contract.
 """
 
 from dataclasses import dataclass, field
@@ -13,29 +10,6 @@ from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
 from jeeves_infra.protocols.interfaces import RequestContext
-
-# Import proto enums for compatibility
-from jeeves_infra.protocols.engine_pb2 import (
-    TerminalReason as ProtoTerminalReason,
-    InterruptKind as ProtoInterruptKind,
-    InterruptStatus as ProtoInterruptStatus,
-    RiskLevel as ProtoRiskLevel,
-    ToolCategory as ProtoToolCategory,
-    ToolAccess as ProtoToolAccess,
-    HealthStatus as ProtoHealthStatus,
-    LoopVerdict as ProtoLoopVerdict,
-    RiskApproval as ProtoRiskApproval,
-    OperationStatus as ProtoOperationStatus,
-    RunMode as ProtoRunMode,
-    JoinStrategy as ProtoJoinStrategy,
-    AgentOutputMode as ProtoAgentOutputMode,
-    TokenStreamMode as ProtoTokenStreamMode,
-    AgentCapability as ProtoAgentCapability,
-    # Enum values
-    CLARIFICATION, CONFIRMATION, CHECKPOINT, RESOURCE_EXHAUSTED,
-    TIMEOUT, SYSTEM_ERROR, AGENT_REVIEW, INTERRUPT_KIND_UNSPECIFIED,
-    INTERRUPT_PENDING, INTERRUPT_RESOLVED, INTERRUPT_EXPIRED, INTERRUPT_CANCELLED,
-)
 
 
 # =============================================================================

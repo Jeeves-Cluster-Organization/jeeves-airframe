@@ -1,8 +1,7 @@
 # Jeeves Protocol Types
 #
-# Session 10: Proto is the source of truth. Python types provide methods.
-# Use Python dataclass types for code that needs methods (to_dict, from_dict, etc.)
-# Use Proto types for gRPC communication.
+# Code is the contract. Python dataclasses define the schema.
+# No proto dependency.
 
 # =============================================================================
 # PYTHON DATACLASS TYPES (with methods - use these in application code)
@@ -94,17 +93,6 @@ from jeeves_infra.protocols.interfaces import (
     EventBridgeProtocol,
     ChunkServiceProtocol,
     SessionStateServiceProtocol,
-)
-
-# =============================================================================
-# PROTO TYPES (for gRPC communication)
-# =============================================================================
-
-from jeeves_infra.protocols import engine_pb2 as proto
-from jeeves_infra.protocols.engine_pb2_grpc import (
-    EngineServiceStub,
-    EngineServiceServicer,
-    add_EngineServiceServicer_to_server,
 )
 
 # =============================================================================
@@ -322,12 +310,6 @@ __all__ = [
     "SessionStateServiceProtocol",
     "InterruptServiceProtocol",
     "RateLimiterProtocol",
-    # Proto module
-    "proto",
-    # gRPC
-    "EngineServiceStub",
-    "EngineServiceServicer",
-    "add_EngineServiceServicer_to_server",
     # Capability registration
     "get_capability_resource_registry",
     "reset_capability_resource_registry",

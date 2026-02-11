@@ -1,21 +1,17 @@
-"""Python gRPC Client for Rust Kernel.
+"""IPC Client for Rust Kernel.
 
-This module provides an async Python client that wraps the gRPC stubs
-for communicating with the Rust kernel (KernelService) and engine (EngineService).
+Async Python client for communicating with the Rust kernel via TCP + msgpack.
 
 Usage:
     from jeeves_infra.kernel_client import KernelClient
 
-    # Create client with connection (or get from AppContext)
     async with KernelClient.connect("localhost:50051") as client:
-        # Create and manage processes
         pcb = await client.create_process(
             pid="req-123",
             user_id="user-1",
             session_id="session-1",
         )
 
-        # Record resource usage
         usage = await client.record_usage(
             pid="req-123",
             llm_calls=1,
@@ -23,35 +19,26 @@ Usage:
             tokens_out=50,
         )
 
-        # Check quota
         result = await client.check_quota(pid="req-123")
         if not result.within_bounds:
             print(f"Quota exceeded: {result.exceeded_reason}")
-
-Constitutional Reference:
-- Session 15: Wire Python capabilities to Rust kernel via gRPC
-- jeeves-core = pure Rust, Python calls via gRPC
 """
 
 from __future__ import annotations
 
-import asyncio
+import json
 import logging
 import os
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from typing import Any, AsyncIterator, Callable, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, AsyncIterator, Callable, Dict, List, Optional
 
-import grpc
-from grpc import aio as grpc_aio
-
-from jeeves_infra.protocols import engine_pb2 as pb2
-from jeeves_infra.protocols import engine_pb2_grpc as pb2_grpc
+from jeeves_infra.ipc import IpcTransport, IpcError
 
 logger = logging.getLogger(__name__)
 
 # Default kernel address from environment
-DEFAULT_KERNEL_ADDRESS = os.getenv("KERNEL_GRPC_ADDRESS", "localhost:50051")
+DEFAULT_KERNEL_ADDRESS = os.getenv("JEEVES_KERNEL_ADDRESS", "localhost:50051")
 
 
 @dataclass
@@ -119,11 +106,12 @@ class OrchestrationSessionState:
 
 
 class KernelClient:
-    """Async gRPC client for the Rust kernel.
+    """Async IPC client for the Rust kernel.
 
     Provides methods to interact with:
     - KernelService: Process lifecycle and resource management
     - EngineService: Envelope operations and pipeline execution
+    - OrchestrationService: Kernel-driven pipeline orchestration
 
     Usage:
         async with KernelClient.connect("localhost:50051") as client:
@@ -131,65 +119,45 @@ class KernelClient:
             usage = await client.record_usage(pid="req-123", llm_calls=1)
     """
 
-    def __init__(
-        self,
-        channel: grpc_aio.Channel,
-        kernel_stub: Optional[pb2_grpc.KernelServiceStub] = None,
-        engine_stub: Optional[pb2_grpc.EngineServiceStub] = None,
-        orchestration_stub: Optional[pb2_grpc.OrchestrationServiceStub] = None,
-    ):
-        """Initialize the client with a gRPC channel.
+    def __init__(self, transport: IpcTransport):
+        """Initialize the client with an IPC transport.
 
         Args:
-            channel: Async gRPC channel to the kernel
-            kernel_stub: Optional pre-created KernelService stub
-            engine_stub: Optional pre-created EngineService stub
-            orchestration_stub: Optional pre-created OrchestrationService stub
+            transport: Connected IpcTransport instance.
         """
-        self._channel = channel
-        # KernelServiceStub now generated - use it directly
-        self._kernel_stub = kernel_stub or pb2_grpc.KernelServiceStub(channel)
-        self._engine_stub = engine_stub or pb2_grpc.EngineServiceStub(channel)
-        self._orchestration_stub = orchestration_stub or pb2_grpc.OrchestrationServiceStub(channel)
-        self._closed = False
+        self._transport = transport
 
     @classmethod
     @asynccontextmanager
     async def connect(
         cls,
         address: str = DEFAULT_KERNEL_ADDRESS,
-        *,
-        secure: bool = False,
-        credentials: Optional[grpc.ChannelCredentials] = None,
+        **kwargs,
     ) -> AsyncIterator["KernelClient"]:
         """Create a connected client as an async context manager.
 
         Args:
-            address: Kernel gRPC address (host:port)
-            secure: Use secure channel (TLS)
-            credentials: Optional TLS credentials
+            address: Kernel address (host:port).
 
         Yields:
-            Connected KernelClient instance
+            Connected KernelClient instance.
         """
-        if secure:
-            if credentials is None:
-                credentials = grpc.ssl_channel_credentials()
-            channel = grpc_aio.secure_channel(address, credentials)
-        else:
-            channel = grpc_aio.insecure_channel(address)
+        host, _, port_str = address.rpartition(":")
+        if not host:
+            host = "127.0.0.1"
+        port = int(port_str) if port_str else 50051
 
-        client = cls(channel)
+        transport = IpcTransport(host=host, port=port)
+        await transport.connect()
+        client = cls(transport)
         try:
             yield client
         finally:
             await client.close()
 
     async def close(self):
-        """Close the gRPC channel."""
-        if not self._closed:
-            await self._channel.close()
-            self._closed = True
+        """Close the IPC transport."""
+        await self._transport.close()
 
     # =========================================================================
     # Process Lifecycle (KernelService)
@@ -209,106 +177,57 @@ class KernelClient:
         max_iterations: int = 50,
         timeout_seconds: int = 300,
     ) -> ProcessInfo:
-        """Create a new process in the kernel.
-
-        Args:
-            pid: Process ID (usually envelope_id)
-            request_id: Request ID
-            user_id: User identifier
-            session_id: Session identifier
-            priority: Scheduling priority (REALTIME, HIGH, NORMAL, LOW, IDLE)
-            max_llm_calls: Max LLM API calls
-            max_tool_calls: Max tool executions
-            max_agent_hops: Max agent transitions
-            max_iterations: Max loop iterations
-            timeout_seconds: Execution timeout
-
-        Returns:
-            ProcessInfo for the created process
-        """
-        # Map priority string to enum
-        priority_map = {
-            "REALTIME": pb2.SCHEDULING_PRIORITY_REALTIME,
-            "HIGH": pb2.SCHEDULING_PRIORITY_HIGH,
-            "NORMAL": pb2.SCHEDULING_PRIORITY_NORMAL,
-            "LOW": pb2.SCHEDULING_PRIORITY_LOW,
-            "IDLE": pb2.SCHEDULING_PRIORITY_IDLE,
+        """Create a new process in the kernel."""
+        body = {
+            "pid": pid,
+            "request_id": request_id or pid,
+            "user_id": user_id,
+            "session_id": session_id,
+            "priority": priority,
+            "quota": {
+                "max_llm_calls": max_llm_calls,
+                "max_tool_calls": max_tool_calls,
+                "max_agent_hops": max_agent_hops,
+                "max_iterations": max_iterations,
+                "timeout_seconds": timeout_seconds,
+            },
         }
-
-        quota = pb2.ResourceQuota(
-            max_llm_calls=max_llm_calls,
-            max_tool_calls=max_tool_calls,
-            max_agent_hops=max_agent_hops,
-            max_iterations=max_iterations,
-            timeout_seconds=timeout_seconds,
-        )
-
-        request = pb2.CreateProcessRequest(
-            pid=pid,
-            request_id=request_id or pid,
-            user_id=user_id,
-            session_id=session_id,
-            priority=priority_map.get(priority, pb2.SCHEDULING_PRIORITY_NORMAL),
-            quota=quota,
-        )
-
         try:
-            response = await self._call_kernel("CreateProcess", request)
-            return self._pcb_to_info(response)
-        except grpc.RpcError as e:
+            response = await self._transport.request("kernel", "CreateProcess", body)
+            return self._dict_to_process_info(response)
+        except IpcError as e:
             logger.error(f"Failed to create process {pid}: {e}")
             raise KernelClientError(f"CreateProcess failed: {e}") from e
 
     async def get_process(self, pid: str) -> Optional[ProcessInfo]:
-        """Get process information by PID.
-
-        Args:
-            pid: Process ID
-
-        Returns:
-            ProcessInfo if found, None if not found
-        """
-        request = pb2.GetProcessRequest(pid=pid)
+        """Get process information by PID. Returns None if not found."""
         try:
-            response = await self._call_kernel("GetProcess", request)
-            return self._pcb_to_info(response)
-        except grpc.RpcError as e:
-            if e.code() == grpc.StatusCode.NOT_FOUND:
+            response = await self._transport.request("kernel", "GetProcess", {"pid": pid})
+            return self._dict_to_process_info(response)
+        except IpcError as e:
+            if e.code == "NOT_FOUND":
                 return None
             logger.error(f"Failed to get process {pid}: {e}")
             raise KernelClientError(f"GetProcess failed: {e}") from e
 
     async def schedule_process(self, pid: str) -> ProcessInfo:
-        """Schedule a process (transition NEW -> READY).
-
-        Args:
-            pid: Process ID
-
-        Returns:
-            Updated ProcessInfo
-        """
-        request = pb2.ScheduleProcessRequest(pid=pid)
+        """Schedule a process (transition NEW -> READY)."""
         try:
-            response = await self._call_kernel("ScheduleProcess", request)
-            return self._pcb_to_info(response)
-        except grpc.RpcError as e:
+            response = await self._transport.request("kernel", "ScheduleProcess", {"pid": pid})
+            return self._dict_to_process_info(response)
+        except IpcError as e:
             logger.error(f"Failed to schedule process {pid}: {e}")
             raise KernelClientError(f"ScheduleProcess failed: {e}") from e
 
     async def get_next_runnable(self) -> Optional[ProcessInfo]:
-        """Get the next runnable process (transitions READY -> RUNNING).
-
-        Returns:
-            ProcessInfo for the highest priority ready process, None if queue empty
-        """
-        request = pb2.GetNextRunnableRequest()
+        """Get the next runnable process (transitions READY -> RUNNING)."""
         try:
-            response = await self._call_kernel("GetNextRunnable", request)
-            if response.pid:
-                return self._pcb_to_info(response)
+            response = await self._transport.request("kernel", "GetNextRunnable", {})
+            if response.get("pid"):
+                return self._dict_to_process_info(response)
             return None
-        except grpc.RpcError as e:
-            if e.code() == grpc.StatusCode.NOT_FOUND:
+        except IpcError as e:
+            if e.code == "NOT_FOUND":
                 return None
             logger.error(f"Failed to get next runnable: {e}")
             raise KernelClientError(f"GetNextRunnable failed: {e}") from e
@@ -319,35 +238,12 @@ class KernelClient:
         new_state: str,
         reason: str = "",
     ) -> ProcessInfo:
-        """Transition a process to a new state.
-
-        Args:
-            pid: Process ID
-            new_state: Target state (READY, RUNNING, WAITING, BLOCKED, TERMINATED)
-            reason: Reason for the transition
-
-        Returns:
-            Updated ProcessInfo
-        """
-        state_map = {
-            "NEW": pb2.PROCESS_STATE_NEW,
-            "READY": pb2.PROCESS_STATE_READY,
-            "RUNNING": pb2.PROCESS_STATE_RUNNING,
-            "WAITING": pb2.PROCESS_STATE_WAITING,
-            "BLOCKED": pb2.PROCESS_STATE_BLOCKED,
-            "TERMINATED": pb2.PROCESS_STATE_TERMINATED,
-            "ZOMBIE": pb2.PROCESS_STATE_ZOMBIE,
-        }
-
-        request = pb2.TransitionStateRequest(
-            pid=pid,
-            new_state=state_map.get(new_state, pb2.PROCESS_STATE_UNSPECIFIED),
-            reason=reason,
-        )
+        """Transition a process to a new state."""
+        body = {"pid": pid, "new_state": new_state, "reason": reason}
         try:
-            response = await self._call_kernel("TransitionState", request)
-            return self._pcb_to_info(response)
-        except grpc.RpcError as e:
+            response = await self._transport.request("kernel", "TransitionState", body)
+            return self._dict_to_process_info(response)
+        except IpcError as e:
             logger.error(f"Failed to transition process {pid}: {e}")
             raise KernelClientError(f"TransitionState failed: {e}") from e
 
@@ -357,25 +253,12 @@ class KernelClient:
         reason: str = "",
         force: bool = False,
     ) -> ProcessInfo:
-        """Terminate a process.
-
-        Args:
-            pid: Process ID
-            reason: Termination reason
-            force: Force termination without cleanup
-
-        Returns:
-            Updated ProcessInfo
-        """
-        request = pb2.TerminateProcessRequest(
-            pid=pid,
-            reason=reason,
-            force=force,
-        )
+        """Terminate a process."""
+        body = {"pid": pid, "reason": reason, "force": force}
         try:
-            response = await self._call_kernel("TerminateProcess", request)
-            return self._pcb_to_info(response)
-        except grpc.RpcError as e:
+            response = await self._transport.request("kernel", "TerminateProcess", body)
+            return self._dict_to_process_info(response)
+        except IpcError as e:
             logger.error(f"Failed to terminate process {pid}: {e}")
             raise KernelClientError(f"TerminateProcess failed: {e}") from e
 
@@ -393,63 +276,43 @@ class KernelClient:
         tokens_in: int = 0,
         tokens_out: int = 0,
     ) -> QuotaCheckResult:
-        """Record resource usage for a process.
-
-        Args:
-            pid: Process ID
-            llm_calls: Number of LLM calls to record
-            tool_calls: Number of tool calls to record
-            agent_hops: Number of agent hops to record
-            tokens_in: Input tokens used
-            tokens_out: Output tokens used
-
-        Returns:
-            QuotaCheckResult with current usage state
-        """
-        request = pb2.RecordUsageRequest(
-            pid=pid,
-            llm_calls=llm_calls,
-            tool_calls=tool_calls,
-            agent_hops=agent_hops,
-            tokens_in=tokens_in,
-            tokens_out=tokens_out,
-        )
+        """Record resource usage for a process."""
+        body = {
+            "pid": pid,
+            "llm_calls": llm_calls,
+            "tool_calls": tool_calls,
+            "agent_hops": agent_hops,
+            "tokens_in": tokens_in,
+            "tokens_out": tokens_out,
+        }
         try:
-            response = await self._call_kernel("RecordUsage", request)
+            response = await self._transport.request("kernel", "RecordUsage", body)
             return QuotaCheckResult(
-                within_bounds=True,  # RecordUsage doesn't return bounds check
-                llm_calls=response.llm_calls,
-                tool_calls=response.tool_calls,
-                agent_hops=response.agent_hops,
-                tokens_in=response.tokens_in,
-                tokens_out=response.tokens_out,
+                within_bounds=True,
+                llm_calls=response.get("llm_calls", 0),
+                tool_calls=response.get("tool_calls", 0),
+                agent_hops=response.get("agent_hops", 0),
+                tokens_in=response.get("tokens_in", 0),
+                tokens_out=response.get("tokens_out", 0),
             )
-        except grpc.RpcError as e:
+        except IpcError as e:
             logger.error(f"Failed to record usage for {pid}: {e}")
             raise KernelClientError(f"RecordUsage failed: {e}") from e
 
     async def check_quota(self, pid: str) -> QuotaCheckResult:
-        """Check if a process is within its resource quota.
-
-        Args:
-            pid: Process ID
-
-        Returns:
-            QuotaCheckResult with bounds check result
-        """
-        request = pb2.CheckQuotaRequest(pid=pid)
+        """Check if a process is within its resource quota."""
         try:
-            response = await self._call_kernel("CheckQuota", request)
+            response = await self._transport.request("kernel", "CheckQuota", {"pid": pid})
             return QuotaCheckResult(
-                within_bounds=response.within_bounds,
-                exceeded_reason=response.exceeded_reason,
-                llm_calls=response.usage.llm_calls if response.usage else 0,
-                tool_calls=response.usage.tool_calls if response.usage else 0,
-                agent_hops=response.usage.agent_hops if response.usage else 0,
-                tokens_in=response.usage.tokens_in if response.usage else 0,
-                tokens_out=response.usage.tokens_out if response.usage else 0,
+                within_bounds=response.get("within_bounds", True),
+                exceeded_reason=response.get("exceeded_reason", ""),
+                llm_calls=response.get("llm_calls", 0),
+                tool_calls=response.get("tool_calls", 0),
+                agent_hops=response.get("agent_hops", 0),
+                tokens_in=response.get("tokens_in", 0),
+                tokens_out=response.get("tokens_out", 0),
             )
-        except grpc.RpcError as e:
+        except IpcError as e:
             logger.error(f"Failed to check quota for {pid}: {e}")
             raise KernelClientError(f"CheckQuota failed: {e}") from e
 
@@ -459,34 +322,11 @@ class KernelClient:
         endpoint: str = "",
         record: bool = True,
     ) -> Dict[str, Any]:
-        """Check rate limit for a user.
-
-        Args:
-            user_id: User identifier
-            endpoint: API endpoint (for per-endpoint limits)
-            record: Whether to record this request against the limit
-
-        Returns:
-            Dict with rate limit status
-        """
-        request = pb2.CheckRateLimitRequest(
-            user_id=user_id,
-            endpoint=endpoint,
-            record=record,
-        )
+        """Check rate limit for a user."""
+        body = {"user_id": user_id, "endpoint": endpoint, "record": record}
         try:
-            response = await self._call_kernel("CheckRateLimit", request)
-            return {
-                "allowed": response.allowed,
-                "exceeded": response.exceeded,
-                "reason": response.reason,
-                "limit_type": response.limit_type,
-                "current_count": response.current_count,
-                "limit": response.limit,
-                "retry_after_seconds": response.retry_after_seconds,
-                "remaining": response.remaining,
-            }
-        except grpc.RpcError as e:
+            return await self._transport.request("kernel", "CheckRateLimit", body)
+        except IpcError as e:
             logger.error(f"Failed to check rate limit for {user_id}: {e}")
             raise KernelClientError(f"CheckRateLimit failed: {e}") from e
 
@@ -499,50 +339,27 @@ class KernelClient:
         state: Optional[str] = None,
         user_id: Optional[str] = None,
     ) -> List[ProcessInfo]:
-        """List processes matching filters.
-
-        Args:
-            state: Filter by state (RUNNING, READY, etc.)
-            user_id: Filter by user ID
-
-        Returns:
-            List of ProcessInfo
-        """
-        state_map = {
-            "NEW": pb2.PROCESS_STATE_NEW,
-            "READY": pb2.PROCESS_STATE_READY,
-            "RUNNING": pb2.PROCESS_STATE_RUNNING,
-            "WAITING": pb2.PROCESS_STATE_WAITING,
-            "BLOCKED": pb2.PROCESS_STATE_BLOCKED,
-            "TERMINATED": pb2.PROCESS_STATE_TERMINATED,
-            "ZOMBIE": pb2.PROCESS_STATE_ZOMBIE,
+        """List processes matching filters."""
+        body = {
+            "state": state or "",
+            "user_id": user_id or "",
         }
-
-        request = pb2.ListProcessesRequest(
-            state=state_map.get(state, pb2.PROCESS_STATE_UNSPECIFIED) if state else pb2.PROCESS_STATE_UNSPECIFIED,
-            user_id=user_id or "",
-        )
         try:
-            response = await self._call_kernel("ListProcesses", request)
-            return [self._pcb_to_info(pcb) for pcb in response.processes]
-        except grpc.RpcError as e:
+            response = await self._transport.request("kernel", "ListProcesses", body)
+            return [self._dict_to_process_info(p) for p in response.get("processes", [])]
+        except IpcError as e:
             logger.error(f"Failed to list processes: {e}")
             raise KernelClientError(f"ListProcesses failed: {e}") from e
 
     async def get_process_counts(self) -> Dict[str, int]:
-        """Get process counts by state.
-
-        Returns:
-            Dict mapping state names to counts
-        """
-        request = pb2.GetProcessCountsRequest()
+        """Get process counts by state."""
         try:
-            response = await self._call_kernel("GetProcessCounts", request)
-            counts = dict(response.counts_by_state)
-            counts["total"] = response.total
-            counts["queue_depth"] = response.queue_depth
+            response = await self._transport.request("kernel", "GetProcessCounts", {})
+            counts = dict(response.get("counts_by_state", {}))
+            counts["total"] = response.get("total", 0)
+            counts["queue_depth"] = response.get("queue_depth", 0)
             return counts
-        except grpc.RpcError as e:
+        except IpcError as e:
             logger.error(f"Failed to get process counts: {e}")
             raise KernelClientError(f"GetProcessCounts failed: {e}") from e
 
@@ -559,58 +376,32 @@ class KernelClient:
         request_id: str = "",
         metadata: Optional[Dict[str, str]] = None,
         stage_order: Optional[List[str]] = None,
-    ) -> pb2.Envelope:
-        """Create a new envelope via the Rust engine.
-
-        Args:
-            raw_input: User input text
-            user_id: User identifier
-            session_id: Session identifier
-            request_id: Request ID (generated if empty)
-            metadata: Additional metadata
-            stage_order: Pipeline stage order
-
-        Returns:
-            Created Envelope
-        """
-        request = pb2.CreateEnvelopeRequest(
-            raw_input=raw_input,
-            user_id=user_id,
-            session_id=session_id,
-            request_id=request_id,
-            metadata=metadata or {},
-            stage_order=stage_order or [],
-        )
+    ) -> Dict[str, Any]:
+        """Create a new envelope via the Rust engine."""
+        body = {
+            "raw_input": raw_input,
+            "user_id": user_id,
+            "session_id": session_id,
+            "request_id": request_id,
+            "metadata": metadata or {},
+            "stage_order": stage_order or [],
+        }
         try:
-            return await self._engine_stub.CreateEnvelope(request)
-        except grpc.RpcError as e:
+            return await self._transport.request("engine", "CreateEnvelope", body)
+        except IpcError as e:
             logger.error(f"Failed to create envelope: {e}")
             raise KernelClientError(f"CreateEnvelope failed: {e}") from e
 
-    async def check_bounds(self, envelope: pb2.Envelope) -> Dict[str, Any]:
-        """Check if an envelope is within bounds.
-
-        Args:
-            envelope: Envelope to check
-
-        Returns:
-            Dict with bounds check result
-        """
+    async def check_bounds(self, envelope: Dict[str, Any]) -> Dict[str, Any]:
+        """Check if an envelope is within bounds."""
         try:
-            response = await self._engine_stub.CheckBounds(envelope)
-            return {
-                "can_continue": response.can_continue,
-                "terminal_reason": pb2.TerminalReason.Name(response.terminal_reason),
-                "llm_calls_remaining": response.llm_calls_remaining,
-                "agent_hops_remaining": response.agent_hops_remaining,
-                "iterations_remaining": response.iterations_remaining,
-            }
-        except grpc.RpcError as e:
+            return await self._transport.request("engine", "CheckBounds", envelope)
+        except IpcError as e:
             logger.error(f"Failed to check bounds: {e}")
             raise KernelClientError(f"CheckBounds failed: {e}") from e
 
     # =========================================================================
-    # Orchestration (OrchestrationService) - Kernel-Driven Pipeline Execution
+    # Orchestration (OrchestrationService)
     # =========================================================================
 
     async def initialize_orchestration_session(
@@ -620,42 +411,23 @@ class KernelClient:
         envelope: Dict[str, Any],
         force: bool = False,
     ) -> OrchestrationSessionState:
-        """Initialize a new orchestration session.
-
-        The kernel takes control of pipeline orchestration. Python workers
-        will execute agents as instructed by the kernel.
-
-        Args:
-            process_id: Unique process identifier (usually envelope_id)
-            pipeline_config: Pipeline configuration dict
-            envelope: Initial envelope state dict
-            force: If True, replace existing session with same process_id.
-                   Default False means ALREADY_EXISTS error if session exists.
-
-        Returns:
-            OrchestrationSessionState with initial state
-
-        Raises:
-            KernelClientError: If session already exists (and force=False),
-                              or if deadline exceeded, or other RPC error.
-        """
-        import json
-        request = pb2.InitializeSessionRequest(
-            process_id=process_id,
-            pipeline_config=json.dumps(pipeline_config).encode('utf-8'),
-            envelope=json.dumps(envelope).encode('utf-8'),
-            force=force,
-        )
+        """Initialize a new orchestration session."""
+        body = {
+            "process_id": process_id,
+            "pipeline_config": json.dumps(pipeline_config),
+            "envelope": json.dumps(envelope),
+            "force": force,
+        }
         try:
-            response = await self._orchestration_stub.InitializeSession(request)
-            return self._session_state_to_dataclass(response)
-        except grpc.RpcError as e:
-            if e.code() == grpc.StatusCode.ALREADY_EXISTS:
+            response = await self._transport.request("orchestration", "InitializeSession", body)
+            return self._dict_to_session_state(response)
+        except IpcError as e:
+            if e.code == "ALREADY_EXISTS":
                 logger.warning(f"Session already exists for {process_id}")
                 raise KernelClientError(f"Session already exists for process {process_id}") from e
-            if e.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
+            if e.code == "TIMEOUT":
                 logger.error(f"Deadline exceeded initializing session {process_id}")
-                raise KernelClientError(f"Request deadline exceeded") from e
+                raise KernelClientError("Request deadline exceeded") from e
             logger.error(f"Failed to initialize orchestration session {process_id}: {e}")
             raise KernelClientError(f"InitializeSession failed: {e}") from e
 
@@ -663,25 +435,16 @@ class KernelClient:
         self,
         process_id: str,
     ) -> OrchestratorInstruction:
-        """Get the next instruction from the kernel.
-
-        The kernel determines what agent to run next, or if the pipeline
-        should terminate or wait for an interrupt.
-
-        Args:
-            process_id: Process identifier
-
-        Returns:
-            OrchestratorInstruction with next action
-        """
-        request = pb2.GetNextInstructionRequest(process_id=process_id)
+        """Get the next instruction from the kernel."""
         try:
-            response = await self._orchestration_stub.GetNextInstruction(request)
-            return self._instruction_to_dataclass(response)
-        except grpc.RpcError as e:
-            if e.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
+            response = await self._transport.request(
+                "orchestration", "GetNextInstruction", {"process_id": process_id},
+            )
+            return self._dict_to_instruction(response)
+        except IpcError as e:
+            if e.code == "TIMEOUT":
                 logger.error(f"Deadline exceeded getting next instruction for {process_id}")
-                raise KernelClientError(f"Request deadline exceeded") from e
+                raise KernelClientError("Request deadline exceeded") from e
             logger.error(f"Failed to get next instruction for {process_id}: {e}")
             raise KernelClientError(f"GetNextInstruction failed: {e}") from e
 
@@ -694,49 +457,29 @@ class KernelClient:
         success: bool = True,
         error: str = "",
     ) -> OrchestratorInstruction:
-        """Report agent execution result and get next instruction.
-
-        After executing an agent, report the result to the kernel.
-        The kernel evaluates routing rules and returns the next instruction.
-
-        Args:
-            process_id: Process identifier
-            agent_name: Name of the agent that just executed
-            output: Agent output dict (optional)
-            metrics: Execution metrics (optional)
-            success: Whether the agent succeeded
-            error: Error message if success=False
-
-        Returns:
-            OrchestratorInstruction with next action
-        """
-        import json
-
-        metrics_pb = None
+        """Report agent execution result and get next instruction."""
+        body: Dict[str, Any] = {
+            "process_id": process_id,
+            "agent_name": agent_name,
+            "output": json.dumps(output) if output else "",
+            "success": success,
+            "error": error,
+        }
         if metrics:
-            metrics_pb = pb2.AgentExecutionMetrics(
-                llm_calls=metrics.llm_calls,
-                tool_calls=metrics.tool_calls,
-                tokens_in=metrics.tokens_in,
-                tokens_out=metrics.tokens_out,
-                duration_ms=metrics.duration_ms,
-            )
-
-        request = pb2.ReportAgentResultRequest(
-            process_id=process_id,
-            agent_name=agent_name,
-            output=json.dumps(output).encode('utf-8') if output else b'',
-            metrics=metrics_pb,
-            success=success,
-            error=error,
-        )
+            body["metrics"] = {
+                "llm_calls": metrics.llm_calls,
+                "tool_calls": metrics.tool_calls,
+                "tokens_in": metrics.tokens_in,
+                "tokens_out": metrics.tokens_out,
+                "duration_ms": metrics.duration_ms,
+            }
         try:
-            response = await self._orchestration_stub.ReportAgentResult(request)
-            return self._instruction_to_dataclass(response)
-        except grpc.RpcError as e:
-            if e.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
+            response = await self._transport.request("orchestration", "ReportAgentResult", body)
+            return self._dict_to_instruction(response)
+        except IpcError as e:
+            if e.code == "TIMEOUT":
                 logger.error(f"Deadline exceeded reporting agent result for {process_id}/{agent_name}")
-                raise KernelClientError(f"Request deadline exceeded") from e
+                raise KernelClientError("Request deadline exceeded") from e
             logger.error(f"Failed to report agent result for {process_id}/{agent_name}: {e}")
             raise KernelClientError(f"ReportAgentResult failed: {e}") from e
 
@@ -744,100 +487,18 @@ class KernelClient:
         self,
         process_id: str,
     ) -> OrchestrationSessionState:
-        """Get current orchestration session state.
-
-        Useful for debugging or recovery.
-
-        Args:
-            process_id: Process identifier
-
-        Returns:
-            OrchestrationSessionState with current state
-        """
-        request = pb2.GetSessionStateRequest(process_id=process_id)
+        """Get current orchestration session state."""
         try:
-            response = await self._orchestration_stub.GetSessionState(request)
-            return self._session_state_to_dataclass(response)
-        except grpc.RpcError as e:
-            if e.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
+            response = await self._transport.request(
+                "orchestration", "GetSessionState", {"process_id": process_id},
+            )
+            return self._dict_to_session_state(response)
+        except IpcError as e:
+            if e.code == "TIMEOUT":
                 logger.error(f"Deadline exceeded getting session state for {process_id}")
-                raise KernelClientError(f"Request deadline exceeded") from e
+                raise KernelClientError("Request deadline exceeded") from e
             logger.error(f"Failed to get session state for {process_id}: {e}")
             raise KernelClientError(f"GetSessionState failed: {e}") from e
-
-    def _instruction_to_dataclass(self, pb_instruction: pb2.Instruction) -> OrchestratorInstruction:
-        """Convert protobuf Instruction to dataclass."""
-        import json
-
-        kind_map = {
-            pb2.INSTRUCTION_KIND_UNSPECIFIED: "UNSPECIFIED",
-            pb2.RUN_AGENT: "RUN_AGENT",
-            pb2.TERMINATE: "TERMINATE",
-            pb2.WAIT_INTERRUPT: "WAIT_INTERRUPT",
-        }
-
-        agent_config = None
-        if pb_instruction.agent_config:
-            try:
-                agent_config = json.loads(pb_instruction.agent_config.decode('utf-8'))
-            except (json.JSONDecodeError, UnicodeDecodeError):
-                pass
-
-        envelope = None
-        if pb_instruction.envelope:
-            try:
-                envelope = json.loads(pb_instruction.envelope.decode('utf-8'))
-            except (json.JSONDecodeError, UnicodeDecodeError):
-                pass
-
-        interrupt = None
-        if pb_instruction.interrupt:
-            interrupt = {
-                "id": pb_instruction.interrupt.id,
-                "kind": pb2.InterruptKind.Name(pb_instruction.interrupt.kind),
-                "question": pb_instruction.interrupt.question,
-                "message": pb_instruction.interrupt.message,
-            }
-
-        terminal_reason = ""
-        if pb_instruction.terminal_reason:
-            terminal_reason = pb2.TerminalReason.Name(pb_instruction.terminal_reason)
-
-        return OrchestratorInstruction(
-            kind=kind_map.get(pb_instruction.kind, "UNSPECIFIED"),
-            agent_name=pb_instruction.agent_name,
-            agent_config=agent_config,
-            envelope=envelope,
-            terminal_reason=terminal_reason,
-            termination_message=pb_instruction.termination_message,
-            interrupt_pending=pb_instruction.interrupt_pending,
-            interrupt=interrupt,
-        )
-
-    def _session_state_to_dataclass(self, pb_state: pb2.SessionState) -> OrchestrationSessionState:
-        """Convert protobuf SessionState to dataclass."""
-        import json
-
-        envelope = None
-        if pb_state.envelope:
-            try:
-                envelope = json.loads(pb_state.envelope.decode('utf-8'))
-            except (json.JSONDecodeError, UnicodeDecodeError):
-                pass
-
-        terminal_reason = ""
-        if pb_state.terminal_reason:
-            terminal_reason = pb2.TerminalReason.Name(pb_state.terminal_reason)
-
-        return OrchestrationSessionState(
-            process_id=pb_state.process_id,
-            current_stage=pb_state.current_stage,
-            stage_order=list(pb_state.stage_order),
-            envelope=envelope,
-            edge_traversals=dict(pb_state.edge_traversals),
-            terminated=pb_state.terminated,
-            terminal_reason=terminal_reason,
-        )
 
     # =========================================================================
     # High-Level Convenience Methods
@@ -851,18 +512,13 @@ class KernelClient:
     ) -> Optional[str]:
         """Record an LLM call. Returns exceeded reason if quota exceeded."""
         try:
-            await self.record_usage(
-                pid=pid,
-                llm_calls=1,
-                tokens_in=tokens_in,
-                tokens_out=tokens_out,
-            )
+            await self.record_usage(pid=pid, llm_calls=1, tokens_in=tokens_in, tokens_out=tokens_out)
             result = await self.check_quota(pid)
             if not result.within_bounds:
                 return result.exceeded_reason
             return None
         except KernelClientError:
-            return None  # Silent failure for backward compatibility
+            return None
 
     async def record_tool_call(self, pid: str) -> Optional[str]:
         """Record a tool call. Returns exceeded reason if quota exceeded."""
@@ -896,44 +552,14 @@ class KernelClient:
         texts: list[str],
         embedding_fn: "Callable[[list[str]], list[list[float]]] | None" = None,
     ) -> list[list[float]]:
-        """Compute embeddings for multiple texts with kernel tracking.
-
-        Enforces quota before embedding and tracks usage. The actual embedding
-        computation is delegated to the provided embedding_fn.
-
-        Args:
-            pid: Process ID for quota tracking
-            texts: List of texts to embed
-            embedding_fn: Function that computes embeddings. Should accept a list
-                of strings and return a list of embedding vectors. If not provided,
-                raises KernelClientError.
-
-        Returns:
-            List of embedding vectors (one per input text)
-
-        Raises:
-            KernelClientError: If quota exceeded, embedding_fn not provided, or
-                embedding computation fails
-
-        Example:
-            # With EmbeddingService from capability memory services
-            embedding_service = EmbeddingService()
-            embeddings = await kernel_client.embed_batch(
-                pid="process-123",
-                texts=["hello", "world"],
-                embedding_fn=embedding_service.embed_batch,
-            )
-        """
+        """Compute embeddings for multiple texts with kernel tracking."""
         if not texts:
             return []
-
         if embedding_fn is None:
             raise KernelClientError(
                 "embedding_fn is required. Pass a function like "
                 "EmbeddingService().embed_batch to compute embeddings."
             )
-
-        # Delegate to provided embedding function
         try:
             return embedding_fn(texts)
         except Exception as e:
@@ -945,38 +571,12 @@ class KernelClient:
         text: str,
         embedding_fn: "Callable[[str], list[float]] | None" = None,
     ) -> list[float]:
-        """Compute embedding for a single text with kernel tracking.
-
-        Enforces quota before embedding and tracks usage.
-
-        Args:
-            pid: Process ID for quota tracking
-            text: Text to embed
-            embedding_fn: Function that computes embedding for a single string.
-                If not provided, raises KernelClientError.
-
-        Returns:
-            Embedding vector
-
-        Raises:
-            KernelClientError: If quota exceeded, embedding_fn not provided, or
-                embedding computation fails
-
-        Example:
-            embedding_service = EmbeddingService()
-            embedding = await kernel_client.embed(
-                pid="process-123",
-                text="hello world",
-                embedding_fn=embedding_service.embed,
-            )
-        """
+        """Compute embedding for a single text with kernel tracking."""
         if embedding_fn is None:
             raise KernelClientError(
                 "embedding_fn is required. Pass a function like "
                 "EmbeddingService().embed to compute embeddings."
             )
-
-        # Delegate to provided embedding function
         try:
             return embedding_fn(text)
         except Exception as e:
@@ -986,48 +586,80 @@ class KernelClient:
     # Internal Helpers
     # =========================================================================
 
-    async def _call_kernel(self, method_name: str, request: Any) -> Any:
-        """Call a KernelService method via the generated stub."""
-        method = getattr(self._kernel_stub, method_name, None)
-        if method is None:
-            raise KernelClientError(f"Unknown KernelService method: {method_name}")
-        return await method(request)
-
-    def _pcb_to_info(self, pcb: pb2.ProcessControlBlock) -> ProcessInfo:
-        """Convert ProcessControlBlock to ProcessInfo."""
-        state_names = {
-            pb2.PROCESS_STATE_UNSPECIFIED: "UNSPECIFIED",
-            pb2.PROCESS_STATE_NEW: "NEW",
-            pb2.PROCESS_STATE_READY: "READY",
-            pb2.PROCESS_STATE_RUNNING: "RUNNING",
-            pb2.PROCESS_STATE_WAITING: "WAITING",
-            pb2.PROCESS_STATE_BLOCKED: "BLOCKED",
-            pb2.PROCESS_STATE_TERMINATED: "TERMINATED",
-            pb2.PROCESS_STATE_ZOMBIE: "ZOMBIE",
-        }
-        priority_names = {
-            pb2.SCHEDULING_PRIORITY_UNSPECIFIED: "UNSPECIFIED",
-            pb2.SCHEDULING_PRIORITY_REALTIME: "REALTIME",
-            pb2.SCHEDULING_PRIORITY_HIGH: "HIGH",
-            pb2.SCHEDULING_PRIORITY_NORMAL: "NORMAL",
-            pb2.SCHEDULING_PRIORITY_LOW: "LOW",
-            pb2.SCHEDULING_PRIORITY_IDLE: "IDLE",
-        }
-
-        usage = pcb.usage if pcb.usage else pb2.ResourceUsage()
+    def _dict_to_process_info(self, d: Dict[str, Any]) -> ProcessInfo:
+        """Convert response dict to ProcessInfo."""
+        usage = d.get("usage", {})
         return ProcessInfo(
-            pid=pcb.pid,
-            request_id=pcb.request_id,
-            user_id=pcb.user_id,
-            session_id=pcb.session_id,
-            state=state_names.get(pcb.state, "UNKNOWN"),
-            priority=priority_names.get(pcb.priority, "NORMAL"),
-            llm_calls=usage.llm_calls,
-            tool_calls=usage.tool_calls,
-            agent_hops=usage.agent_hops,
-            tokens_in=usage.tokens_in,
-            tokens_out=usage.tokens_out,
-            current_stage=pcb.current_stage,
+            pid=d.get("pid", ""),
+            request_id=d.get("request_id", ""),
+            user_id=d.get("user_id", ""),
+            session_id=d.get("session_id", ""),
+            state=d.get("state", "UNKNOWN"),
+            priority=d.get("priority", "NORMAL"),
+            llm_calls=usage.get("llm_calls", 0),
+            tool_calls=usage.get("tool_calls", 0),
+            agent_hops=usage.get("agent_hops", 0),
+            tokens_in=usage.get("tokens_in", 0),
+            tokens_out=usage.get("tokens_out", 0),
+            current_stage=d.get("current_stage", ""),
+        )
+
+    def _dict_to_instruction(self, d: Dict[str, Any]) -> OrchestratorInstruction:
+        """Convert response dict to OrchestratorInstruction."""
+        agent_config = None
+        raw_config = d.get("agent_config")
+        if raw_config:
+            if isinstance(raw_config, str):
+                try:
+                    agent_config = json.loads(raw_config)
+                except json.JSONDecodeError:
+                    pass
+            elif isinstance(raw_config, dict):
+                agent_config = raw_config
+
+        envelope = None
+        raw_envelope = d.get("envelope")
+        if raw_envelope:
+            if isinstance(raw_envelope, str):
+                try:
+                    envelope = json.loads(raw_envelope)
+                except json.JSONDecodeError:
+                    pass
+            elif isinstance(raw_envelope, dict):
+                envelope = raw_envelope
+
+        return OrchestratorInstruction(
+            kind=d.get("kind", "UNSPECIFIED"),
+            agent_name=d.get("agent_name", ""),
+            agent_config=agent_config,
+            envelope=envelope,
+            terminal_reason=d.get("terminal_reason", ""),
+            termination_message=d.get("termination_message", ""),
+            interrupt_pending=d.get("interrupt_pending", False),
+            interrupt=d.get("interrupt"),
+        )
+
+    def _dict_to_session_state(self, d: Dict[str, Any]) -> OrchestrationSessionState:
+        """Convert response dict to OrchestrationSessionState."""
+        envelope = None
+        raw_envelope = d.get("envelope")
+        if raw_envelope:
+            if isinstance(raw_envelope, str):
+                try:
+                    envelope = json.loads(raw_envelope)
+                except json.JSONDecodeError:
+                    pass
+            elif isinstance(raw_envelope, dict):
+                envelope = raw_envelope
+
+        return OrchestrationSessionState(
+            process_id=d.get("process_id", ""),
+            current_stage=d.get("current_stage", ""),
+            stage_order=d.get("stage_order", []),
+            envelope=envelope,
+            edge_traversals=d.get("edge_traversals", {}),
+            terminated=d.get("terminated", False),
+            terminal_reason=d.get("terminal_reason", ""),
         )
 
 

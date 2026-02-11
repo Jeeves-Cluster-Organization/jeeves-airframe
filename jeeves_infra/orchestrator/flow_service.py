@@ -1,6 +1,6 @@
-"""FlowServicer - gRPC service for conversational flow orchestration.
+"""FlowServicer - service for conversational flow orchestration.
 
-Implements JeevesFlowServiceServicer to handle:
+Handles:
 - StartFlow: Stream events from capability servicer
 
 Session CRUD is owned by capability layer (e.g. chat_router.py + ChatService).
@@ -14,14 +14,7 @@ from __future__ import annotations
 
 import json
 import time
-from typing import Any, Dict, Optional
-
-try:
-    import grpc
-    from jeeves_infra.gateway.proto import jeeves_pb2, jeeves_pb2_grpc
-    _GRPC_AVAILABLE = True
-except ImportError:
-    _GRPC_AVAILABLE = False
+from typing import Any, AsyncIterator, Dict, Optional
 
 
 def _timestamp_ms() -> int:
@@ -29,14 +22,8 @@ def _timestamp_ms() -> int:
     return int(time.time() * 1000)
 
 
-if _GRPC_AVAILABLE:
-    _Base = jeeves_pb2_grpc.JeevesFlowServiceServicer
-else:
-    _Base = object
-
-
-class FlowServicer(_Base):
-    """gRPC servicer for conversational flow management."""
+class FlowServicer:
+    """Service for conversational flow management."""
 
     def __init__(
         self,
@@ -52,13 +39,24 @@ class FlowServicer(_Base):
     # StartFlow (server-streaming)
     # -----------------------------------------------------------------
 
-    async def StartFlow(self, request, context):
-        """Start a conversational flow, streaming events back."""
-        user_id = request.user_id
-        session_id = request.session_id
-        message = request.message
-        req_context = request.context
+    async def start_flow(
+        self,
+        user_id: str,
+        session_id: str,
+        message: str,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> AsyncIterator[Dict[str, Any]]:
+        """Start a conversational flow, streaming events back.
 
+        Args:
+            user_id: User identifier.
+            session_id: Session identifier.
+            message: User message text.
+            context: Optional request context dict.
+
+        Yields:
+            Event dicts from the capability servicer.
+        """
         if self._logger:
             self._logger.info(
                 "flow_started",
@@ -67,7 +65,7 @@ class FlowServicer(_Base):
             )
 
         async for event in self._servicer.process_request(
-            user_id, session_id, message, req_context
+            user_id, session_id, message, context
         ):
             yield event
 
@@ -75,19 +73,28 @@ class FlowServicer(_Base):
     # Helpers
     # -----------------------------------------------------------------
 
-    def _make_event(
-        self,
-        event_type: int,
+    @staticmethod
+    def make_event(
+        event_type: str,
         request_id: str,
         session_id: str,
         payload: Optional[Dict[str, Any]] = None,
-    ):
-        """Create a FlowEvent proto message."""
-        payload_bytes = json.dumps(payload or {}).encode("utf-8")
-        return jeeves_pb2.FlowEvent(
-            type=event_type,
-            request_id=request_id,
-            session_id=session_id,
-            payload=payload_bytes,
-            timestamp_ms=_timestamp_ms(),
-        )
+    ) -> Dict[str, Any]:
+        """Create a flow event dict.
+
+        Args:
+            event_type: Event type string (e.g. "response_ready").
+            request_id: Request identifier.
+            session_id: Session identifier.
+            payload: Optional event payload.
+
+        Returns:
+            Event dict.
+        """
+        return {
+            "type": event_type,
+            "request_id": request_id,
+            "session_id": session_id,
+            "payload": payload or {},
+            "timestamp_ms": _timestamp_ms(),
+        }

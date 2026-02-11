@@ -1,7 +1,7 @@
 """
 Jeeves Gateway - Main FastAPI Application.
 
-HTTP gateway that translates REST/SSE to internal gRPC services.
+HTTP gateway for REST/SSE endpoints.
 Capability-agnostic: discovers service identity via CapabilityResourceRegistry.
 
 Endpoints:
@@ -32,7 +32,6 @@ from fastapi import Request
 import json
 from prometheus_client import make_asgi_app
 
-from jeeves_infra.gateway.grpc_client import GrpcClientManager, set_grpc_client, get_grpc_client
 from jeeves_infra.gateway.websocket import (
     register_client,
     unregister_client,
@@ -40,7 +39,7 @@ from jeeves_infra.gateway.websocket import (
 )
 from jeeves_infra.logging import get_current_logger
 from jeeves_infra.protocols import get_capability_resource_registry
-from jeeves_infra.observability.tracing import init_tracing, instrument_fastapi, instrument_grpc_client, shutdown_tracing
+from jeeves_infra.observability.tracing import init_tracing, instrument_fastapi, shutdown_tracing
 
 
 def _get_service_identity() -> str:
@@ -78,7 +77,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     Application lifecycle manager.
 
     Handles:
-    - gRPC client connection to orchestrator
+    - Service initialization
     - Graceful shutdown
     """
     _logger = get_current_logger()
@@ -91,25 +90,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     jaeger_endpoint = os.getenv("JAEGER_ENDPOINT", "jaeger:4317")
     service_name = _get_service_identity() + "-gateway"
     init_tracing(service_name, jaeger_endpoint)
-    instrument_grpc_client()
     _logger.info("tracing_initialized", service=service_name, jaeger=jaeger_endpoint)
 
-    # Initialize gRPC client
-    client = GrpcClientManager(
-        orchestrator_host=config.orchestrator_host,
-        orchestrator_port=config.orchestrator_port,
-    )
-
     try:
-        await client.connect()
-        set_grpc_client(client)
-
-        # Store in app state for dependency injection
-        app.state.grpc_client = client
-
-        # Note: InterruptService is injected by the composition root (jeeves_infra.bootstrap)
-        # The gateway does not create it directly to maintain proper layer separation.
-        # If interrupt_service is not set, interrupt endpoints will return 503.
+        # Note: flow_servicer, health_servicer, session_service are injected
+        # by the composition root (jeeves_infra.bootstrap) via app.state.
+        # If not set, endpoints will return 503.
         if not hasattr(app.state, "interrupt_service"):
             _logger.warning("interrupt_service_not_configured",
                           hint="Interrupt endpoints will return 503 until service is injected")
@@ -126,9 +112,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         raise
 
     finally:
-        # Shutdown
         _logger.info("gateway_shutdown_initiated")
-        await client.disconnect()
         shutdown_tracing()
         _logger.info("gateway_shutdown_complete")
 
@@ -140,7 +124,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 _service_id = _get_service_identity()
 app = FastAPI(
     title=f"{_service_id.replace('_', ' ').title()} Gateway",
-    description="HTTP Gateway - translates REST/SSE to internal gRPC",
+    description="HTTP Gateway for REST/SSE endpoints",
     version="4.0.0",
     lifespan=lifespan,
 )
@@ -213,23 +197,24 @@ async def ready() -> JSONResponse:
     Readiness probe - can the gateway serve traffic?
 
     Checks:
-    - gRPC connection to orchestrator
+    - Service availability (flow_servicer, health_servicer)
     - InterruptService availability
     """
     checks = {
-        "orchestrator": "unknown",
+        "flow_service": "unknown",
         "interrupt_service": "unknown",
     }
 
+    # Check flow servicer
     try:
-        # Check gRPC client
-        client = get_grpc_client()
-        is_grpc_healthy = await client.health_check()
-        checks["orchestrator"] = "connected" if is_grpc_healthy else "disconnected"
+        if hasattr(app.state, "flow_servicer") and app.state.flow_servicer is not None:
+            checks["flow_service"] = "initialized"
+        else:
+            checks["flow_service"] = "not_initialized"
     except Exception as e:
-        checks["orchestrator"] = f"error: {str(e)}"
+        checks["flow_service"] = f"error: {str(e)}"
 
-    # Check InterruptService is initialized
+    # Check InterruptService
     try:
         if hasattr(app.state, "interrupt_service") and app.state.interrupt_service is not None:
             checks["interrupt_service"] = "initialized"
@@ -238,25 +223,12 @@ async def ready() -> JSONResponse:
     except Exception as e:
         checks["interrupt_service"] = f"error: {str(e)}"
 
-    # Determine overall status
-    all_ok = (
-        checks["orchestrator"] == "connected"
-        and checks["interrupt_service"] == "initialized"
-    )
+    all_ok = all(v == "initialized" for v in checks.values())
 
     if all_ok:
-        return JSONResponse({
-            "status": "ready",
-            **checks,
-        })
+        return JSONResponse({"status": "ready", **checks})
     else:
-        return JSONResponse(
-            status_code=503,
-            content={
-                "status": "not_ready",
-                **checks,
-            }
-        )
+        return JSONResponse(status_code=503, content={"status": "not_ready", **checks})
 
 
 @app.get("/")
