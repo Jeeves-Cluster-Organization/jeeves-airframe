@@ -23,7 +23,7 @@ router = APIRouter(prefix="/api/v1/governance", tags=["governance"])
 def get_tool_health_service() -> ToolHealthService:
     """Dependency injection for ToolHealthService.
 
-    Overridden by app_server.py at startup to inject the real instance.
+    Overridden by CapabilityResourceRegistry at startup to inject the real instance.
     """
     raise HTTPException(status_code=503, detail="Governance service not initialized")
 

@@ -45,8 +45,8 @@ if app_dir.exists() and str(app_dir) not in sys.path:
     sys.path.append(str(app_dir))
 
 # Import config for environment setup
-from tests.config.llm_config import LLAMASERVER_HOST, DEFAULT_MODEL
-from tests.config.markers import (
+from config.llm_config import LLAMASERVER_HOST, DEFAULT_MODEL
+from config.markers import (
     configure_markers,
     apply_skip_markers,
     setup_e2e_skip,
@@ -55,7 +55,6 @@ from tests.config.markers import (
 # Set environment defaults
 os.environ.setdefault("LLAMASERVER_HOST", LLAMASERVER_HOST)
 os.environ.setdefault("DEFAULT_MODEL", DEFAULT_MODEL)
-os.environ["DISABLE_TEMPERATURE"] = "false"
 
 
 # ============================================================
@@ -113,27 +112,27 @@ def pytest_runtest_setup(item):
 # ============================================================
 
 # Database fixtures
-from tests.fixtures.database import (
+from fixtures.database import (
     test_db,
     create_test_prerequisites,
     create_session_only,
 )
 
 # LLM fixtures
-from tests.fixtures.llm import (
+from fixtures.llm import (
     llm_provider,
     schema_path,
 )
 
 # Service fixtures
-from tests.fixtures.services import (
+from fixtures.services import (
     session_service,
     tool_health_service,
     tool_registry,
 )
 
 # Envelope and mock fixtures (mission system level - no app imports)
-from tests.fixtures.agents import (
+from fixtures.agents import (
     # Envelope fixtures
     envelope_factory,
     sample_envelope,

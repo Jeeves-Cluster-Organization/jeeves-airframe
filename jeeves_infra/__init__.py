@@ -5,17 +5,16 @@ and protocol-based plumbing for the jeeves-core microkernel. Concrete database
 implementations are owned by capabilities and registered via the backend registry.
 
 Sub-packages:
-- gateway/       - HTTP/WebSocket/gRPC translation (FastAPI)
+- gateway/       - HTTP/WebSocket/SSE translation (FastAPI)
 - llm/           - LLM providers (LiteLLM, OpenAI, Mock)
 - database/      - Protocol-based database factory and registry
 - redis/         - Distributed state backend
 - memory/        - Memory handlers, messages, tool metrics/health
 - runtime/       - Python agent/pipeline execution (LLM calls, tool execution)
 - config/        - Agent profiles, registry, constants
-- orchestrator/  - Event context, governance, flow, vertical service
+- orchestrator/  - Event context, governance, flow
 - events/        - Event bridge for kernel <-> gateway
 - services/      - Debug API
-- verticals/     - Generic vertical registry
 - utils/         - JSON repair, string helpers, prompt builder
 
 Top-level modules:

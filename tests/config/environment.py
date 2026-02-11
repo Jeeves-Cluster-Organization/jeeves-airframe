@@ -37,7 +37,7 @@ def is_running_in_ci() -> bool:
 # ============================================================
 
 # Database backend
-TEST_DATABASE_BACKEND: str = os.getenv("TEST_DATABASE_BACKEND", "postgres")
+TEST_DATABASE_BACKEND: str = os.getenv("TEST_DATABASE_BACKEND", "sqlite")
 
 # Database connection with sensible defaults
 # Override via env vars: DB_HOST, DB_PORT, etc.

@@ -70,7 +70,7 @@ class EventOrchestrator:
     Unified orchestrator for all event operations.
 
     Provides single facade over:
-    - EventEmitter (real-time streaming via gRPC to gateway)
+    - EventEmitter (real-time streaming via IPC to gateway)
     - EventContext (unified emission context)
     - EventEmitter (domain event persistence)
 
@@ -78,7 +78,7 @@ class EventOrchestrator:
 
     Event Flow Architecture:
     - Orchestrator emits to EventEmitter (in-memory queue)
-    - Events streamed via gRPC to Gateway
+    - Events streamed via IPC to Gateway
     - Gateway converts to Event and broadcasts to WebSocket clients
     - NO direct gateway_event_bus injection (orchestrator and gateway are separate processes)
 
@@ -153,10 +153,10 @@ class EventOrchestrator:
         Emit agent started event.
 
         Emission:
-        1. Real-time queue (AgentEvent) -> gRPC stream -> Gateway
+        1. Real-time queue (AgentEvent) -> IPC stream -> Gateway
         2. Domain persistence (if enabled)
 
-        Note: Gateway receives events via gRPC and converts to Event.
+        Note: Gateway receives events via IPC and converts to Event.
         No direct gateway_event_bus injection needed (cross-process).
         """
         self._ensure_initialized()
@@ -173,10 +173,10 @@ class EventOrchestrator:
         Emit agent completed event.
 
         Emission:
-        1. Real-time queue (AgentEvent) -> gRPC stream -> Gateway
+        1. Real-time queue (AgentEvent) -> IPC stream -> Gateway
         2. Domain persistence (if enabled)
 
-        Note: Gateway receives events via gRPC and converts to Event.
+        Note: Gateway receives events via IPC and converts to Event.
         No direct gateway_event_bus injection needed (cross-process).
         """
         self._ensure_initialized()
@@ -317,7 +317,7 @@ class EventOrchestrator:
         """
         Iterate over emitted real-time events.
 
-        Use this in gRPC servicer to stream events to frontend.
+        Use this in IPC servicer to stream events to frontend.
 
         Yields:
             AgentEvent instances as they are emitted
@@ -372,7 +372,7 @@ def create_event_orchestrator(
     """
     Factory function to create an EventOrchestrator.
 
-    Events flow: Orchestrator -> gRPC -> Gateway -> WebSocket
+    Events flow: Orchestrator -> IPC -> Gateway -> WebSocket
     No direct gateway injection (separate processes).
 
     Args:

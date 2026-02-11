@@ -101,27 +101,15 @@ class FeatureFlags(BaseSettings):
     """Runtime toggles for new features across implementation phases.
 
     All flags default to False (disabled) for safety. Enable via environment
-    variables (FEATURE_USE_LLM_GATEWAY=true) or in .env file.
+    variables (FEATURE_USE_REDIS_STATE=true) or in .env file.
 
     Phase ownership:
-    - Phase 1: use_llm_gateway, use_redis_state
-    - Phase 2: use_graph_engine, enable_checkpoints
-    - Phase 3: enable_distributed_mode, enable_node_discovery
+    - Phase 1: use_redis_state
+    - Phase 3: enable_distributed_mode
     - Phase 4: enable_tracing, enable_metrics_export
     """
 
-    # Phase 1: LLM Gateway + Redis State
-    use_llm_gateway: bool = False
-    """Enable unified LLM gateway with cost tracking and provider fallback.
-
-    When enabled:
-    - All LLM calls route through gateway.LLMGateway
-    - Cost tracking per request (tokens, latency, cost_usd)
-    - Automatic fallback between providers on failure
-
-    Rollback: Set to False to use direct provider calls
-    """
-
+    # Phase 1: Redis State
     use_redis_state: bool = False
     """Enable Redis for shared state (rate limiting, locks, cache).
 
@@ -132,30 +120,6 @@ class FeatureFlags(BaseSettings):
 
     Requires: REDIS_URL environment variable
     Rollback: Set to False to use in-memory state
-    """
-
-    # Phase 2: Graph-Based Workflow Engine
-    use_graph_engine: bool = False
-    """Enable graph-based workflow execution instead of linear pipeline.
-
-    When enabled:
-    - Orchestrator uses WorkflowEngine with graph definition
-    - Conditional routing based on confidence scores
-    - Support for pause/resume workflows
-
-    Rollback: Set to False to use linear pipeline
-    """
-
-    enable_checkpoints: bool = False
-    """Enable workflow state persistence for pause/resume.
-
-    When enabled:
-    - State saved to execution_checkpoints table after each step
-    - Can restart server and resume in-flight workflows
-    - Human-in-the-loop support at any graph node
-
-    Requires: use_graph_engine=True
-    Rollback: Set to False to run workflows to completion
     """
 
     # Phase 3: LAN Deployment + Node Registry
@@ -169,18 +133,6 @@ class FeatureFlags(BaseSettings):
 
     Requires: REDIS_URL for node coordination
     Rollback: Set to False to use single-node mode
-    """
-
-    enable_node_discovery: bool = False
-    """Enable automatic GPU node discovery and health monitoring.
-
-    When enabled:
-    - Node agents report capabilities via heartbeat
-    - TTL-based health tracking (nodes expire after 60s)
-    - Dynamic routing based on current load
-
-    Requires: enable_distributed_mode=True
-    Rollback: Set to False for static node configuration
     """
 
     # Phase 4: Observability + Production Hardening
@@ -367,15 +319,10 @@ class FeatureFlags(BaseSettings):
         """
         logger.info(
             "feature_flags_status",
-            # Phase 1 - LLM Gateway + Redis
-            use_llm_gateway=self.use_llm_gateway,
+            # Phase 1 - Redis State
             use_redis_state=self.use_redis_state,
-            # Phase 2 - Graph Workflow
-            use_graph_engine=self.use_graph_engine,
-            enable_checkpoints=self.enable_checkpoints,
             # Phase 3 - Distributed Mode
             enable_distributed_mode=self.enable_distributed_mode,
-            enable_node_discovery=self.enable_node_discovery,
             # Phase 4 - Observability
             enable_tracing=self.enable_tracing,
             enable_metrics_export=self.enable_metrics_export,
@@ -397,16 +344,6 @@ class FeatureFlags(BaseSettings):
             List of validation errors (empty if all valid)
         """
         errors = []
-
-        if self.enable_checkpoints and not self.use_graph_engine:
-            errors.append(
-                "enable_checkpoints requires use_graph_engine=True"
-            )
-
-        if self.enable_node_discovery and not self.enable_distributed_mode:
-            errors.append(
-                "enable_node_discovery requires enable_distributed_mode=True"
-            )
 
         if self.enable_distributed_mode and not self.use_redis_state:
             errors.append(

@@ -22,12 +22,13 @@ Usage:
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Callable, Optional, TYPE_CHECKING
 
 from jeeves_infra.protocols import (
     AppContextProtocol,
     ClockProtocol,
     ConfigRegistryProtocol,
+    DatabaseClientProtocol,
     FeatureFlagsProtocol,
     LLMProviderProtocol,
     LoggerProtocol,
@@ -76,7 +77,6 @@ class AppContext:
         config_registry: Configuration registry (implements ConfigRegistryProtocol)
         core_config: Core runtime configuration (bounds, timeouts, etc.)
         orchestration_flags: Orchestration feature flags
-        vertical_registry: Registry of registered capability verticals
 
     Usage:
         # In composition root
@@ -108,11 +108,20 @@ class AppContext:
     # Core configuration (previously global state in protocols)
     core_config: ExecutionConfig = field(default_factory=ExecutionConfig)
     orchestration_flags: OrchestrationFlags = field(default_factory=OrchestrationFlags)
-    vertical_registry: Dict[str, bool] = field(default_factory=dict)
 
     # Kernel Client - IPC client to Rust kernel for orchestration (TCP+msgpack)
     # Uses string annotation for TYPE_CHECKING-only import (layer extraction support)
     kernel_client: "KernelClient" = None  # type: ignore[assignment]  # Set by bootstrap, never None at runtime
+
+    # Tool health service — auto-wired into ToolExecutionCore for metric recording
+    tool_health_service: Optional[Any] = None
+
+    # Database client — capability-owned, wired via bootstrap or gateway lifespan
+    db: Optional[DatabaseClientProtocol] = None
+
+    # Redis wiring prep — populated when scaling beyond single-node
+    state_backend: Optional[Any] = None
+    distributed_bus: Optional[Any] = None
 
     # Optional request-scoped context
     request_id: Optional[str] = None
@@ -148,30 +157,15 @@ class AppContext:
             llm_provider_factory=self.llm_provider_factory,
             core_config=self.core_config,
             orchestration_flags=self.orchestration_flags,
-            vertical_registry=self.vertical_registry,
             kernel_client=self.kernel_client,
+            tool_health_service=self.tool_health_service,
+            db=self.db,
+            state_backend=self.state_backend,
+            distributed_bus=self.distributed_bus,
             request_id=request_id,
             envelope_id=envelope_id,
             user_id=user_id,
         )
-
-    # ─── Vertical Registry Operations ───
-
-    def register_vertical(self, vertical_id: str) -> None:
-        """Register a vertical as available."""
-        self.vertical_registry[vertical_id] = True
-
-    def unregister_vertical(self, vertical_id: str) -> None:
-        """Unregister a vertical."""
-        self.vertical_registry.pop(vertical_id, None)
-
-    def is_vertical_registered(self, vertical_id: str) -> bool:
-        """Check if a vertical is registered."""
-        return self.vertical_registry.get(vertical_id, False)
-
-    def list_registered_verticals(self) -> List[str]:
-        """List all registered verticals."""
-        return list(self.vertical_registry.keys())
 
     # ─── Config Accessors ───
 

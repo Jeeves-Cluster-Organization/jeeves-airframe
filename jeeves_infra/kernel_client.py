@@ -105,6 +105,40 @@ class OrchestrationSessionState:
     terminal_reason: str = ""
 
 
+@dataclass
+class QuotaDefaults:
+    """Kernel's default resource quota."""
+    max_llm_calls: int = 100
+    max_tool_calls: int = 50
+    max_agent_hops: int = 10
+    max_iterations: int = 20
+    timeout_seconds: int = 300
+    soft_timeout_seconds: int = 240
+    max_input_tokens: int = 100_000
+    max_output_tokens: int = 50_000
+    max_context_tokens: int = 150_000
+    rate_limit_rpm: int = 60
+    rate_limit_rph: int = 1000
+    rate_limit_burst: int = 10
+    max_inference_requests: int = 50
+    max_inference_input_chars: int = 500_000
+
+
+@dataclass
+class SystemStatusResult:
+    """Full system status snapshot from the kernel."""
+    processes_total: int = 0
+    processes_by_state: Dict[str, int] = field(default_factory=dict)
+    services_healthy: int = 0
+    services_degraded: int = 0
+    services_unhealthy: int = 0
+    active_orchestration_sessions: int = 0
+    commbus_events_published: int = 0
+    commbus_commands_sent: int = 0
+    commbus_queries_executed: int = 0
+    commbus_active_subscribers: int = 0
+
+
 class KernelClient:
     """Async IPC client for the Rust kernel.
 
@@ -329,6 +363,64 @@ class KernelClient:
         except IpcError as e:
             logger.error(f"Failed to check rate limit for {user_id}: {e}")
             raise KernelClientError(f"CheckRateLimit failed: {e}") from e
+
+    # =========================================================================
+    # Quota Defaults (Single Source of Truth)
+    # =========================================================================
+
+    async def set_quota_defaults(self, **overrides: int) -> QuotaDefaults:
+        """Set (merge) kernel default quota. Only non-zero fields overwrite.
+
+        Args:
+            **overrides: Quota fields to override (e.g. max_llm_calls=200).
+
+        Returns:
+            The merged QuotaDefaults now active in the kernel.
+        """
+        body = {"quota": {k: v for k, v in overrides.items() if v is not None}}
+        try:
+            response = await self._transport.request("kernel", "SetQuotaDefaults", body)
+            return self._dict_to_quota_defaults(response)
+        except IpcError as e:
+            logger.error(f"Failed to set quota defaults: {e}")
+            raise KernelClientError(f"SetQuotaDefaults failed: {e}") from e
+
+    async def get_quota_defaults(self) -> QuotaDefaults:
+        """Get the kernel's current default quota."""
+        try:
+            response = await self._transport.request("kernel", "GetQuotaDefaults", {})
+            return self._dict_to_quota_defaults(response)
+        except IpcError as e:
+            logger.error(f"Failed to get quota defaults: {e}")
+            raise KernelClientError(f"GetQuotaDefaults failed: {e}") from e
+
+    # =========================================================================
+    # System Status
+    # =========================================================================
+
+    async def get_system_status(self) -> SystemStatusResult:
+        """Get full system status snapshot from the kernel."""
+        try:
+            response = await self._transport.request("kernel", "GetSystemStatus", {})
+            procs = response.get("processes", {})
+            svcs = response.get("services", {})
+            orch = response.get("orchestration", {})
+            cb = response.get("commbus", {})
+            return SystemStatusResult(
+                processes_total=procs.get("total", 0),
+                processes_by_state=dict(procs.get("by_state", {})),
+                services_healthy=svcs.get("healthy", 0),
+                services_degraded=svcs.get("degraded", 0),
+                services_unhealthy=svcs.get("unhealthy", 0),
+                active_orchestration_sessions=orch.get("active_sessions", 0),
+                commbus_events_published=cb.get("events_published", 0),
+                commbus_commands_sent=cb.get("commands_sent", 0),
+                commbus_queries_executed=cb.get("queries_executed", 0),
+                commbus_active_subscribers=cb.get("active_subscribers", 0),
+            )
+        except IpcError as e:
+            logger.error(f"Failed to get system status: {e}")
+            raise KernelClientError(f"GetSystemStatus failed: {e}") from e
 
     # =========================================================================
     # Queries (KernelService)
@@ -604,6 +696,25 @@ class KernelClient:
             current_stage=d.get("current_stage", ""),
         )
 
+    def _dict_to_quota_defaults(self, d: Dict[str, Any]) -> QuotaDefaults:
+        """Convert response dict to QuotaDefaults."""
+        return QuotaDefaults(
+            max_llm_calls=d.get("max_llm_calls", 100),
+            max_tool_calls=d.get("max_tool_calls", 50),
+            max_agent_hops=d.get("max_agent_hops", 10),
+            max_iterations=d.get("max_iterations", 20),
+            timeout_seconds=d.get("timeout_seconds", 300),
+            soft_timeout_seconds=d.get("soft_timeout_seconds", 240),
+            max_input_tokens=d.get("max_input_tokens", 100_000),
+            max_output_tokens=d.get("max_output_tokens", 50_000),
+            max_context_tokens=d.get("max_context_tokens", 150_000),
+            rate_limit_rpm=d.get("rate_limit_rpm", 60),
+            rate_limit_rph=d.get("rate_limit_rph", 1000),
+            rate_limit_burst=d.get("rate_limit_burst", 10),
+            max_inference_requests=d.get("max_inference_requests", 50),
+            max_inference_input_chars=d.get("max_inference_input_chars", 500_000),
+        )
+
     def _dict_to_instruction(self, d: Dict[str, Any]) -> OrchestratorInstruction:
         """Convert response dict to OrchestratorInstruction."""
         agent_config = None
@@ -672,6 +783,8 @@ __all__ = [
     "KernelClient",
     "KernelClientError",
     "QuotaCheckResult",
+    "QuotaDefaults",
+    "SystemStatusResult",
     "ProcessInfo",
     "AgentExecutionMetrics",
     "OrchestratorInstruction",

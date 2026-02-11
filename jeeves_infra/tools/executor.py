@@ -47,14 +47,22 @@ class ToolExecutionCore:
     - Prevents cascade failures from invalid parameters
     """
 
-    def __init__(self, logger: Optional[LoggerProtocol] = None):
-        """Initialize with optional logger.
+    def __init__(
+        self,
+        logger: Optional[LoggerProtocol] = None,
+        tool_health_service: Optional[Any] = None,
+    ):
+        """Initialize with optional logger and tool health service.
 
         Args:
             logger: Optional LoggerProtocol for structured logging.
                     If None, logging is skipped (useful for tests).
+            tool_health_service: Optional ToolHealthService for auto-recording
+                    execution metrics. If provided, every tool execution is
+                    automatically recorded.
         """
         self._logger = logger
+        self._tool_health_service = tool_health_service
 
     def validate_params(
         self,
@@ -140,7 +148,7 @@ class ToolExecutionCore:
         parameter_schemas: Optional[Dict[str, Any]] = None,
         tool_name: str = "unknown",
     ) -> Dict[str, Any]:
-        """Execute a tool function with validation, filtering, and timing.
+        """Execute a tool function with validation, filtering, timing, and health recording.
 
         This is the main entry point for pure tool execution.
 
@@ -168,20 +176,24 @@ class ToolExecutionCore:
                         tool=tool_name,
                         errors=validation_errors,
                     )
-                return {
+                result = {
                     "status": "error",
                     "error": f"Parameter validation failed: {'; '.join(validation_errors)}",
                     "error_type": "validation_error",
                     "validation_errors": validation_errors,
                     "execution_time_ms": int((time.perf_counter() - start_time) * 1000),
                 }
+                await self._record_health(tool_name, result)
+                return result
 
             # Step 3: Execute
-            result = await tool_function(**filtered_params)
+            raw_result = await tool_function(**filtered_params)
             execution_time_ms = int((time.perf_counter() - start_time) * 1000)
 
             # Step 4: Normalize result
-            return self.normalize_result(result, execution_time_ms)
+            result = self.normalize_result(raw_result, execution_time_ms)
+            await self._record_health(tool_name, result)
+            return result
 
         except TypeError as e:
             # Parameter binding errors (missing required args, unexpected kwargs)
@@ -192,12 +204,14 @@ class ToolExecutionCore:
                     tool=tool_name,
                     error=error_msg,
                 )
-            return {
+            result = {
                 "status": "error",
                 "error": f"Parameter error: {error_msg}",
                 "error_type": "parameter_error",
                 "execution_time_ms": int((time.perf_counter() - start_time) * 1000),
             }
+            await self._record_health(tool_name, result)
+            return result
         except Exception as e:
             error_type = type(e).__name__
             if self._logger:
@@ -207,12 +221,32 @@ class ToolExecutionCore:
                     error_type=error_type,
                     error=str(e),
                 )
-            return {
+            result = {
                 "status": "error",
                 "error": str(e),
                 "error_type": error_type,
                 "execution_time_ms": int((time.perf_counter() - start_time) * 1000),
             }
+            await self._record_health(tool_name, result)
+            return result
+
+    async def _record_health(self, tool_name: str, result: Dict[str, Any]) -> None:
+        """Record tool execution to ToolHealthService if available."""
+        if not self._tool_health_service:
+            return
+        try:
+            await self._tool_health_service.record_execution(
+                tool_name=tool_name,
+                user_id="system",
+                status=result.get("status", "success"),
+                execution_time_ms=result.get("execution_time_ms", 0),
+                error_type=result.get("error_type"),
+                error_message=result.get("error"),
+            )
+        except Exception:
+            # Never let health recording break tool execution
+            if self._logger:
+                self._logger.debug("tool_health_record_failed", tool=tool_name)
 
 
 __all__ = ["ToolExecutionCore"]

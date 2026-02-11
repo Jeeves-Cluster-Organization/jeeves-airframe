@@ -4,11 +4,8 @@ Implements DatabaseClientProtocol using aiosqlite with :memory: databases.
 No SQLAlchemy, no connection pools, no containers.
 """
 
-import json
 import re
-import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime, date
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -61,18 +58,16 @@ class SQLiteClient:
         return [dict(r) for r in rows]
 
     async def insert(self, table: str, data: Dict[str, Any]) -> None:
-        processed = {k: self._serialize_value(v) for k, v in data.items()}
-        cols = ", ".join(processed.keys())
-        placeholders = ", ".join(f":{k}" for k in processed.keys())
+        cols = ", ".join(data.keys())
+        placeholders = ", ".join(f":{k}" for k in data.keys())
         query = f"INSERT INTO {table} ({cols}) VALUES ({placeholders})"
-        await self._db.execute(query, processed)
+        await self._db.execute(query, data)
         if not self._in_transaction:
             await self._db.commit()
 
     async def update(self, table: str, data: Dict[str, Any], where_clause: str, where_params=None) -> int:
-        processed = {k: self._serialize_value(v) for k, v in data.items()}
-        set_clause = ", ".join(f"{k} = :_set_{k}" for k in processed.keys())
-        params = {f"_set_{k}": v for k, v in processed.items()}
+        set_clause = ", ".join(f"{k} = :_set_{k}" for k in data.keys())
+        params = {f"_set_{k}": v for k, v in data.items()}
 
         # Convert ? placeholders in where_clause to named params
         if where_params and isinstance(where_params, (list, tuple)):
@@ -83,7 +78,7 @@ class SQLiteClient:
                 return f":{name}"
             named_where = re.sub(r'\?', _replacer, where_clause)
             for i, val in enumerate(where_params):
-                params[f"_w{i}"] = self._serialize_value(val)
+                params[f"_w{i}"] = val
         else:
             named_where = where_clause
 
@@ -92,6 +87,18 @@ class SQLiteClient:
         if not self._in_transaction:
             await self._db.commit()
         return cursor.rowcount
+
+    async def upsert(self, table: str, data: Dict[str, Any], key_columns: List[str]) -> None:
+        cols = ", ".join(data.keys())
+        placeholders = ", ".join(f":{k}" for k in data.keys())
+        update_cols = [k for k in data.keys() if k not in key_columns]
+        set_clause = ", ".join(f"{k} = EXCLUDED.{k}" for k in update_cols)
+        query = f"INSERT INTO {table} ({cols}) VALUES ({placeholders})"
+        if set_clause:
+            query += f" ON CONFLICT ({', '.join(key_columns)}) DO UPDATE SET {set_clause}"
+        await self._db.execute(query, data)
+        if not self._in_transaction:
+            await self._db.commit()
 
     @asynccontextmanager
     async def transaction(self):
@@ -111,13 +118,6 @@ class SQLiteClient:
         sql = Path(schema_path).read_text(encoding="utf-8")
         await self._db.executescript(sql)
 
-    @staticmethod
-    def from_json(value):
-        """Parse JSON string to Python object. No-op if already parsed."""
-        if isinstance(value, str):
-            return json.loads(value)
-        return value
-
     # -- internals --
 
     def _convert_params(self, query, params):
@@ -126,15 +126,3 @@ class SQLiteClient:
         if isinstance(params, dict):
             return query, params
         return query, list(params)
-
-    @staticmethod
-    def _serialize_value(value: Any) -> Any:
-        if isinstance(value, uuid.UUID):
-            return str(value)
-        if isinstance(value, (dict, list)):
-            return json.dumps(value, default=str)
-        if isinstance(value, datetime):
-            return value.isoformat()
-        if isinstance(value, date):
-            return value.isoformat()
-        return value

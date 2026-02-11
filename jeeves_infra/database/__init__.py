@@ -1,17 +1,11 @@
-"""Database infrastructure - protocols and factory.
+"""Database infrastructure - protocol and utilities.
 
-Concrete implementations are owned by capabilities
-and registered via the backend registry at startup.
-
-This module provides:
-- DatabaseClientProtocol (interface)
-- create_database_client (factory that uses registry)
+Concrete implementations are owned by capabilities.
+Airframe provides only the protocol interface.
 """
 
 from jeeves_infra.database.client import DatabaseClientProtocol
-from jeeves_infra.database.factory import create_database_client
 
 __all__ = [
     "DatabaseClientProtocol",
-    "create_database_client",
 ]

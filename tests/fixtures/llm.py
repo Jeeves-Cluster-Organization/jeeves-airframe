@@ -62,7 +62,7 @@ def llm_provider():
         pytest.fail(
             "LLM provider not available. "
             "Per LLAMASERVER_ALWAYS policy, ensure llama-server is running:\n"
-            "  docker-compose up -d llama-server\n"
+            "  start llama-server\n"
             "See docs/architecture/ENGINEERING_IMPROVEMENT_PLAN.md"
         )
 

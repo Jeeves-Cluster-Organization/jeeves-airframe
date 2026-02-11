@@ -108,7 +108,7 @@ class PipelineWorker:
         """Initialize the pipeline worker.
 
         Args:
-            kernel_client: Connected KernelClient for gRPC calls
+            kernel_client: Connected KernelClient for IPC calls
             agents: Dict mapping agent names to Agent instances
             logger: Optional logger for structured logging
             persistence: Optional persistence layer for state saving
@@ -324,7 +324,7 @@ class PipelineWorker:
                 # Persist state if configured
                 if self._persistence and thread_id:
                     try:
-                        await self._persistence.save_state(thread_id, envelope.to_dict())
+                        await self._persistence.save_state(thread_id, envelope.to_state_dict())
                     except Exception as e:
                         self._logger.warning("worker_persistence_failed", error=str(e))
 
@@ -476,7 +476,7 @@ class PipelineWorker:
 
                 if self._persistence and thread_id:
                     try:
-                        await self._persistence.save_state(thread_id, envelope.to_dict())
+                        await self._persistence.save_state(thread_id, envelope.to_state_dict())
                     except Exception:
                         pass
 

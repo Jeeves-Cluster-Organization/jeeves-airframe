@@ -1,42 +1,15 @@
 """Database client module.
 
-Provides protocol-based database access via registry pattern.
-Database client protocol re-exports.
+Re-exports DatabaseClientProtocol and JSON utilities.
+Concrete implementations are owned by capabilities (e.g. SQLiteClient).
 
 Constitutional Reference:
 - jeeves_infra.protocols: DatabaseClientProtocol definition
 - Constitution R4: Swappable Implementations
-- Constitution R6: Database Backend Registry
-- Database Decoupling Audit (Option B)
-
-Usage:
-    from jeeves_infra.database.client import (
-        DatabaseClientProtocol,
-        create_database_client,
-    )
-
-    # Create client
-    client = await create_database_client(settings)
-    await client.connect()
-
-    # Use client
-    result = await client.fetch_one("SELECT * FROM users WHERE id = :id", {"id": 1})
-
-    # Cleanup
-    await client.disconnect()
 """
 
 # Re-export protocol from canonical location
-from jeeves_infra.protocols import DatabaseClientProtocol, VectorStorageProtocol
-
-# Re-export registry functions
-from jeeves_infra.database.registry import (
-    create_database_client,
-    register_backend,
-    unregister_backend,
-    list_backends,
-    is_backend_registered,
-)
+from jeeves_infra.protocols import DatabaseClientProtocol
 
 # Re-export JSON utilities from centralized location
 from jeeves_infra.utils.serialization import (
@@ -47,17 +20,7 @@ from jeeves_infra.utils.serialization import (
 
 
 __all__ = [
-    # Protocols (from jeeves_infra.protocols)
     "DatabaseClientProtocol",
-    "VectorStorageProtocol",
-    # Factory (from registry)
-    "create_database_client",
-    # Registry functions
-    "register_backend",
-    "unregister_backend",
-    "list_backends",
-    "is_backend_registered",
-    # JSON utilities
     "JSONEncoderWithUUID",
     "to_json",
     "from_json",

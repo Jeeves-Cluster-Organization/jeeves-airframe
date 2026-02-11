@@ -37,7 +37,6 @@ from jeeves_infra.protocols import (
 )
 from jeeves_infra.logging import create_logger
 from jeeves_infra.settings import Settings, get_settings
-from jeeves_infra.database.client import DatabaseClientProtocol
 
 
 # =============================================================================
@@ -303,16 +302,3 @@ def create_tool_executor(
     return ToolExecutor(registry)
 
 
-async def get_database_client(settings: Optional[Settings] = None) -> DatabaseClientProtocol:
-    """Get a DatabaseClient instance.
-
-    Args:
-        settings: Application settings. If None, uses get_settings().
-
-    Returns:
-        DatabaseClientProtocol implementing PersistenceProtocol
-    """
-    from jeeves_infra.database.factory import create_database_client
-    if settings is None:
-        settings = get_settings()
-    return await create_database_client(settings)

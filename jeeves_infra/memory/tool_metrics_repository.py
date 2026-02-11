@@ -20,7 +20,6 @@ import json
 
 from jeeves_infra.utils.logging import get_component_logger
 from jeeves_infra.utils.serialization import parse_datetime
-from jeeves_infra.utils.uuid_utils import uuid_str, uuid_read
 from jeeves_infra.protocols import LoggerProtocol, DatabaseClientProtocol
 
 
@@ -131,11 +130,11 @@ class ToolMetricsRepository:
     # The authoritative schema is in the capability schema files
     CREATE_TABLE_SQL = """
         CREATE TABLE IF NOT EXISTS tool_metrics (
-            metric_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            metric_id TEXT PRIMARY KEY,
             tool_name TEXT NOT NULL,
             user_id TEXT NOT NULL,
-            session_id UUID,
-            request_id UUID,
+            session_id TEXT,
+            request_id TEXT,
             status TEXT NOT NULL DEFAULT 'success',
             execution_time_ms INTEGER DEFAULT 0,
             error_type TEXT,
@@ -144,7 +143,7 @@ class ToolMetricsRepository:
             input_size INTEGER DEFAULT 0,
             output_size INTEGER DEFAULT 0,
             metadata TEXT,
-            recorded_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+            recorded_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
     """
 
@@ -412,10 +411,7 @@ class ToolMetricsRepository:
         return 0
 
     def _row_to_metric(self, row: Dict[str, Any]) -> ToolMetric:
-        """Convert database row to ToolMetric.
-
-        Uses centralized uuid_str from common/uuid_utils for UUID conversion.
-        """
+        """Convert database row to ToolMetric."""
         metadata = row.get("metadata")
         if isinstance(metadata, str):
             metadata = json.loads(metadata) if metadata else {}
@@ -423,11 +419,11 @@ class ToolMetricsRepository:
         recorded_at = parse_datetime(row.get("recorded_at"))
 
         return ToolMetric(
-            metric_id=uuid_read(row["metric_id"]),
+            metric_id=row["metric_id"],
             tool_name=row["tool_name"],
-            user_id=uuid_read(row["user_id"]),
-            session_id=uuid_read(row.get("session_id")),
-            request_id=uuid_read(row.get("request_id")),
+            user_id=row["user_id"],
+            session_id=row.get("session_id"),
+            request_id=row.get("request_id"),
             status=row.get("status", "success"),
             execution_time_ms=row.get("execution_time_ms", 0),
             error_type=row.get("error_type"),

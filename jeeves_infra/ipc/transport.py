@@ -1,7 +1,6 @@
 """Async TCP transport for kernel IPC.
 
-Replaces grpc.aio.Channel. Manages a persistent TCP connection
-with length-prefixed msgpack framing.
+Manages a persistent TCP connection with msgpack framing.
 """
 
 from __future__ import annotations

@@ -65,9 +65,6 @@ class Settings(BaseSettings):
     # Default temperature (used when capability doesn't specify)
     default_temperature: Optional[float] = 0.3
 
-    # Temperature feature toggle
-    disable_temperature: bool = False
-
     # OpenAI API Configuration
     openai_api_key: Optional[str] = None
 
@@ -153,23 +150,6 @@ class Settings(BaseSettings):
     # CHAT UI INTEGRATION
     # =========================================================================
     chat_enabled: bool = True
-
-    # =========================================================================
-    # DATABASE CONFIGURATION
-    # =========================================================================
-    db_host: str = "localhost"
-    db_port: int = Field(default=5432, ge=1, le=65535)
-    db_name: str = "assistant"
-    db_user: str = "assistant"
-    db_password: str = ""
-    db_pool_size: int = Field(default=20, ge=1, le=100)
-    db_max_overflow: int = Field(default=10, ge=0, le=100)
-    db_pool_timeout: int = Field(default=30, ge=1, le=300)
-    db_pool_recycle: int = Field(default=3600, ge=60, le=86400)
-
-    # Backend identifiers (set by capability via env: DATABASE_BACKEND, VECTOR_BACKEND)
-    database_backend: str = "sqlite"
-    vector_backend: str = ""
 
     # =========================================================================
     # REDIS CONFIGURATION (for distributed mode)

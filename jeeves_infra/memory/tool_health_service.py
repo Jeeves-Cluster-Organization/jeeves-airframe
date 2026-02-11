@@ -456,11 +456,11 @@ class ToolHealthService:
 
     async def get_health_summary(self) -> Dict[str, Any]:
         """
-        Get health summary formatted for gRPC service.
+        Get health summary formatted for IPC/HTTP service.
 
         Returns:
             Dictionary with per-tool health data suitable for
-            the GovernanceService gRPC endpoint.
+            the GovernanceService IPC/HTTP endpoint.
         """
         system_report = await self.check_all_tools_health(period_hours=24)
 
@@ -484,7 +484,7 @@ class ToolHealthService:
 
     async def get_tool_health(self, tool_name: str) -> Optional[Dict[str, Any]]:
         """
-        Get health info for a specific tool, formatted for gRPC.
+        Get health info for a specific tool, formatted for IPC/HTTP.
 
         Per P2 (Reliability): Fetches actual execution data rather than estimating.
         Per P6 (Observable): Provides real timestamps for last success/failure.

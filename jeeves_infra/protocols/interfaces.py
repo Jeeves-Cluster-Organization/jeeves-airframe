@@ -101,17 +101,8 @@ class LoggerProtocol(Protocol):
 
 
 # =============================================================================
-# PERSISTENCE
+# DATABASE
 # =============================================================================
-
-@runtime_checkable
-class PersistenceProtocol(Protocol):
-    """Database persistence interface."""
-
-    async def execute(self, query: str, params: Optional[Dict[str, Any]] = None) -> None: ...
-    async def fetch_one(self, query: str, params: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]: ...
-    async def fetch_all(self, query: str, params: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]: ...
-
 
 @runtime_checkable
 class DatabaseClientProtocol(Protocol):
@@ -119,7 +110,7 @@ class DatabaseClientProtocol(Protocol):
 
     Lifecycle: connect/disconnect
     Query: execute/fetch_one/fetch_all (raw SQL)
-    Data: insert/update (structured), initialize_schema (DDL from file)
+    Data: insert/update/upsert (structured), initialize_schema (DDL from file)
     Transaction: transaction() context manager (ACID)
     Identity: backend property
     """
@@ -136,6 +127,7 @@ class DatabaseClientProtocol(Protocol):
     # Data
     async def insert(self, table: str, data: Dict[str, Any]) -> None: ...
     async def update(self, table: str, data: Dict[str, Any], where_clause: str, where_params: Optional[Any] = None) -> int: ...
+    async def upsert(self, table: str, data: Dict[str, Any], key_columns: List[str]) -> None: ...
     async def initialize_schema(self, schema_path: str) -> None: ...
 
     # Transaction
@@ -144,31 +136,6 @@ class DatabaseClientProtocol(Protocol):
     # Identity
     @property
     def backend(self) -> str: ...
-
-
-@runtime_checkable
-class VectorStorageProtocol(Protocol):
-    """Unified vector storage interface for embeddings."""
-
-    async def upsert(
-        self,
-        item_id: str,
-        content: str,
-        collection: str,
-        metadata: Dict[str, Any]
-    ) -> None: ...
-
-    async def search(
-        self,
-        query: str,
-        collections: List[str],
-        filters: Optional[Dict[str, Any]] = None,
-        limit: int = 10
-    ) -> List[Dict[str, Any]]: ...
-
-    async def delete(self, item_id: str, collection: str) -> None: ...
-
-    def close(self) -> None: ...
 
 
 # =============================================================================
@@ -318,56 +285,6 @@ class SessionStateProtocol(Protocol):
 
 
 # =============================================================================
-# CHECKPOINT (Time-travel debugging)
-# =============================================================================
-
-@dataclass
-class CheckpointRecord:
-    """Checkpoint record for time-travel debugging."""
-    checkpoint_id: str
-    envelope_id: str
-    agent_name: str
-    stage_order: int
-    created_at: datetime
-    parent_checkpoint_id: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
-
-
-@runtime_checkable
-class CheckpointProtocol(Protocol):
-    """Checkpoint interface for time-travel debugging."""
-
-    async def save_checkpoint(
-        self,
-        envelope_id: str,
-        checkpoint_id: str,
-        agent_name: str,
-        state: Dict[str, Any],
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> CheckpointRecord: ...
-
-    async def load_checkpoint(self, checkpoint_id: str) -> Optional[Dict[str, Any]]: ...
-
-    async def list_checkpoints(
-        self,
-        envelope_id: str,
-        limit: int = 100,
-    ) -> List[CheckpointRecord]: ...
-
-    async def delete_checkpoints(
-        self,
-        envelope_id: str,
-        before_checkpoint_id: Optional[str] = None,
-    ) -> int: ...
-
-    async def fork_from_checkpoint(
-        self,
-        checkpoint_id: str,
-        new_envelope_id: str,
-    ) -> str: ...
-
-
-# =============================================================================
 # DISTRIBUTED BUS
 # =============================================================================
 
@@ -421,26 +338,6 @@ class DistributedBusProtocol(Protocol):
 
 
 # =============================================================================
-# NLI (Natural Language Interface)
-# =============================================================================
-
-@runtime_checkable
-class IntentParsingProtocol(Protocol):
-    """Intent parsing service for natural language understanding."""
-
-    async def parse_intent(self, text: str) -> Dict[str, Any]: ...
-    async def generate_response(self, intent: Dict[str, Any], context: Dict[str, Any]) -> str: ...
-
-
-@runtime_checkable
-class ClaimVerificationProtocol(Protocol):
-    """Claim verification service using Natural Language Inference."""
-
-    def verify_claim(self, claim: str, evidence: str) -> Any: ...
-    def verify_claims_batch(self, claims: List[tuple]) -> List[Any]: ...
-
-
-# =============================================================================
 # EVENT BUS
 # =============================================================================
 
@@ -451,18 +348,6 @@ class EventBusProtocol(Protocol):
     def publish(self, event_type: str, payload: Dict[str, Any]) -> None: ...
     def subscribe(self, event_type: str, handler: Any) -> None: ...
     def unsubscribe(self, event_type: str, handler: Any) -> None: ...
-
-
-# =============================================================================
-# ID GENERATOR
-# =============================================================================
-
-@runtime_checkable
-class IdGeneratorProtocol(Protocol):
-    """ID generator interface."""
-
-    def generate(self) -> str: ...
-    def generate_prefixed(self, prefix: str) -> str: ...
 
 
 # =============================================================================
@@ -494,72 +379,6 @@ class ConfigRegistryProtocol(Protocol):
     def register(self, key: str, value: Any) -> None: ...
     def get(self, key: str, default: Any = None) -> Any: ...
     def has(self, key: str) -> bool: ...
-
-
-# =============================================================================
-# LANGUAGE CONFIG
-# =============================================================================
-
-@runtime_checkable
-class LanguageConfigProtocol(Protocol):
-    """Language configuration for source file handling."""
-
-    def get_extensions(self, language: str) -> List[str]: ...
-    def get_comment_patterns(self, language: str) -> Dict[str, str]: ...
-    def detect_language(self, filename: str) -> Optional[str]: ...
-
-
-# =============================================================================
-# DISTRIBUTED NODE PROFILES
-# =============================================================================
-
-@dataclass
-class InferenceEndpoint:
-    """Profile for a distributed LLM node."""
-    name: str
-    base_url: str
-    agents: List[str] = field(default_factory=list)
-    model: str = ""
-    vram_gb: Optional[int] = None
-    ram_gb: Optional[int] = None
-    model_size_gb: Optional[float] = None
-    max_parallel: int = 1
-    gpu_id: Optional[int] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    priority: int = 0
-
-    def __post_init__(self):
-        if self.model_size_gb is not None and self.vram_gb is not None:
-            if self.model_size_gb > self.vram_gb:
-                raise ValueError(
-                    f"Model size ({self.model_size_gb}GB) exceeds "
-                    f"VRAM capacity ({self.vram_gb}GB) for node {self.name}"
-                )
-        if self.max_parallel < 1:
-            raise ValueError(f"max_parallel must be >= 1 for node {self.name}")
-
-    @property
-    def model_name(self) -> str:
-        if not self.model:
-            return ""
-        return self.model.replace(".gguf", "").replace("-q4_k_m", "").replace("-q4_K_M", "")
-
-    @property
-    def vram_utilization(self) -> Optional[float]:
-        if self.vram_gb is None or self.model_size_gb is None or self.vram_gb == 0:
-            return None
-        return (self.model_size_gb / self.vram_gb) * 100
-
-    def can_handle_load(self, current_requests: int) -> bool:
-        return current_requests < self.max_parallel
-
-
-@runtime_checkable
-class InferenceEndpointsProtocol(Protocol):
-    """Node profiles interface for distributed LLM routing."""
-
-    def get_profile_for_agent(self, agent_name: str) -> InferenceEndpoint: ...
-    def list_profiles(self) -> List[InferenceEndpoint]: ...
 
 
 # =============================================================================
@@ -618,101 +437,6 @@ class AgentToolAccessProtocol(Protocol):
 
 
 # =============================================================================
-# MEMORY LAYER PROTOCOLS (L5-L6)
-# =============================================================================
-
-@runtime_checkable
-class GraphStorageProtocol(Protocol):
-    """L5 Entity Graph storage interface."""
-
-    async def add_node(
-        self,
-        node_id: str,
-        node_type: str,
-        properties: Dict[str, Any],
-        user_id: Optional[str] = None,
-    ) -> bool: ...
-
-    async def add_edge(
-        self,
-        source_id: str,
-        target_id: str,
-        edge_type: str,
-        properties: Optional[Dict[str, Any]] = None,
-    ) -> bool: ...
-
-    async def get_node(self, node_id: str) -> Optional[Dict[str, Any]]: ...
-
-    async def get_neighbors(
-        self,
-        node_id: str,
-        edge_type: Optional[str] = None,
-        direction: str = "both",
-        limit: int = 100,
-    ) -> List[Dict[str, Any]]: ...
-
-    async def find_path(
-        self,
-        source_id: str,
-        target_id: str,
-        max_depth: int = 5,
-    ) -> Optional[List[Dict[str, Any]]]: ...
-
-    async def query_subgraph(
-        self,
-        center_id: str,
-        depth: int = 2,
-        node_types: Optional[List[str]] = None,
-        edge_types: Optional[List[str]] = None,
-    ) -> Dict[str, Any]: ...
-
-    async def delete_node(self, node_id: str) -> bool: ...
-
-
-@runtime_checkable
-class SkillStorageProtocol(Protocol):
-    """L6 Skills/Patterns storage interface."""
-
-    async def store_skill(
-        self,
-        skill_id: str,
-        skill_type: str,
-        pattern: Dict[str, Any],
-        source_context: Optional[Dict[str, Any]] = None,
-        confidence: float = 0.5,
-        user_id: Optional[str] = None,
-    ) -> str: ...
-
-    async def get_skill(self, skill_id: str) -> Optional[Dict[str, Any]]: ...
-
-    async def find_skills(
-        self,
-        skill_type: Optional[str] = None,
-        context: Optional[Dict[str, Any]] = None,
-        min_confidence: float = 0.0,
-        limit: int = 10,
-        user_id: Optional[str] = None,
-    ) -> List[Dict[str, Any]]: ...
-
-    async def update_confidence(
-        self,
-        skill_id: str,
-        delta: float,
-        reason: Optional[str] = None,
-    ) -> float: ...
-
-    async def record_usage(
-        self,
-        skill_id: str,
-        success: bool,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> None: ...
-
-    async def delete_skill(self, skill_id: str) -> bool: ...
-    async def get_skill_stats(self, skill_id: str) -> Optional[Dict[str, Any]]: ...
-
-
-# =============================================================================
 # INFRASTRUCTURE PROTOCOLS
 # =============================================================================
 
@@ -727,29 +451,10 @@ class WebSocketManagerProtocol(Protocol):
 
 
 @runtime_checkable
-class EmbeddingServiceProtocol(Protocol):
-    """Embedding generation interface."""
-
-    def embed(self, content: str) -> List[float]: ...
-    def embed_batch(self, contents: List[str]) -> List[List[float]]: ...
-
-
-@runtime_checkable
 class EventBridgeProtocol(Protocol):
     """Bridge for kernel events to external systems."""
 
     async def emit(self, event_type: str, payload: Dict[str, Any]) -> None: ...
-
-
-@runtime_checkable
-class ChunkServiceProtocol(Protocol):
-    """Document chunking interface."""
-
-    async def chunk_document(
-        self,
-        content: str,
-        metadata: Dict[str, Any],
-    ) -> List[Dict[str, Any]]: ...
 
 
 @runtime_checkable
@@ -770,10 +475,8 @@ __all__ = [
     "RequestContext",
     # Logging
     "LoggerProtocol",
-    # Persistence
-    "PersistenceProtocol",
+    # Database
     "DatabaseClientProtocol",
-    "VectorStorageProtocol",
     # LLM
     "LLMProviderProtocol",
     # Tools
@@ -790,42 +493,24 @@ __all__ = [
     "MemoryServiceProtocol",
     "SemanticSearchProtocol",
     "SessionStateProtocol",
-    # Checkpoint
-    "CheckpointRecord",
-    "CheckpointProtocol",
-    # Distributed Bus
+    # Distributed Bus (kept for Redis scaling)
     "DistributedTask",
     "QueueStats",
     "DistributedBusProtocol",
-    # NLI
-    "IntentParsingProtocol",
-    "ClaimVerificationProtocol",
     # Event Bus
     "EventBusProtocol",
-    # ID Generator
-    "IdGeneratorProtocol",
     # Tool Executor
     "ToolExecutorProtocol",
     # Config Registry
     "ConfigRegistryProtocol",
-    # Language Config
-    "LanguageConfigProtocol",
-    # Distributed Node Profiles
-    "InferenceEndpoint",
-    "InferenceEndpointsProtocol",
     # Capability LLM Config
     "AgentLLMConfig",
     "DomainLLMRegistryProtocol",
     "FeatureFlagsProviderProtocol",
     # Agent Tool Access
     "AgentToolAccessProtocol",
-    # Memory Layer Protocols
-    "GraphStorageProtocol",
-    "SkillStorageProtocol",
     # Infrastructure Protocols
     "WebSocketManagerProtocol",
-    "EmbeddingServiceProtocol",
     "EventBridgeProtocol",
-    "ChunkServiceProtocol",
     "SessionStateServiceProtocol",
 ]

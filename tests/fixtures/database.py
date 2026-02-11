@@ -10,9 +10,9 @@ from uuid import uuid4
 
 import pytest
 
-from tests.config.fixtures_data import TEST_USER_ID
-from tests.config.test_thresholds import TEST_HIGH_CONFIDENCE
-from tests.fixtures.sqlite_client import SQLiteClient
+from config.fixtures_data import TEST_USER_ID
+from config.test_thresholds import TEST_HIGH_CONFIDENCE
+from fixtures.sqlite_client import SQLiteClient
 
 _SCHEMA = Path(__file__).parent / "test_schema.sql"
 
@@ -50,7 +50,7 @@ async def create_test_prerequisites(db, user_id: str = TEST_USER_ID) -> tuple:
     session_id = str(uuid4())
     request_id = str(uuid4())
     plan_id = str(uuid4())
-    now = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc).isoformat()
 
     await db.insert("sessions", {
         "session_id": session_id,
@@ -91,7 +91,7 @@ async def create_session_only(db, user_id: str = TEST_USER_ID) -> str:
         str: The created session_id
     """
     session_id = str(uuid4())
-    now = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc).isoformat()
 
     await db.insert("sessions", {
         "session_id": session_id,

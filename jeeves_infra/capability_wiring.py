@@ -154,19 +154,21 @@ def wire_capabilities() -> None:
         pass
 
 
-def wire_infra_routers() -> None:
+def wire_infra_routers(app_context) -> None:
     """Register infrastructure API routers (governance, etc.).
 
     These are infrastructure concerns (P6 observability) not owned by any capability.
     They use the same registry mechanism as capability routers.
+
+    Args:
+        app_context: AppContext with tool_health_service for governance DI.
     """
     from jeeves_infra.gateway.routers.governance import router as gov_router, get_tool_health_service
 
     registry = get_capability_resource_registry()
 
     def _create_governance_deps(db, event_manager, orchestrator, **kwargs):
-        from jeeves_infra.gateway.app_server import get_app_state
-        return {get_tool_health_service: lambda: get_app_state().tool_health_service}
+        return {get_tool_health_service: lambda: app_context.tool_health_service}
 
     registry.register_api_router(
         "_infra_governance",

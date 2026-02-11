@@ -20,7 +20,7 @@ jeeves_infra_root = Path(__file__).parent.parent
 if str(jeeves_infra_root) not in sys.path:
     sys.path.insert(0, str(jeeves_infra_root))
 
-# 2. tests directory (for tests.fixtures)
+# 2. tests directory (for config.* and fixtures.*)
 tests_root = Path(__file__).parent
 if str(tests_root) not in sys.path:
     sys.path.insert(0, str(tests_root))

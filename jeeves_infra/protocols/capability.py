@@ -742,7 +742,7 @@ class CapabilityResourceRegistry:
     ) -> None:
         """Register a FastAPI API router for a capability.
 
-        The router is mounted by app_server.py at startup. The deps_factory
+        The router is mounted at startup. The deps_factory
         receives (db, event_manager, orchestrator) and returns a dict of
         FastAPI dependency overrides.
 

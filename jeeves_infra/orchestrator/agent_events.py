@@ -2,7 +2,7 @@
 Agent event streaming for real-time frontend updates.
 
 Provides an async queue-based mechanism to stream events from
-capability orchestrators to the gRPC servicer, enabling real-time
+capability orchestrators to the IPC transport, enabling real-time
 visibility into agent activity.
 
 Agent names and pipeline structure are capability-owned -- this module
@@ -94,7 +94,7 @@ class AgentEvent:
         }
 
     def to_json(self) -> str:
-        """Convert to JSON string for gRPC payload."""
+        """Convert to JSON string for IPC transport payload."""
         return json.dumps(self.to_dict())
 
 
@@ -102,7 +102,7 @@ class EventEmitter:
     """Async queue-based event emitter for agent activity.
 
     Capability orchestrators use this to emit events during processing,
-    which are consumed by the gRPC servicer and broadcast to WebSocket clients.
+    which are consumed by the IPC transport and broadcast to WebSocket clients.
 
     Example:
         emitter = EventEmitter()

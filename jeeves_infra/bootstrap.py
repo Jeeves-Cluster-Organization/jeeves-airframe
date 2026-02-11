@@ -25,7 +25,7 @@ Usage:
 
 import os
 from contextvars import ContextVar
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
 from jeeves_infra.context import AppContext, SystemClock
 from jeeves_infra.logging import configure_logging
@@ -36,18 +36,10 @@ from jeeves_infra.protocols import get_capability_resource_registry
 from jeeves_infra.config.registry import ConfigRegistry
 
 # KernelClient for Rust kernel integration
-from jeeves_infra.kernel_client import KernelClient, QuotaCheckResult, DEFAULT_KERNEL_ADDRESS
-
-# Type alias for LLMGateway (imported conditionally)
-LLMGatewayType = Any
+from jeeves_infra.kernel_client import KernelClient, DEFAULT_KERNEL_ADDRESS
 
 if TYPE_CHECKING:
-    from jeeves_infra.protocols import (
-        LanguageConfigProtocol,
-        InferenceEndpointsProtocol,
-        AgentToolAccessProtocol,
-        ConfigRegistryProtocol,
-    )
+    from jeeves_infra.protocols import AgentToolAccessProtocol
 
 
 # =============================================================================
@@ -91,11 +83,6 @@ def _parse_bool(value: str, default: bool = True) -> bool:
     """Parse boolean from environment variable string."""
     return value.lower() == "true" if value else default
 
-
-def _parse_optional_int(env_var: str) -> Optional[int]:
-    """Parse an optional integer from environment variable."""
-    val = os.getenv(env_var)
-    return int(val) if val else None
 
 
 def create_core_config_from_env() -> ExecutionConfig:
@@ -243,7 +230,7 @@ def create_app_context(
     # Eagerly provision LLM provider factory (required — fail loud)
     from jeeves_infra.llm.factory import create_llm_provider_factory as _create_llm_factory
     llm_provider_factory = _create_llm_factory(settings)
-    root_logger.info("llm_provider_factory_provisioned", adapter=settings.llm_adapter)
+    root_logger.info("llm_provider_factory_provisioned", adapter=settings.jeeves_llm_adapter)
 
     # Eagerly provision kernel client (required — fail loud)
     from jeeves_infra.ipc import IpcTransport
@@ -252,6 +239,26 @@ def create_app_context(
     transport = IpcTransport(host=host or "127.0.0.1", port=int(port_str or 50051))
     kernel_client = KernelClient(transport)
     root_logger.info("kernel_client_provisioned", address=kernel_address)
+
+    # Wire state backend (sync constructors — async init deferred to gateway lifespan)
+    state_backend = None
+    distributed_bus = None
+
+    if feature_flags.use_redis_state:
+        from jeeves_infra.redis.connection_manager import ConnectionManager
+        state_backend = ConnectionManager(settings, logger=root_logger)
+        root_logger.info("state_backend_provisioned", backend="redis_connection_manager")
+
+        if feature_flags.enable_distributed_mode:
+            from jeeves_infra.redis.client import get_redis_client
+            from jeeves_infra.distributed.redis_bus import RedisDistributedBus
+            redis_client = get_redis_client(settings.redis_url)
+            distributed_bus = RedisDistributedBus(redis_client, logger=root_logger)
+            root_logger.info("distributed_bus_provisioned", backend="redis")
+    else:
+        from jeeves_infra.redis.connection_manager import InMemoryStateBackend
+        state_backend = InMemoryStateBackend(logger=root_logger)
+        root_logger.info("state_backend_provisioned", backend="in_memory")
 
     root_logger.info(
         "app_context_created",
@@ -270,83 +277,11 @@ def create_app_context(
         llm_provider_factory=llm_provider_factory,
         core_config=core_config,
         orchestration_flags=orchestration_flags,
-        vertical_registry={},
         kernel_client=kernel_client,
+        state_backend=state_backend,
+        distributed_bus=distributed_bus,
     )
 
-
-def create_infra_dependencies(
-    app_context: AppContext,
-    language_config: Optional["LanguageConfigProtocol"] = None,
-    node_profiles: Optional["InferenceEndpointsProtocol"] = None,
-    access_checker: Optional["AgentToolAccessProtocol"] = None,
-):
-    """Create and inject dependencies into infrastructure layer.
-
-    This function sets up the dependency injection for infrastructure
-    components that need capability-owned implementations.
-
-    ADR-001 Decision 1: Layer Violation Resolution via Protocol Injection
-
-    Args:
-        app_context: The AppContext with core dependencies
-        language_config: Optional LanguageConfigProtocol implementation
-        node_profiles: Optional InferenceEndpointsProtocol implementation
-        access_checker: Optional AgentToolAccessProtocol implementation
-
-    Returns:
-        Dict with created dependencies (for use by capability layer)
-    """
-    # LLM components moved to jeeves-infra
-    try:
-        from jeeves_infra.llm.factory import LLMFactory
-    except ImportError:
-        raise ImportError(
-            "LLM factory requires jeeves-infra package. "
-            "Install with: pip install jeeves-infra[llm]"
-        )
-
-    # Create LLM factory
-    # Note: node_profiles are stored in deps for capability layer use but not
-    # passed to LLMFactory directly (distributed routing handled at capability layer)
-    llm_factory = LLMFactory(settings=app_context.settings)
-
-    # Initialize LLM Gateway if feature flag is enabled
-    llm_gateway = None
-    if app_context.feature_flags.use_llm_gateway:
-        from jeeves_infra.llm.gateway import LLMGateway
-        from jeeves_infra.logging import create_logger
-
-        gateway_logger = create_logger("llm_gateway")
-
-        # Configure fallback providers based on primary provider
-        fallback_providers = []
-        primary_provider = app_context.settings.llm_provider
-        if primary_provider == "llamaserver":
-            fallback_providers = ["openai"]  # Fallback to cloud if local fails
-        elif primary_provider == "openai":
-            fallback_providers = ["anthropic"]  # Fallback between cloud providers
-
-        llm_gateway = LLMGateway(
-            settings=app_context.settings,
-            fallback_providers=fallback_providers,
-            logger=gateway_logger,
-            kernel_client=app_context.kernel_client,
-        )
-
-        gateway_logger.info(
-            "llm_gateway_initialized",
-            primary_provider=primary_provider,
-            fallback_providers=fallback_providers,
-        )
-
-    return {
-        "llm_factory": llm_factory,
-        "llm_gateway": llm_gateway,
-        "language_config": language_config,
-        "node_profiles": node_profiles,
-        "access_checker": access_checker,
-    }
 
 
 def create_tool_executor_with_access(
@@ -374,17 +309,41 @@ def create_tool_executor_with_access(
 
 
 
-# MemoryManager has been moved to capability layer.
-# Capabilities create their own MemoryManager via their wiring code.
-# See: jeeves_capability_hello_world/database/services/memory_manager.py
+async def sync_quota_defaults_to_kernel(app_context: AppContext) -> None:
+    """Push env-parsed quota defaults to the kernel (single source of truth).
+
+    Call this once at startup after the kernel is running and the
+    transport is connected. The kernel merges non-zero fields, so only
+    the values present in create_core_config_from_env() are overwritten.
+
+    Args:
+        app_context: AppContext with connected kernel_client.
+    """
+    cfg = app_context.core_config
+    try:
+        await app_context.kernel_client.set_quota_defaults(
+            max_llm_calls=cfg.max_llm_calls,
+            max_iterations=cfg.context_bounds.max_input_tokens,
+            max_input_tokens=cfg.context_bounds.max_input_tokens,
+            max_output_tokens=cfg.context_bounds.max_output_tokens,
+            max_context_tokens=cfg.context_bounds.max_context_tokens,
+            max_agent_hops=cfg.max_agent_hops,
+        )
+        app_context.logger.info("quota_defaults_synced_to_kernel")
+    except Exception as e:
+        app_context.logger.warning(
+            "quota_defaults_sync_failed",
+            error=str(e),
+            detail="Kernel will use its built-in defaults",
+        )
 
 
 __all__ = [
     "create_app_context",
-    "create_infra_dependencies",
     "create_tool_executor_with_access",
     "create_core_config_from_env",
     "create_orchestration_flags_from_env",
+    "sync_quota_defaults_to_kernel",
     # Per-request PID context for resource tracking
     "set_request_pid",
     "clear_request_pid",

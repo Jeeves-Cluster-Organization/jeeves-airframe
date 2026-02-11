@@ -100,6 +100,24 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             _logger.warning("interrupt_service_not_configured",
                           hint="Interrupt endpoints will return 503 until service is injected")
 
+        # Async init for state_backend (ConnectionManager.get_state_backend() is async)
+        ctx = getattr(app.state, "context", None)
+        if ctx is not None:
+            from jeeves_infra.redis.connection_manager import ConnectionManager
+            if isinstance(ctx.state_backend, ConnectionManager):
+                ctx.state_backend = await ctx.state_backend.get_state_backend()
+                _logger.info("state_backend_async_init_complete")
+
+            # Connect database if pre-wired
+            if ctx.db is not None and hasattr(ctx.db, "connect"):
+                await ctx.db.connect()
+                _logger.info("database_connected")
+
+            # Connect kernel transport
+            if ctx.kernel_client is not None:
+                await ctx.kernel_client._transport.connect()
+                _logger.info("kernel_transport_connected")
+
         # Setup event bus subscriptions for WebSocket broadcasting
         await setup_websocket_subscriptions()
         _logger.info("websocket_subscriptions_configured")
@@ -113,6 +131,31 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     finally:
         _logger.info("gateway_shutdown_initiated")
+
+        # Graceful shutdown of async resources
+        ctx = getattr(app.state, "context", None)
+        if ctx is not None:
+            if ctx.db is not None and hasattr(ctx.db, "disconnect"):
+                try:
+                    await ctx.db.disconnect()
+                    _logger.info("database_disconnected")
+                except Exception as e:
+                    _logger.warning("database_disconnect_error", error=str(e))
+
+            if ctx.state_backend is not None and hasattr(ctx.state_backend, "close"):
+                try:
+                    await ctx.state_backend.close()
+                    _logger.info("state_backend_closed")
+                except Exception as e:
+                    _logger.warning("state_backend_close_error", error=str(e))
+
+            if ctx.kernel_client is not None:
+                try:
+                    await ctx.kernel_client.close()
+                    _logger.info("kernel_transport_closed")
+                except Exception as e:
+                    _logger.warning("kernel_transport_close_error", error=str(e))
+
         shutdown_tracing()
         _logger.info("gateway_shutdown_complete")
 

@@ -62,10 +62,11 @@ def get_agent_definitions() -> List[dict]:
 class HealthServicer:
     """Governance service for health, agents, and memory layer introspection."""
 
-    def __init__(self, tool_health_service, db=None, logger: Optional[LoggerProtocol] = None):
+    def __init__(self, tool_health_service, db=None, logger: Optional[LoggerProtocol] = None, kernel_client=None):
         self._logger = logger or get_logger()
         self.tool_health_service = tool_health_service
         self.db = db
+        self._kernel_client = kernel_client
 
     async def get_health_summary(self) -> Dict[str, Any]:
         """Get overall system health summary.
@@ -110,6 +111,46 @@ class HealthServicer:
 
         except Exception as e:
             self._logger.error("get_health_summary_error", error=str(e))
+            raise ServiceError("INTERNAL", str(e))
+
+    async def get_system_status(self) -> Dict[str, Any]:
+        """Get system-level status from the kernel.
+
+        Delegates to kernel.GetSystemStatus for process counts,
+        service health, orchestration state, and commbus stats.
+
+        Returns:
+            Dict with processes, services, orchestration, commbus sections.
+
+        Raises:
+            ServiceError: If kernel_client is not available or call fails.
+        """
+        if not self._kernel_client:
+            raise ServiceError("UNAVAILABLE", "kernel_client not configured")
+        try:
+            status = await self._kernel_client.get_system_status()
+            return {
+                "processes": {
+                    "total": status.processes_total,
+                    "by_state": status.processes_by_state,
+                },
+                "services": {
+                    "healthy": status.services_healthy,
+                    "degraded": status.services_degraded,
+                    "unhealthy": status.services_unhealthy,
+                },
+                "orchestration": {
+                    "active_sessions": status.active_orchestration_sessions,
+                },
+                "commbus": {
+                    "events_published": status.commbus_events_published,
+                    "commands_sent": status.commbus_commands_sent,
+                    "queries_executed": status.commbus_queries_executed,
+                    "active_subscribers": status.commbus_active_subscribers,
+                },
+            }
+        except Exception as e:
+            self._logger.error("get_system_status_error", error=str(e))
             raise ServiceError("INTERNAL", str(e))
 
     async def get_tool_health(self, tool_name: str) -> Dict[str, Any]:

@@ -3,14 +3,6 @@
 Tests the capability registration system in jeeves_infra.protocols.capability.
 """
 
-import sys
-from pathlib import Path
-
-# Add jeeves-infra root to path for imports
-jeeves_infra_root = Path(__file__).parent.parent.parent
-if str(jeeves_infra_root) not in sys.path:
-    sys.path.insert(0, str(jeeves_infra_root))
-
 import pytest
 from dataclasses import FrozenInstanceError
 

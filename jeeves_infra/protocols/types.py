@@ -539,7 +539,6 @@ class Envelope:
     loop_feedback: List[str] = field(default_factory=list)
     processing_history: List[ProcessingRecord] = field(default_factory=list)
     errors: List[Dict[str, Any]] = field(default_factory=list)
-    created_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
@@ -731,7 +730,6 @@ class Envelope:
             "loop_feedback": self.loop_feedback,
             "processing_history": serialized_history,
             "errors": self.errors,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
             "completed_at": self.completed_at.isoformat() if self.completed_at else None,
             "metadata": self.metadata,
         }
@@ -767,15 +765,6 @@ class InterruptServiceProtocol(Protocol):
     async def list_pending(self, envelope_id: str) -> List[FlowInterrupt]: ...
 
 
-@runtime_checkable
-class RateLimiterProtocol(Protocol):
-    """Rate limiter interface."""
-
-    def check(self, key: str) -> RateLimitResult: ...
-    def record(self, key: str) -> None: ...
-    def reset(self, key: str) -> None: ...
-
-
 # =============================================================================
 # EXPORTS
 # =============================================================================
@@ -806,7 +795,6 @@ __all__ = [
     # Rate limiting
     "RateLimitConfig",
     "RateLimitResult",
-    "RateLimiterProtocol",
     # Processing
     "ProcessingRecord",
     "PipelineEvent",

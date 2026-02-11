@@ -569,7 +569,6 @@ def create_envelope(
         session_id=request_context.session_id or "",
         raw_input=raw_input,
         received_at=utc_now(),
-        created_at=utc_now(),
         metadata=metadata or {},
     )
 
