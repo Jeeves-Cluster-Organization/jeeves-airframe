@@ -106,7 +106,7 @@ class FeatureFlags(BaseSettings):
     Phase ownership:
     - Phase 1: use_redis_state
     - Phase 3: enable_distributed_mode
-    - Phase 4: enable_tracing, enable_metrics_export
+    - Phase 4: enable_tracing
     """
 
     # Phase 1: Redis State
@@ -146,17 +146,6 @@ class FeatureFlags(BaseSettings):
 
     Requires: OTEL_EXPORTER_JAEGER_ENDPOINT environment variable
     Rollback: Set to False for zero tracing overhead
-    """
-
-    enable_metrics_export: bool = False
-    """Enable Prometheus metrics export.
-
-    When enabled:
-    - /metrics endpoint exposes Prometheus format
-    - Request rate, latency, cost counters/histograms
-    - Per-agent and per-provider breakdowns
-
-    Rollback: Set to False to disable metrics collection
     """
 
     # Development/Testing flags
@@ -325,7 +314,6 @@ class FeatureFlags(BaseSettings):
             enable_distributed_mode=self.enable_distributed_mode,
             # Phase 4 - Observability
             enable_tracing=self.enable_tracing,
-            enable_metrics_export=self.enable_metrics_export,
             # V2 Memory Infrastructure
             memory_event_sourcing=self.memory_event_sourcing_mode,
             memory_agent_tracing=self.memory_agent_tracing,

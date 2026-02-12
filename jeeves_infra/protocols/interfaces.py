@@ -253,15 +253,6 @@ class SearchResult:
 
 
 @runtime_checkable
-class MemoryServiceProtocol(Protocol):
-    """Memory service interface."""
-
-    async def store(self, key: str, value: Any, ttl: Optional[int] = None) -> None: ...
-    async def retrieve(self, key: str) -> Optional[Any]: ...
-    async def delete(self, key: str) -> None: ...
-
-
-@runtime_checkable
 class SemanticSearchProtocol(Protocol):
     """Semantic search interface."""
 
@@ -401,28 +392,6 @@ class AgentLLMConfig:
     context_window: int = 16384
 
 
-@runtime_checkable
-class DomainLLMRegistryProtocol(Protocol):
-    """Registry for capability-owned agent LLM configurations."""
-
-    def register(
-        self,
-        capability_id: str,
-        agent_name: str,
-        config: AgentLLMConfig
-    ) -> None: ...
-
-    def get_agent_config(self, agent_name: str) -> Optional[AgentLLMConfig]: ...
-    def list_agents(self) -> List[str]: ...
-    def get_capability_agents(self, capability_id: str) -> List[AgentLLMConfig]: ...
-
-
-@runtime_checkable
-class FeatureFlagsProviderProtocol(Protocol):
-    """Provider for feature flags at runtime."""
-
-    def get_feature_flags(self) -> FeatureFlagsProtocol: ...
-
 
 # =============================================================================
 # AGENT TOOL ACCESS
@@ -490,7 +459,6 @@ __all__ = [
     "AppContextProtocol",
     # Memory
     "SearchResult",
-    "MemoryServiceProtocol",
     "SemanticSearchProtocol",
     "SessionStateProtocol",
     # Distributed Bus (kept for Redis scaling)
@@ -505,8 +473,6 @@ __all__ = [
     "ConfigRegistryProtocol",
     # Capability LLM Config
     "AgentLLMConfig",
-    "DomainLLMRegistryProtocol",
-    "FeatureFlagsProviderProtocol",
     # Agent Tool Access
     "AgentToolAccessProtocol",
     # Infrastructure Protocols

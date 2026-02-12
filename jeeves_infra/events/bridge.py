@@ -1,63 +1,68 @@
-"""EventBridge - Connects Control Tower events to Mission System.
+"""EventBridge - Translates kernel lifecycle events to frontend WebSocket events.
 
 This bridge:
-1. Subscribes to Control Tower's EventAggregator kernel events
-2. Translates them to Mission System event formats
-3. Forwards to WebSocket manager for frontend streaming
+1. Subscribes to kernel lifecycle events via KernelEventAggregator
+2. Translates them to frontend-friendly event formats
+3. Forwards to WebSocket manager for real-time streaming
 4. Handles interrupt-to-clarification/confirmation translation
 
 Architecture:
-    ControlTower.EventAggregator (kernel events)
-           | (subscribe)
+    Kernel CommBus (Rust)
+           | IPC Subscribe (streaming)
+    KernelEventAggregator
+           | subscribe("*", callback)
     EventBridge (translation layer)
-           | (forward)
+           | broadcast
     WebSocketEventManager (frontend streaming)
 """
 
-from typing import Any, Callable, Dict, Optional
+from __future__ import annotations
+
+from typing import Any, Dict, Optional, TYPE_CHECKING
 
 from jeeves_infra.protocols import InterruptKind
 from jeeves_infra.protocols import LoggerProtocol
 
 from dataclasses import dataclass
-from typing import Dict, Any as _Any
+
+if TYPE_CHECKING:
+    from jeeves_infra.events.aggregator import KernelEventAggregator
+
 
 @dataclass
 class KernelEvent:
     """Kernel event for pipeline orchestration."""
     event_type: str
     pid: str
-    data: Dict[str, _Any]
+    data: Dict[str, Any]
 
 
 class EventBridge:
-    """Bridges kernel events to Mission System event streams.
+    """Bridges kernel lifecycle events to frontend WebSocket streams.
 
     Integration layer between:
-    - Kernel EventAggregator (kernel-level events)
-    - Mission System's WebSocketEventManager (frontend streaming)
+    - KernelEventAggregator (CommBus event streaming)
+    - WebSocketEventManager (frontend broadcasting)
 
     Usage:
-        bridge = EventBridge(
-            event_aggregator=kernel_events,
-            websocket_manager=event_manager,
-            logger=logger,
-        )
-        bridge.start()  # Begin forwarding events
+        aggregator = KernelEventAggregator(kernel_client)
+        bridge = EventBridge(aggregator, ws_manager, logger)
+        await aggregator.start()
+        bridge.start()
     """
 
     def __init__(
         self,
-        event_aggregator: Any,  # EventAggregatorProtocol
+        event_aggregator: "KernelEventAggregator",
         websocket_manager: Any,  # WebSocketEventManager
         logger: LoggerProtocol,
     ) -> None:
         """Initialize EventBridge.
 
         Args:
-            event_aggregator: Control Tower's EventAggregator
-            websocket_manager: Mission System's WebSocketEventManager
-            logger: Logger instance
+            event_aggregator: KernelEventAggregator streaming CommBus events.
+            websocket_manager: WebSocketEventManager for frontend broadcasting.
+            logger: Logger instance.
         """
         self._aggregator = event_aggregator
         self._ws_manager = websocket_manager
@@ -67,7 +72,7 @@ class EventBridge:
     def start(self) -> None:
         """Start bridging events.
 
-        Subscribes to all Control Tower kernel events and begins forwarding.
+        Subscribes to all kernel events and begins forwarding to WebSocket.
         """
         if self._started:
             return
@@ -89,7 +94,7 @@ class EventBridge:
         self._logger.info("event_bridge_stopped")
 
     def _on_kernel_event(self, event: KernelEvent) -> None:
-        """Handle kernel event from Control Tower.
+        """Handle kernel event from CommBus.
 
         Translates kernel events to frontend-friendly format and broadcasts.
         """
@@ -139,7 +144,6 @@ class EventBridge:
             }
 
         elif event_type == "process.state_changed":
-            old_state = data.get("old_state")
             new_state = data.get("new_state")
 
             # Map to frontend-friendly names
@@ -211,4 +215,4 @@ class EventBridge:
         return None
 
 
-__all__ = ["EventBridge"]
+__all__ = ["EventBridge", "KernelEvent"]

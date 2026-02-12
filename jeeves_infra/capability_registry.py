@@ -32,7 +32,6 @@ from typing import Dict, List, Optional, TYPE_CHECKING
 
 from jeeves_infra.protocols import (
     AgentLLMConfig,
-    DomainLLMRegistryProtocol,
     LoggerProtocol,
 )
 from jeeves_infra.utils.logging import get_component_logger
@@ -43,8 +42,6 @@ if TYPE_CHECKING:
 
 class DomainLLMRegistry:
     """Registry for capability-owned agent LLM configurations.
-
-    Implements DomainLLMRegistryProtocol.
 
     This registry allows capabilities to own their agent configurations
     while infrastructure remains capability-agnostic. The registry supports
@@ -267,10 +264,3 @@ def reset_capability_registry() -> None:
     """
     global _registry
     _registry = None
-
-
-# Type assertion for protocol compliance
-def _assert_protocol_compliance() -> None:
-    """Static assertion that DomainLLMRegistry implements the protocol."""
-    registry: DomainLLMRegistryProtocol = DomainLLMRegistry()
-    _ = registry  # Suppress unused variable warning

@@ -423,6 +423,36 @@ class KernelClient:
             raise KernelClientError(f"GetSystemStatus failed: {e}") from e
 
     # =========================================================================
+    # CommBus Event Subscription
+    # =========================================================================
+
+    async def subscribe_events(
+        self,
+        event_types: List[str],
+        subscriber_id: str = "",
+    ) -> AsyncIterator[Dict[str, Any]]:
+        """Subscribe to kernel CommBus events (streaming).
+
+        Yields event dicts with keys: event_type, payload, timestamp_ms, source.
+        The payload is a JSON string that should be parsed by the consumer.
+
+        Args:
+            event_types: Event type patterns to subscribe to
+                (e.g. ["process.created", "process.state_changed"]).
+            subscriber_id: Optional subscriber ID for tracking.
+
+        Yields:
+            Event dicts from the CommBus stream.
+        """
+        body: Dict[str, Any] = {"event_types": event_types}
+        if subscriber_id:
+            body["subscriber_id"] = subscriber_id
+        async for chunk in self._transport.request_stream(
+            "commbus", "Subscribe", body
+        ):
+            yield chunk
+
+    # =========================================================================
     # Queries (KernelService)
     # =========================================================================
 

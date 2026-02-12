@@ -118,6 +118,29 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 await ctx.kernel_client._transport.connect()
                 _logger.info("kernel_transport_connected")
 
+                # Start kernel event bridge (CommBus → EventBridge → WebSocket)
+                try:
+                    from jeeves_infra.events.aggregator import KernelEventAggregator
+                    from jeeves_infra.events.bridge import EventBridge
+                    from jeeves_infra.gateway.websocket import broadcast_to_clients
+
+                    class _BroadcastAdapter:
+                        """Adapter: EventBridge calls broadcast(type, data) →
+                        broadcast_to_clients({"event": type, "payload": data})."""
+                        async def broadcast(self, event_type: str, payload: dict) -> None:
+                            await broadcast_to_clients({"event": event_type, "payload": payload})
+
+                    aggregator = KernelEventAggregator(ctx.kernel_client)
+                    bridge = EventBridge(aggregator, _BroadcastAdapter(), _logger)
+                    await aggregator.start()
+                    bridge.start()
+                    app.state.event_bridge = bridge
+                    app.state.event_aggregator = aggregator
+                    _logger.info("kernel_event_bridge_started")
+                except Exception as e:
+                    _logger.warning("kernel_event_bridge_failed", error=str(e),
+                                    hint="Kernel events will not stream to frontend")
+
         # Setup event bus subscriptions for WebSocket broadcasting
         await setup_websocket_subscriptions()
         _logger.info("websocket_subscriptions_configured")
@@ -131,6 +154,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     finally:
         _logger.info("gateway_shutdown_initiated")
+
+        # Stop kernel event bridge
+        if hasattr(app.state, "event_bridge"):
+            try:
+                app.state.event_bridge.stop()
+            except Exception as e:
+                _logger.warning("event_bridge_stop_error", error=str(e))
+        if hasattr(app.state, "event_aggregator"):
+            try:
+                await app.state.event_aggregator.stop()
+                _logger.info("kernel_event_bridge_stopped")
+            except Exception as e:
+                _logger.warning("event_aggregator_stop_error", error=str(e))
 
         # Graceful shutdown of async resources
         ctx = getattr(app.state, "context", None)

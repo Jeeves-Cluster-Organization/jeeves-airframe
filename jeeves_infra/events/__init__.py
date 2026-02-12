@@ -1,9 +1,12 @@
-"""Event integration layer for Control Tower.
+"""Event integration layer.
 
-This module bridges Control Tower's EventAggregator with Mission System's
-EventOrchestrator and WebSocket event manager.
+Bridges the Rust kernel's CommBus lifecycle events to the gateway's
+WebSocket event manager for real-time frontend streaming.
+
+Flow: Kernel CommBus → KernelEventAggregator → EventBridge → WebSocket
 """
 
+from jeeves_infra.events.aggregator import KernelEventAggregator
 from jeeves_infra.events.bridge import EventBridge
 
-__all__ = ["EventBridge"]
+__all__ = ["EventBridge", "KernelEventAggregator"]
