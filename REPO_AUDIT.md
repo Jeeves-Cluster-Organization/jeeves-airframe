@@ -265,8 +265,10 @@ The `Envelope` is the master state container flowing through the pipeline:
 |--------|-------|
 | **Total Tests** | 167 |
 | **Pass Rate** | 100% (167/167) |
-| **Execution Time** | ~1.1s |
-| **Framework** | pytest 9.0.2 + pytest-asyncio 1.3.0 |
+| **Statement Coverage** | **31.1%** (1,858 / 5,965 statements) |
+| **Modules at 0% Coverage** | 32 files (3,156 statements — 53% of all code) |
+| **Execution Time** | ~1.4s |
+| **Framework** | pytest 9.0.2 + pytest-asyncio 1.3.0 + pytest-cov 7.0.0 |
 | **Async Mode** | auto |
 | **Test Database** | In-memory SQLite |
 
@@ -275,36 +277,64 @@ The `Envelope` is the master state container flowing through the pipeline:
 | Test File | Tests | Coverage Area |
 |-----------|-------|--------------|
 | `test_event_bridge.py` | 17 | Event bridge kernel↔gateway |
-| `unit/distributed/test_redis_bus.py` | 24 | Redis distributed bus |
-| `unit/test_kernel_client.py` | 31 | IPC client to Rust kernel |
-| `unit/test_persistence.py` | 9 | Database persistence layer |
-| `unit/test_pipeline_worker.py` | 8 | Pipeline execution worker |
-| `unit/test_protocols.py` | 34 | Protocol types and enums |
-| `unit/test_thresholds.py` | 6 | Configuration thresholds |
-| `unit/test_tool_executor.py` | 22 | Tool execution framework |
+| `unit/distributed/test_redis_bus.py` | 24 | Redis distributed bus (99% coverage) |
+| `unit/test_kernel_client.py` | 31 | IPC client to Rust kernel (57% coverage) |
+| `unit/test_persistence.py` | 9 | Database persistence layer (100% coverage) |
+| `unit/test_pipeline_worker.py` | 8 | Pipeline execution worker (72% coverage) |
+| `unit/test_protocols.py` | 34 | Protocol types and enums (77-88% coverage) |
+| `unit/test_thresholds.py` | 6 | Configuration thresholds (100% coverage) |
+| `unit/test_tool_executor.py` | 22 | Tool execution framework (88% coverage) |
 | `unit/test_utils.py` | 16 | Utility functions |
 
-### 7.3 Test Quality Assessment
+### 7.3 Coverage by Module
+
+**Well-covered (>70%):**
+
+| Module | Coverage |
+|--------|----------|
+| `runtime/persistence.py` | 100% |
+| `thresholds.py` | 100% |
+| `distributed/redis_bus.py` | 99% |
+| `protocols/capability.py` | 88% |
+| `tools/executor.py` | 88% |
+| `protocols/interfaces.py` | 82% |
+| `settings.py` | 79% |
+| `protocols/types.py` | 77% |
+| `pipeline_worker.py` | 72% |
+
+**Completely untested (0% — 32 modules, 3,156 statements):**
+
+| Subsystem | Files | Statements | Priority |
+|-----------|-------|-----------|----------|
+| **Gateway (public API)** | 9 files | 916 stmts | CRITICAL |
+| **LLM providers** | 6 files | 519 stmts | HIGH |
+| **Orchestrator** | 3 files | 285 stmts | HIGH |
+| **Memory** | 3 files | 283 stmts | HIGH |
+| **Redis client** | 2 files | 222 stmts | MEDIUM |
+| **Bootstrap/context** | 2 files | 136 stmts | HIGH |
+| **Health checks** | 1 file | 133 stmts | HIGH |
+| **Observability** | 2 files | 112 stmts | MEDIUM |
+| **Other** | 4 files | 250 stmts | MEDIUM |
+
+### 7.4 Test Quality Assessment
 
 **Strengths:**
-- All tests pass with zero failures
-- Good coverage of core infrastructure (kernel client, protocols, tools)
-- Proper async test support with `asyncio_mode = "auto"`
-- Well-organized fixture system with mocks for kernel, LLM, and database
-- In-memory SQLite for fast, isolated database tests
-- Custom markers for unit/integration/slow test categorization
+- All 167 tests pass with zero failures in ~1.4s (fully in-memory, no I/O)
+- Well-structured 3-layer architecture: `config/` constants → `fixtures/` implementations → `conftest.py` imports
+- Excellent mocking patterns with `AsyncMock`, `spec=` enforcement, and factory functions
+- Comprehensive fixture infrastructure: in-memory SQLite client, pre-built envelopes for all pipeline stages, mock implementations for all external dependencies
+- 16 custom pytest markers defined (unit, integration, e2e, requires_services, etc.)
+- Production-grade test configuration system with CI detection, service availability checking, configurable timeouts
 
 **Gaps & Concerns:**
-- **No integration tests present** — only unit tests exist in the current suite
-- **No gateway/API endpoint tests** — the FastAPI app, routers (chat, governance, interrupts) lack tests
-- **No WebSocket tests** — the `/ws` endpoint is untested
-- **No LLM provider tests** — LiteLLM, OpenAI HTTP providers lack dedicated tests
-- **No middleware tests** — rate limiting middleware is untested
-- **No observability tests** — metrics and tracing are untested
-- **No settings/config validation tests** — Pydantic validators are untested
+- **31% statement coverage** — over half the codebase has zero coverage
+- **Entire gateway API untested** — all HTTP endpoints, WebSocket, SSE (916 statements)
+- **All LLM providers untested** — factory, LiteLLM, OpenAI HTTP, even Mock provider (519 statements)
+- **No integration tests** — `mission_conftest.py` scaffolding exists but no test files use it
+- **No E2E tests** — 16 markers defined but none used in any test file
+- **No coverage enforcement** — no `.coveragerc`, no `fail_under` threshold, no CI gate
 - **No CI/CD pipeline** — no `.github/workflows/` or any CI configuration
-- **No coverage reporting** — no coverage thresholds or reports configured
-- **Test-to-code ratio:** 6,560 / 18,962 = 34.6% (test LOC / source LOC)
+- **Test infrastructure far exceeds test usage** — elaborate fixture/config system (7 config modules, 6 fixture modules, 16 markers) but only 10 test files
 
 ---
 
