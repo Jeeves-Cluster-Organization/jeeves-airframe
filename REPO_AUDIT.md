@@ -314,35 +314,60 @@ The `Envelope` is the master state container flowing through the pipeline:
 
 | ID | Severity | Finding | Location |
 |----|----------|---------|----------|
-| **S1** | **HIGH** | CORS allows all origins (`"*"`) by default | `gateway/app.py:63,216-221` |
-| **S2** | **HIGH** | WebSocket authentication disabled by default (`websocket_auth_required: False`) | `settings.py:140` |
-| **S3** | **MEDIUM** | Hardcoded default WebSocket auth token (`"local-dev-token"`) | `settings.py:139` |
-| **S4** | **MEDIUM** | WebSocket endpoint accepts connections without auth validation | `gateway/app.py:360` |
-| **S5** | **MEDIUM** | API endpoints lack authentication middleware | `gateway/routers/*` |
-| **S6** | **LOW** | Server binds to `0.0.0.0` by default | `settings.py:126` |
-| **S7** | **INFO** | No secrets in committed code — API keys are env-var sourced | `settings.py` |
-| **S8** | **INFO** | `.gitignore` properly excludes `.env`, `.venv`, credentials | `.gitignore` |
-| **S9** | **INFO** | Rate limiting delegated to Rust kernel (good separation) | `middleware/rate_limit.py` |
-| **S10** | **INFO** | No SQL injection risk — protocol-based DB abstraction | `database/` |
+| **S1** | **CRITICAL** | Hardcoded default WebSocket auth token (`"local-dev-token"`) with auth disabled | `settings.py:139-140` |
+| **S2** | **HIGH** | CORS allows all origins (`"*"`) with `allow_credentials=True` | `gateway/app.py:63,215-221` |
+| **S3** | **HIGH** | No HTTP authentication on any API endpoint — `user_id` from query param | `gateway/routers/chat.py:343` |
+| **S4** | **HIGH** | WebSocket `accept()` called before any token validation | `gateway/app.py:360-369` |
+| **S5** | **MEDIUM** | Raw exception messages exposed to HTTP clients via `detail=str(e)` | `gateway/routers/chat.py:384,489,525`, `governance.py:116,190,214` |
+| **S6** | **MEDIUM** | Rate limiting middleware exists but is NOT wired into the gateway | `middleware/rate_limit.py` (unused), `gateway/app.py` (not referenced) |
+| **S7** | **MEDIUM** | No request body size limit at framework level | `gateway/app.py` |
+| **S8** | **MEDIUM** | WebSocket has no per-message rate limiting (unbounded `while True` loop) | `gateway/app.py:379-408` |
+| **S9** | **MEDIUM** | No WebSocket Origin header validation during upgrade | `gateway/app.py:360` |
+| **S10** | **MEDIUM** | f-string table name interpolation in SQL query | `orchestrator/governance_service.py:274` |
+| **S11** | **MEDIUM** | Redis URL potentially logged with credentials | `redis/client.py:63` |
+| **S12** | **MEDIUM** | Dependencies use only lower version bounds (`>=`) — no upper bounds | `pyproject.toml` |
+| **S13** | **LOW** | Dynamic `__import__` from `JEEVES_CAPABILITIES` env var without validation | `capability_wiring.py:111` |
+| **S14** | **LOW** | No secrets file patterns (`.pem`, `.key`, `.cert`) in `.gitignore` | `.gitignore` |
+| **S15** | **LOW** | No schema validation on deserialized IPC msgpack payloads | `ipc/protocol.py:71` |
 
-### 8.2 Security Architecture
+### 8.2 Positive Security Findings
 
-- **Authentication:** Not implemented at the infrastructure level — assumed to be a capability/platform concern
-- **Authorization:** Tool access controls via `ToolAccess` enum (NONE/READ/WRITE/ALL) and `AgentToolAccessProtocol`
-- **Rate Limiting:** Delegated to Rust kernel via IPC — middleware extracts user identity and calls `check_rate_limit()`
-- **Input Validation:** Pydantic models for settings validation; JSON repair for LLM outputs
-- **Secrets Management:** Environment variables via pydantic-settings (`.env` file support)
+- No hardcoded API keys, tokens, or passwords in source code
+- No `.env` or key files ever committed to git history
+- No usage of `pickle`, `eval()`, `exec()`, `yaml.load`, or `os.system`
+- Parameterized SQL queries (`?` placeholders) used consistently in repositories
+- Pydantic models enforce input validation on API endpoints (min/max length, range bounds)
+- IPC frame size limit enforced (50MB max) in transport layer
+- WebSocketEventManager has idle timeout and heartbeat mechanisms
+- Tool executor validates parameters against schemas before execution
+- Settings loaded from environment via pydantic-settings (not hardcoded)
+- Interrupt endpoints verify user ownership before allowing access
+
+### 8.3 Security Architecture
+
+- **Authentication:** Not implemented at the infrastructure level — `user_id` is a trusted query parameter with no identity verification
+- **Authorization:** Tool access controls via `ToolAccess` enum (NONE/READ/WRITE/ALL) and `AgentToolAccessProtocol`; interrupt endpoints verify user ownership
+- **Rate Limiting:** `RateLimitMiddleware` exists and delegates to Rust kernel, but is **not wired** into the FastAPI middleware stack
+- **Input Validation:** Pydantic models for API inputs (message max 10,000 chars, user_id max 255 chars); tool parameter schema validation
+- **Secrets Management:** Environment variables via pydantic-settings (`.env` file support); no secrets in code
 - **Transport Security:** No TLS configuration for IPC (TCP+msgpack) — assumes trusted network
-- **CORS:** Configurable via `CORS_ORIGINS` env var, but defaults to wildcard `*`
+- **CORS:** Configurable via `CORS_ORIGINS` env var, but defaults to wildcard `*` with credentials enabled
+- **Serialization:** Safe formats only (JSON, msgpack) — no pickle/eval/yaml.load
 
-### 8.3 Recommendations
+### 8.4 Recommendations (Priority Order)
 
-1. **Set restrictive CORS defaults** — change `CORS_ORIGINS` default from `"*"` to specific origins
-2. **Enable WebSocket auth by default** — flip `websocket_auth_required` to `True`
-3. **Remove hardcoded dev token** — require explicit configuration of `websocket_auth_token`
-4. **Add authentication middleware** — implement token/JWT validation at the gateway level
-5. **Add TLS for IPC** — consider TLS for TCP+msgpack transport in production
-6. **Add request size limits** — no max request body size configured for the gateway
+1. **Wire rate limiting middleware** — `RateLimitMiddleware` exists but is not added to the FastAPI app
+2. **Add HTTP authentication middleware** — implement JWT/API key validation; derive `user_id` from token, not query param
+3. **Fix CORS defaults** — change from `"*"` to explicit origins; remove `allow_credentials=True` unless needed
+4. **Fix WebSocket auth** — validate token BEFORE `accept()`; enable `websocket_auth_required` by default; remove hardcoded dev token
+5. **Sanitize error responses** — return generic messages to clients; log full exceptions server-side only
+6. **Add request size limits** — configure uvicorn `--limit-max-request-line` or add ASGI middleware
+7. **Add WebSocket protections** — per-message rate limiting, Origin header validation, max message size
+8. **Sanitize logged URLs** — strip credentials from Redis URLs before logging
+9. **Validate dynamic imports** — allowlist module paths in `capability_wiring.py`
+10. **Add dependency upper bounds** — pin versions to prevent unvetted major upgrades; run `pip-audit` regularly
+11. **Add TLS for IPC** — consider TLS for TCP+msgpack transport in production
+12. **Add secrets file patterns to .gitignore** — `.pem`, `.key`, `.cert`, `credentials.json`
 
 ---
 
@@ -493,24 +518,30 @@ This is a well-designed plugin architecture that keeps the infrastructure layer 
 ## 15. Summary of Risks & Recommendations
 
 ### Critical (Address Before Production)
-1. **Add CI/CD pipeline** — no automated tests, linting, or type checking on push
-2. **Fix CORS default** — wildcard `*` is unsafe for production
-3. **Enable WebSocket authentication** — currently accepts all connections
-4. **Add API authentication middleware** — endpoints are unprotected
+1. **Wire rate limiting middleware** — `RateLimitMiddleware` exists but is not added to the gateway
+2. **Add HTTP authentication middleware** — endpoints accept arbitrary `user_id` from query params
+3. **Fix CORS default** — wildcard `*` with `allow_credentials=True` is unsafe
+4. **Fix WebSocket security** — auth before `accept()`, remove hardcoded dev token, validate Origin
+5. **Add CI/CD pipeline** — no automated tests, linting, or type checking on push
 
 ### High Priority
-5. **Add integration tests** — gateway, routers, WebSocket endpoints are untested
-6. **Add Dockerfile** — no containerization for deployment
-7. **Add coverage thresholds** — establish and enforce minimum coverage
-8. **Add dependency scanning** — no Dependabot/Snyk/safety checks
+6. **Sanitize error responses** — raw exception messages leak internal details to clients
+7. **Add integration tests** — gateway, routers, WebSocket endpoints are untested
+8. **Add Dockerfile** — no containerization for deployment
+9. **Add coverage thresholds** — establish and enforce minimum coverage
+10. **Add dependency scanning** — no Dependabot/Snyk/safety checks; run `pip-audit`
 
 ### Medium Priority
-9. **Add pre-commit hooks** — automate Black/Ruff/mypy on commit
-10. **Add request size limits** — no max body size on API endpoints
-11. **Establish release process** — no tags, no CHANGELOG, no versioning strategy
-12. **Add IPC transport security** — TCP+msgpack has no TLS
+11. **Add request body size limits** — no max body size on API endpoints
+12. **Add WebSocket protections** — per-message rate limiting, max message size
+13. **Add pre-commit hooks** — automate Black/Ruff/mypy on commit
+14. **Pin dependency upper bounds** — only lower bounds (`>=`) currently specified
+15. **Sanitize logged URLs** — Redis URLs may contain credentials
+16. **Establish release process** — no tags, no CHANGELOG, no versioning strategy
+17. **Add IPC transport security** — TCP+msgpack has no TLS
 
 ### Low Priority
-13. **Add CONTRIBUTING.md** — development workflow documentation
-14. **Add API rate limiting tests** — rate limit middleware is untested
-15. **Consider removing global settings singleton** — prefer full DI via AppContext
+18. **Validate dynamic imports** — allowlist module paths in `capability_wiring.py`
+19. **Add secrets file patterns to .gitignore** — `.pem`, `.key`, `.cert`
+20. **Add CONTRIBUTING.md** — development workflow documentation
+21. **Consider removing global settings singleton** — prefer full DI via AppContext
