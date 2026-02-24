@@ -381,7 +381,7 @@ async def send_message(
         raise
     except Exception as e:
         _logger.error("chat_message_failed", error=str(e), user_id=user_id)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/stream")
@@ -432,7 +432,7 @@ async def stream_chat(
 
         except Exception as e:
             _logger.error("chat_stream_error", error=str(e))
-            yield stream.error(str(e))
+            yield stream.error("Internal server error")
 
     return StreamingResponse(
         merge_sse_streams(event_generator()),
@@ -486,7 +486,7 @@ async def create_session(
         )
     except Exception as e:
         _logger.error("create_session_failed", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/sessions", response_model=SessionListResponse)
@@ -522,7 +522,7 @@ async def list_sessions(
         return SessionListResponse(sessions=sessions, total=result.get("total", len(sessions)))
     except Exception as e:
         _logger.error("list_sessions_failed", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/sessions/{session_id}", response_model=SessionResponse)
@@ -581,7 +581,7 @@ async def get_session_messages(
         return MessageListResponse(messages=messages, total=result.get("total", len(messages)))
     except Exception as e:
         _logger.error("get_session_messages_failed", error=str(e), session_id=session_id)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.delete("/sessions/{session_id}", status_code=204)
@@ -602,4 +602,4 @@ async def delete_session(
         raise
     except Exception as e:
         _logger.error("delete_session_failed", error=str(e), session_id=session_id)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")

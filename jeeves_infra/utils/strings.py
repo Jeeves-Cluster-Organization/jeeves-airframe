@@ -1,6 +1,17 @@
 """String manipulation utilities."""
 
+import re
 from typing import List, Union
+
+
+def redact_url(url: str) -> str:
+    """Redact credentials from a URL for safe logging.
+
+    redis://:secret@host:6379/0  →  redis://***@host:6379/0
+    redis://user:pass@host:6379  →  redis://***@host:6379
+    redis://host:6379            →  redis://host:6379  (no change)
+    """
+    return re.sub(r"://[^@]+@", "://***@", url)
 
 
 def normalize_string_list(value: Union[str, List[str], None]) -> List[str]:

@@ -15,7 +15,7 @@ Per-Agent Configuration:
 """
 
 import re
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List, Optional, TYPE_CHECKING
 
@@ -136,7 +136,7 @@ class Settings(BaseSettings):
     # =========================================================================
     # WEBSOCKET CONFIGURATION
     # =========================================================================
-    websocket_auth_token: str = "local-dev-token"
+    websocket_auth_token: str = ""
     websocket_auth_required: bool = False
     websocket_heartbeat_interval: float = Field(default=30.0, ge=1.0, le=300.0)
     websocket_idle_timeout: float = Field(default=120.0, ge=10.0, le=3600.0)
@@ -201,6 +201,15 @@ class Settings(BaseSettings):
         if not v.startswith(('redis://', 'rediss://')):
             raise ValueError(f"Invalid Redis URL: {v}. Must start with redis:// or rediss://")
         return v
+
+    @model_validator(mode='after')
+    def validate_websocket_auth(self) -> 'Settings':
+        """Enforce that a token is set when WebSocket auth is required."""
+        if self.websocket_auth_required and not self.websocket_auth_token:
+            raise ValueError(
+                "WEBSOCKET_AUTH_TOKEN must be set when websocket_auth_required=True"
+            )
+        return self
 
     model_config = SettingsConfigDict(
         env_file=".env",

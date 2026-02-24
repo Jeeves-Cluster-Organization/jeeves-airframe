@@ -17,6 +17,7 @@ from datetime import datetime, timedelta
 
 from jeeves_infra.logging import get_current_logger
 from jeeves_infra.protocols import LoggerProtocol
+from jeeves_infra.utils.strings import redact_url
 
 
 class RedisClient:
@@ -60,7 +61,7 @@ class RedisClient:
             await self.redis.ping()
             self._connected = True
 
-            self._logger.info("redis_connected", url=self.redis_url)
+            self._logger.info("redis_connected", url=redact_url(self.redis_url))
 
         except ImportError:
             self._logger.error(
@@ -69,7 +70,7 @@ class RedisClient:
             )
             raise
         except Exception as e:
-            self._logger.error("redis_connection_failed", error=str(e), url=self.redis_url)
+            self._logger.error("redis_connection_failed", error=str(e), url=redact_url(self.redis_url))
             raise
 
     async def disconnect(self):

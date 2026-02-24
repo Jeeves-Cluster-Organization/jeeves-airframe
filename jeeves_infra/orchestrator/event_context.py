@@ -196,10 +196,10 @@ class EventContext:
     async def emit_tool_started(
         self,
         tool_name: str,
+        agent_name: str,
         params: Optional[Dict[str, Any]] = None,
         step_number: Optional[int] = None,
         total_steps: Optional[int] = None,
-        agent_name: str,
         **payload,
     ) -> None:
         """
@@ -236,11 +236,11 @@ class EventContext:
     async def emit_tool_completed(
         self,
         tool_name: str,
+        agent_name: str,
         status: str = "success",
         execution_time_ms: Optional[int] = None,
         error: Optional[str] = None,
         error_type: Optional[str] = None,
-        agent_name: str,
     ) -> Optional[str]:
         """
         Emit tool execution completed event to both systems.

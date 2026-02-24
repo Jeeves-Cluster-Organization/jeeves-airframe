@@ -49,7 +49,19 @@ class RateLimitMiddleware:
 
         user_id = self._extract_user_id(request)
 
-        result = await self._kernel_client.check_rate_limit(user_id, endpoint)
+        try:
+            result = await self._kernel_client.check_rate_limit(user_id, endpoint)
+        except Exception as exc:
+            if self._logger:
+                self._logger.error("rate_limit_check_failed", user_id=user_id, endpoint=endpoint, error=str(exc))
+            try:
+                from starlette.responses import JSONResponse
+                return JSONResponse(
+                    status_code=503,
+                    content={"error": "rate_limit_unavailable", "detail": "Rate limiting service is unavailable"},
+                )
+            except ImportError:
+                return {"status_code": 503, "error": "rate_limit_unavailable"}
 
         if result.get("exceeded", False):
             if self._logger:

@@ -78,8 +78,6 @@ from .endpoints import (
     TEST_API_HOST,
     TEST_API_PORT,
     TEST_API_BASE_URL,
-    # WebSocket
-    TEST_WEBSOCKET_URL,
     # Helpers
     get_llamaserver_url,
     get_api_url,
@@ -269,7 +267,6 @@ __all__ = [
     "TEST_API_HOST",
     "TEST_API_PORT",
     "TEST_API_BASE_URL",
-    "TEST_WEBSOCKET_URL",
     "get_llamaserver_url",
     "get_api_url",
     # Thresholds (v4.2)

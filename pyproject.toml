@@ -24,38 +24,38 @@ classifiers = [
 
 dependencies = [
     # IPC transport for kernel communication (Rust kernel via TCP+msgpack)
-    "msgpack>=1.0.0",
+    "msgpack>=1.0.0,<2",
     # HTTP client (used by LLM providers and health probes)
-    "httpx>=0.25.0",
+    "httpx>=0.25.0,<1",
     # Data validation
-    "pydantic>=2.0.0",
-    "pydantic-settings>=2.0.0",
+    "pydantic>=2.0.0,<3",
+    "pydantic-settings>=2.0.0,<3",
     # Structured logging
-    "structlog>=23.0.0",
+    "structlog>=23.0.0,<25",
 ]
 
 [project.optional-dependencies]
 gateway = [
-    "fastapi>=0.109.0",
-    "uvicorn>=0.27.0",
-    "websockets>=12.0",
-    "sse-starlette>=1.6.0",
+    "fastapi>=0.109.0,<1",
+    "uvicorn>=0.27.0,<1",
+    "websockets>=12.0,<14",
+    "sse-starlette>=1.6.0,<3",
 ]
 redis = [
-    "redis>=5.0.0",
+    "redis>=5.0.0,<6",
 ]
 llm = [
-    "litellm>=1.0.0",
-    "tiktoken>=0.5.0",
+    "litellm>=1.0.0,<2",
+    "tiktoken>=0.5.0,<1",
 ]
 dev = [
-    "pytest>=7.0.0",
-    "pytest-asyncio>=0.21.0",
-    "pytest-cov>=4.0.0",
-    "aiosqlite>=0.19.0",
-    "black>=23.0.0",
-    "ruff>=0.1.0",
-    "mypy>=1.0.0",
+    "pytest>=7.0.0,<9",
+    "pytest-asyncio>=0.21.0,<1",
+    "pytest-cov>=4.0.0,<6",
+    "aiosqlite>=0.19.0,<1",
+    "black>=23.0.0,<25",
+    "ruff>=0.1.0,<1",
+    "mypy>=1.0.0,<2",
 ]
 all = [
     "jeeves-infra[gateway,redis,llm]",
@@ -80,6 +80,20 @@ select = ["E", "F", "I", "UP"]
 python_version = "3.11"
 warn_return_any = true
 warn_unused_ignores = true
+
+[tool.coverage.run]
+source = ["jeeves_infra"]
+omit = ["jeeves_infra/**/test_*", "jeeves_infra/**/*_test.py"]
+
+[tool.coverage.report]
+fail_under = 40
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.",
+    "@abstractmethod",
+    "raise NotImplementedError",
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

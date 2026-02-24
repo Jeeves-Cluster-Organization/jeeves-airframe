@@ -23,20 +23,14 @@ import time
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi import Request
-import json
 from prometheus_client import make_asgi_app
 
-from jeeves_infra.gateway.websocket import (
-    register_client,
-    unregister_client,
-    setup_websocket_subscriptions,
-)
 from jeeves_infra.logging import get_current_logger
 from jeeves_infra.protocols import get_capability_resource_registry
 from jeeves_infra.observability.tracing import init_tracing, instrument_fastapi, shutdown_tracing
@@ -60,7 +54,11 @@ class GatewayConfig:
         self.orchestrator_port = int(os.getenv("ORCHESTRATOR_PORT", "50051"))
         self.api_host = os.getenv("API_HOST", "0.0.0.0")
         self.api_port = int(os.getenv("API_PORT", "8000"))
-        self.cors_origins = os.getenv("CORS_ORIGINS", "*").split(",")
+        self.cors_origins = os.getenv(
+            "CORS_ORIGINS", "http://localhost:8000,http://localhost:3000"
+        ).split(",")
+        self.allow_credentials = True
+        self.max_request_body_bytes = int(os.getenv("MAX_REQUEST_BODY_BYTES", str(1 * 1024 * 1024)))
         self.debug = os.getenv("DEBUG", "false").lower() == "true"
 
 
@@ -118,33 +116,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 await ctx.kernel_client._transport.connect()
                 _logger.info("kernel_transport_connected")
 
-                # Start kernel event bridge (CommBus → EventBridge → WebSocket)
-                try:
-                    from jeeves_infra.events.aggregator import KernelEventAggregator
-                    from jeeves_infra.events.bridge import EventBridge
-                    from jeeves_infra.gateway.websocket import broadcast_to_clients
-
-                    class _BroadcastAdapter:
-                        """Adapter: EventBridge calls broadcast(type, data) →
-                        broadcast_to_clients({"event": type, "payload": data})."""
-                        async def broadcast(self, event_type: str, payload: dict) -> None:
-                            await broadcast_to_clients({"event": event_type, "payload": payload})
-
-                    aggregator = KernelEventAggregator(ctx.kernel_client)
-                    bridge = EventBridge(aggregator, _BroadcastAdapter(), _logger)
-                    await aggregator.start()
-                    bridge.start()
-                    app.state.event_bridge = bridge
-                    app.state.event_aggregator = aggregator
-                    _logger.info("kernel_event_bridge_started")
-                except Exception as e:
-                    _logger.warning("kernel_event_bridge_failed", error=str(e),
-                                    hint="Kernel events will not stream to frontend")
-
-        # Setup event bus subscriptions for WebSocket broadcasting
-        await setup_websocket_subscriptions()
-        _logger.info("websocket_subscriptions_configured")
-
         _logger.info("gateway_startup_complete", status="READY")
         yield
 
@@ -154,19 +125,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     finally:
         _logger.info("gateway_shutdown_initiated")
-
-        # Stop kernel event bridge
-        if hasattr(app.state, "event_bridge"):
-            try:
-                app.state.event_bridge.stop()
-            except Exception as e:
-                _logger.warning("event_bridge_stop_error", error=str(e))
-        if hasattr(app.state, "event_aggregator"):
-            try:
-                await app.state.event_aggregator.stop()
-                _logger.info("kernel_event_bridge_stopped")
-            except Exception as e:
-                _logger.warning("event_aggregator_stop_error", error=str(e))
 
         # Graceful shutdown of async resources
         ctx = getattr(app.state, "context", None)
@@ -211,14 +169,25 @@ app = FastAPI(
 # Instrument FastAPI with OpenTelemetry
 instrument_fastapi(app)
 
-# CORS middleware
+# CORS middleware — reject wildcard + credentials (insecure combination)
+if "*" in config.cors_origins and config.allow_credentials:
+    raise ValueError(
+        "CORS wildcard ('*') with allow_credentials=True is forbidden. "
+        "Set CORS_ORIGINS to explicit origins or disable credentials."
+    )
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=config.cors_origins,
-    allow_credentials=True,
+    allow_credentials=config.allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Request body size limit (1 MB default, override via MAX_REQUEST_BODY_BYTES)
+from jeeves_infra.middleware.body_limit import BodyLimitMiddleware
+
+app.add_middleware(BodyLimitMiddleware, max_bytes=config.max_request_body_bytes)
 
 # Metrics middleware
 from jeeves_infra.observability.metrics import record_http_request
@@ -349,69 +318,6 @@ app.include_router(interrupts.router, prefix="/api/v1", tags=["interrupts"])
 # Mount Prometheus metrics endpoint
 metrics_app = make_asgi_app()
 app.mount("/metrics", metrics_app)
-
-
-# =============================================================================
-# WebSocket Support
-# =============================================================================
-
-
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket, token: str = None):
-    """
-    WebSocket endpoint for real-time communication.
-
-    The frontend connects here for real-time updates.
-    Messages are JSON with format: {"event": "...", "payload": {...}}
-    """
-    _logger = get_current_logger()
-    await websocket.accept()
-    client_count = register_client(websocket)
-    _logger.info("websocket_connected", client_count=client_count)
-
-    try:
-        # Send connection confirmation
-        await websocket.send_json({
-            "event": "connected",
-            "payload": {"message": "WebSocket connected successfully"}
-        })
-
-        while True:
-            try:
-                # Receive message from client
-                data = await websocket.receive_json()
-                msg_type = data.get("type", "unknown")
-                payload = data.get("payload", {})
-
-                _logger.debug("websocket_message", type=msg_type)
-
-                # Handle different message types
-                if msg_type == "ping":
-                    await websocket.send_json({"event": "pong", "payload": {}})
-                elif msg_type == "subscribe":
-                    await websocket.send_json({
-                        "event": "subscribed",
-                        "payload": {"channel": payload.get("channel", "default")}
-                    })
-                else:
-                    await websocket.send_json({
-                        "event": "ack",
-                        "payload": {"received": msg_type}
-                    })
-
-            except WebSocketDisconnect:
-                break
-            except json.JSONDecodeError:
-                await websocket.send_json({
-                    "event": "error",
-                    "payload": {"message": "Invalid JSON"}
-                })
-
-    except Exception as e:
-        _logger.error("websocket_error", error=str(e))
-    finally:
-        client_count = unregister_client(websocket)
-        _logger.info("websocket_disconnected", client_count=client_count)
 
 
 # =============================================================================

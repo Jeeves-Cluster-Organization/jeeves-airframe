@@ -10,6 +10,7 @@ from jeeves_infra.settings import Settings
 from jeeves_infra.feature_flags import get_feature_flags
 from jeeves_infra.logging import get_current_logger
 from jeeves_infra.protocols import LoggerProtocol
+from jeeves_infra.utils.strings import redact_url
 
 
 class StateBackend:
@@ -183,7 +184,7 @@ class RedisStateBackend(StateBackend):
 
         self._logger = logger or get_current_logger()
         self.redis = get_redis_client(redis_url)
-        self._logger.info("state_backend_initialized", backend="redis", url=redis_url)
+        self._logger.info("state_backend_initialized", backend="redis", url=redact_url(redis_url))
 
     async def rate_limit_check(
         self,
@@ -280,7 +281,7 @@ class ConnectionManager:
                 "initializing_state_backend",
                 mode="distributed",
                 backend="redis",
-                url=redis_url
+                url=redact_url(redis_url)
             )
 
             self._backend = RedisStateBackend(redis_url, logger=self._logger)
