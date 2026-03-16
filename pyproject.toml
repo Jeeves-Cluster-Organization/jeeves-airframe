@@ -4,10 +4,19 @@ build-backend = "hatchling.build"
 
 [project]
 name = "jeeves-airframe"
-version = "0.1.0"
+version = "0.0.2"
 description = "Pipeline training data generator for jeeves-core — trajectory collection, reward scoring, dataset export (SFT/DPO/GRPO)"
 requires-python = ">=3.11"
 license = {file = "LICENSE"}
+readme = "README.md"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
     "pydantic>=2.0",
     "jsonschema>=4.0",
@@ -20,7 +29,12 @@ dev = [
     "pytest>=7.0",
     "pytest-asyncio>=0.21",
     "ruff>=0.1",
+    "pre-commit>=3.0",
 ]
+
+[project.urls]
+Repository = "https://github.com/Jeeves-Cluster-Organization/jeeves-airframe"
+Changelog = "https://github.com/Jeeves-Cluster-Organization/jeeves-airframe/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/jeeves_airframe"]
@@ -28,6 +42,9 @@ packages = ["src/jeeves_airframe"]
 [tool.ruff]
 target-version = "py311"
 line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
