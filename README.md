@@ -1,67 +1,65 @@
 # jeeves-airframe
 
-Pipeline training data generator for [jeeves-core](https://github.com/Jeeves-Cluster-Organization/jeeves-core).
+Pipeline training data generator for [jeeves-core](https://github.com/Jeeves-Cluster-Organization/jeeves-core). Rust crate with PyO3 bindings.
 
 Captures pipeline execution trajectories, scores them with composable reward functions, and exports SFT/DPO/GRPO datasets for SLM finetuning.
 
 ## Architecture
 
 ```
-Pipeline runs (jeeves-core, strong LLMs)
-  → Trajectory collection (airframe)
-    → Reward scoring (airframe)
-      → Dataset export (SFT / DPO / GRPO)
+Pipeline runs (jeeves-core PipelineRunner)
+  → TrajectoryCollector (Rust, typed mpsc::Receiver<PipelineEvent>)
+    → RewardFn scoring (Rust trait, composable)
+      → Dataset export (SFT / DPO / GRPO — serde JSONL)
         → Training (consumer's choice: TRL, SkyRL, etc.)
 ```
 
-This package is a **data generator**, not a training framework. It owns capture and formatting — consumers own model training.
+Airframe consumes `PipelineEvent` directly from jeeves-core — no JSON serialization roundtrip. The Python boundary exists only at the PyO3 edge.
 
-## Installation
+## Rust Usage
 
-```bash
-pip install -e "."          # Core
-pip install -e ".[dev]"     # + pytest, ruff
-pip install -e ".[hf]"     # + HuggingFace datasets export
+```rust
+use jeeves_core::prelude::PipelineRunner;
+use jeeves_airframe::trajectory::TrajectoryCollector;
+use jeeves_airframe::reward::TokenEfficiencyReward;
+use jeeves_airframe::dataset::SftBuilder;
+
+let runner = PipelineRunner::from_json("pipeline.json", "prompts/", None).await?;
+let reward = Box::new(TokenEfficiencyReward::new(2000, 1.0));
+let collector = TrajectoryCollector::new(Some(reward), false);
+let trajectory = collector.collect(&runner, "hello", "user1").await?;
+
+let mut sft = SftBuilder::new(Some(0.8), None, None);
+sft.add_trajectory(&trajectory);
+sft.export_jsonl(Path::new("sft.jsonl"))?;
 ```
 
-## Quick Start
+## Python Usage
 
 ```python
 from jeeves_core import PipelineRunner
-from jeeves_airframe.trajectory import TrajectoryCollector, TrajectoryStore
-from jeeves_airframe.reward import WeightedReward, SchemaComplianceReward, TokenEfficiencyReward
-from jeeves_airframe.dataset import SftBuilder
+from jeeves_airframe import TrajectoryCollector, TrajectoryStore, SftBuilder
 
-# 1. Collect trajectories from pipeline runs
-runner = PipelineRunner.from_json("pipeline.json", prompts_dir="prompts/")
-collector = TrajectoryCollector(reward_fn=WeightedReward({
-    "schema": (SchemaComplianceReward({"type": "object", "required": ["intent"]}), 2.0),
-    "efficiency": (TokenEfficiencyReward(budget=2000), 0.5),
-}))
+runner = PipelineRunner.from_json("pipeline.json", "prompts/")
+collector = TrajectoryCollector()
+trajectory = collector.collect(runner, "hello")
 
-trajectory = collector.collect(runner, "Hello, can you help me?")
-
-# 2. Persist
-store = TrajectoryStore("trajectories/runs.jsonl")
+store = TrajectoryStore("runs.jsonl")
 store.save(trajectory)
-
-# 3. Build SFT dataset from high-quality runs
-sft = SftBuilder(min_reward=0.8, include_stages=["respond"])
-sft.add_trajectories(store.load())
-sft.export_jsonl("datasets/sft.jsonl")
 ```
 
 ## Modules
 
 ### `trajectory/` — Pipeline event capture
 
-- **`TrajectoryCollector`** — Consumes `PipelineRunner.stream()`, builds structured `Trajectory` objects with per-stage `Step` and `StageTrace` data
-- **`TrajectoryStore`** — Append-only JSONL persistence with filtered loading
-- Types: `Trajectory`, `Step`, `StageTrace`, `ToolResult`, `RoutingDecision` (all frozen dataclasses with immutable containers)
+- **`TrajectoryCollector`** — Consumes typed `mpsc::Receiver<PipelineEvent>`, builds `Trajectory`
+- **`TrajectoryStore`** — JSONL persistence via serde + BufWriter
+- Types: `Trajectory`, `Step`, `StageTrace`, `StepAction`, `ToolEvent`
+- Reuses jeeves-core types: `ToolCallResult`, `RoutingReason`, `StageMetrics`, `AggregateMetrics`
 
 ### `reward/` — Composable reward scoring
 
-All implement the `RewardFn` protocol. Combine with `CompositeReward` (sum) or `WeightedReward` (weighted + breakdown).
+All implement the `RewardFn` trait. Combine with `CompositeReward` or `WeightedReward`.
 
 | Reward | Signal |
 |--------|--------|
@@ -69,39 +67,40 @@ All implement the `RewardFn` protocol. Combine with `CompositeReward` (sum) or `
 | `TokenEfficiencyReward` | `-alpha * (tokens_in + tokens_out) / budget` |
 | `LatencyReward` | `-beta * duration_ms / target_ms` |
 | `ToolSuccessRateReward` | `successful_tools / total_tools` |
-| `CustomReward` | Wraps any `Callable[[Step], float]` |
+| `CallableRewardFn` | Wraps any `Fn(&Step) -> f64` |
 
 ### `dataset/` — Training dataset export
 
 | Builder | Format | Use Case |
 |---------|--------|----------|
-| `SftBuilder` | `{"messages": [...]}` | Supervised finetuning from good trajectories |
-| `DpoBuilder` | `{"prompt": ..., "chosen": ..., "rejected": ...}` | Preference learning from trajectory pairs |
-| `GrpoBuilder` | `{"prompt": ..., "completions": [...], "rewards": [...]}` | Group relative policy optimization |
-
-All export JSONL. Optional Parquet and HuggingFace `datasets` export via `jeeves_airframe.dataset.export`.
+| `SftBuilder` | `{"messages": [...]}` | Supervised finetuning |
+| `DpoBuilder` | `{"prompt", "chosen", "rejected"}` | Preference learning |
+| `GrpoBuilder` | `{"prompt", "completions", "rewards"}` | Group relative policy optimization |
 
 ### `eval/` — Model comparison
 
-- **`EvalHarness`** — Run a pipeline against an eval dataset, collect per-stage metrics and reward stats
-- **`ModelComparison`** — Baseline vs candidate: reward delta, win rate, per-stage metric diff
+- **`EvalHarness`** — Run pipeline against eval dataset, collect per-stage metrics
+- **`ModelComparison`** — Baseline vs candidate: reward delta, win rate
 
-## jeeves-core API Surface
-
-Airframe consumes only the existing Python API — no kernel changes required:
-
-| API | Used By |
-|-----|---------|
-| `runner.stream(input)` | `TrajectoryCollector` |
-| `runner.run(input)` | `EvalHarness` |
-| `runner.describe_pipeline()` | Observation context |
-| `PipelineRunner.get_schema()` | `SchemaComplianceReward` |
-
-## Testing
+## Build
 
 ```bash
-pytest tests/ -v    # 71 tests
+# Rust library
+cargo test                          # 30 tests
+cargo clippy --all-features         # Lint
+
+# Python module (PyO3)
+pip install -e .                    # Build via maturin
+python -c "from jeeves_airframe import TrajectoryCollector"
 ```
+
+## Feature Flags
+
+| Feature | Dependencies | Purpose |
+|---------|-------------|---------|
+| `py-bindings` | pyo3 | Python importable module |
+
+Default: none. `cargo test` uses rlib only. `pip install -e .` activates `py-bindings`.
 
 ## License
 

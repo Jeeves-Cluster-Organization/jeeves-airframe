@@ -2,14 +2,22 @@
 
 ## 0.0.2 — 2026-03-17
 
-Complete rewrite. Replaced jeeves-infra (Python gateway/orchestration layer, superseded by Rust kernel) with jeeves-airframe (pipeline training data generator).
+Complete rewrite: Rust crate with PyO3 bindings (matching jeeves-core's architecture).
+
+### Changed
+- **Rewritten in Rust** — all modules now Rust with typed PipelineEvent consumption
+- Types reuse jeeves-core directly: `ToolCallResult`, `RoutingReason`, `StageMetrics`, `AggregateMetrics`
+- `TrajectoryCollector` consumes `mpsc::Receiver<PipelineEvent>` — zero JSON serialization
+- PyO3 bindings behind `py-bindings` feature flag (same pattern as jeeves-core)
+- Build via maturin: `pip install -e .`
 
 ### Added
-- `trajectory/` — `TrajectoryCollector`, `TrajectoryStore`, frozen dataclass types (`Trajectory`, `Step`, `StageTrace`, `ToolResult`, `RoutingDecision`)
-- `reward/` — `RewardFn` protocol, `CompositeReward`, `WeightedReward`, built-in rewards: `SchemaComplianceReward`, `TokenEfficiencyReward`, `LatencyReward`, `ToolSuccessRateReward`, `CustomReward`
-- `dataset/` — `SftBuilder`, `DpoBuilder`, `GrpoBuilder` with JSONL export, optional Parquet/HF
-- `eval/` — `EvalHarness`, `EvalResult`, `EvalDataset`, `ModelComparison`
-- 71 tests covering all modules
+- `trajectory/` — `TrajectoryCollector`, `TrajectoryStore`, typed `Trajectory`/`Step`/`StageTrace`
+- `reward/` — `RewardFn` trait, `CompositeReward`, `WeightedReward`, built-in rewards
+- `dataset/` — `SftBuilder`, `DpoBuilder`, `GrpoBuilder` with JSONL export
+- `eval/` — `EvalHarness`, `EvalResult`, `ModelComparison`
+- `python/` — PyO3 module with `PyRewardFn` bridge (Python callable → Rust trait)
+- 30 Rust integration tests + 1 doc-test
 
 ### Removed
-- Entire jeeves-infra package (gateway, LLM providers, database, redis, middleware, etc.)
+- Previous Python implementation (replaced by Rust)

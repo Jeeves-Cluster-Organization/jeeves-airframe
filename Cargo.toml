@@ -1,0 +1,33 @@
+[package]
+name = "jeeves-airframe"
+version = "0.0.2"
+edition = "2021"
+rust-version = "1.75"
+description = "Pipeline training data generator for jeeves-core — trajectory collection, reward scoring, dataset export (SFT/DPO/GRPO)"
+license = "Apache-2.0"
+
+[lib]
+name = "jeeves_airframe"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+jeeves-core = { path = "../jeeves-core", default-features = false }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+tokio = { version = "1", features = ["sync", "rt"] }
+jsonschema = "0.28"
+thiserror = "2"
+
+# PyO3 (conditional)
+pyo3 = { version = "0.22", features = ["multiple-pymethods"], optional = true }
+
+[features]
+default = []
+py-bindings = ["dep:pyo3", "pyo3/extension-module", "jeeves-core/py-bindings"]
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
+tempfile = "3"
+futures = "0.3"

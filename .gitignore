@@ -74,6 +74,10 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+# Rust
+target/
+Cargo.lock
+
 # Project specific
 *.log
 .local/

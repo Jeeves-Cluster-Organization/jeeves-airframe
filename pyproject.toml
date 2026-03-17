@@ -1,11 +1,11 @@
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
 
 [project]
 name = "jeeves-airframe"
 version = "0.0.2"
-description = "Pipeline training data generator for jeeves-core — trajectory collection, reward scoring, dataset export (SFT/DPO/GRPO)"
+description = "Pipeline training data generator for jeeves-core"
 requires-python = ">=3.11"
 license = {file = "LICENSE"}
 readme = "README.md"
@@ -15,36 +15,21 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Rust",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
-]
-dependencies = [
-    "pydantic>=2.0",
-    "jsonschema>=4.0",
 ]
 
 [project.optional-dependencies]
-hf = ["datasets>=2.0"]
-eval = ["tabulate>=0.9"]
-dev = [
-    "pytest>=7.0",
-    "pytest-asyncio>=0.21",
-    "ruff>=0.1",
-    "pre-commit>=3.0",
-]
+dev = ["pytest>=7.0"]
 
 [project.urls]
 Repository = "https://github.com/Jeeves-Cluster-Organization/jeeves-airframe"
 Changelog = "https://github.com/Jeeves-Cluster-Organization/jeeves-airframe/blob/main/CHANGELOG.md"
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/jeeves_airframe"]
-
-[tool.ruff]
-target-version = "py311"
-line-length = 120
-
-[tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM"]
+[tool.maturin]
+features = ["py-bindings"]
+module-name = "jeeves_airframe"
+bindings = "pyo3"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
