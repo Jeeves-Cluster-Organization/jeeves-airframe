@@ -6,7 +6,9 @@ use serde::Serialize;
 
 use crate::eval::harness::EvalResult;
 
-/// Compare two EvalResults side-by-side.
+/// Side-by-side comparison of baseline vs candidate EvalResults.
+///
+/// Reports reward delta, win rate, tie rate, and per-stage metric deltas.
 #[derive(Debug, Serialize)]
 pub struct ModelComparison {
     pub baseline_mean_reward: f64,

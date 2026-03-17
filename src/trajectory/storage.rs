@@ -6,7 +6,10 @@ use std::path::{Path, PathBuf};
 
 use crate::trajectory::types::Trajectory;
 
-/// Append-only JSONL store for trajectories.
+/// Append-only JSONL store for trajectory persistence.
+///
+/// Uses serde_json + BufWriter for efficient serialization.
+/// Supports save, batch save, load, filtered load, and count.
 #[derive(Debug)]
 pub struct TrajectoryStore {
     path: PathBuf,

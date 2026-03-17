@@ -8,7 +8,10 @@ use crate::reward::RewardFn;
 use crate::trajectory::{Trajectory, TrajectoryCollector};
 use jeeves_core::worker::runner::PipelineRunner;
 
-/// Results from evaluating a pipeline on a dataset.
+/// Results from evaluating a pipeline on an eval dataset.
+///
+/// Contains per-trajectory data, reward statistics, per-stage metric
+/// averages, and aggregate pipeline metrics.
 #[derive(Debug, Clone, Serialize)]
 pub struct EvalResult {
     pub reward_stats: RewardStats,
@@ -27,7 +30,9 @@ pub struct RewardStats {
     pub max: f64,
 }
 
-/// Run a pipeline against an eval dataset, collect trajectories and metrics.
+/// Runs a pipeline against an eval dataset, collecting trajectories and metrics.
+///
+/// Uses `TrajectoryCollector` internally to capture typed events.
 #[derive(Debug)]
 pub struct EvalHarness {
     collector: TrajectoryCollector,
